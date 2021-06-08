@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/scripts/vcpkg.schema.json",
+  "name": "dx12scrap",
+  "version": "20210606",
+  "dependencies": [
+    "glm",
+    "sdl2"
+  ]
+}
