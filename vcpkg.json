@@ -3,7 +3,9 @@
   "name": "dx12scrap",
   "version": "20210606",
   "dependencies": [
+    "fmt",
     "glm",
-    "sdl2"
+    "sdl2",
+    "spdlog"
   ]
 }
