@@ -1,6 +1,8 @@
 #include "Window.h"
 
 #include <SDL2/SDL.h>
+#include <spdlog/spdlog.h>
+
 namespace scrap
 {
 Window::Window(std::string_view title, glm::i32vec2 size)
@@ -9,7 +11,7 @@ Window::Window(std::string_view title, glm::i32vec2 size)
                                   SDL_WindowFlags::SDL_WINDOW_ALLOW_HIGHDPI);
     if(mSdlWindow == nullptr)
     {
-        SDL_Log("Failed to create window '%s' (%d, %d)", title.data(), size.x, size.y);
+        spdlog::critical("Failed to create window '{}' ({}, {})", title.data(), size.x, size.y);
         return;
     }
 }

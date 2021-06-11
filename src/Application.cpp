@@ -1,6 +1,7 @@
 #include "Application.h"
 
 #include <SDL2/SDL.h>
+#include <spdlog/spdlog.h>
 
 namespace scrap
 {
@@ -8,7 +9,7 @@ Application::Application()
 {
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0)
     {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to initialize SDL '%s'", SDL_GetError());
+        spdlog::critical("Failed to initialize SDL '{}'", SDL_GetError());
         return;
     }
 
