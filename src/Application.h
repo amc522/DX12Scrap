@@ -7,9 +7,11 @@
 
 namespace scrap
 {
+class D3D12Context;
+
 class Application
 {
-  public:
+public:
     Application();
     ~Application();
 
@@ -17,8 +19,9 @@ class Application
 
     void update();
 
-  private:
+private:
     std::unique_ptr<Window> mMainWindow;
+    std::unique_ptr<D3D12Context> mD3D12Context;
     bool mRunning = false;
 };
 

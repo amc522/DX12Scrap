@@ -1,5 +1,7 @@
 #include "Application.h"
 
+#include "d3d12/D3D12Context.h"
+
 #include <SDL2/SDL.h>
 #include <spdlog/spdlog.h>
 
@@ -16,6 +18,8 @@ Application::Application()
     mMainWindow = std::make_unique<Window>("DX12Scrap", glm::i32vec2{1280, 720});
 
     if(!mMainWindow) { return; }
+
+    mD3D12Context = std::make_unique<D3D12Context>();
 
     mRunning = true;
 }
