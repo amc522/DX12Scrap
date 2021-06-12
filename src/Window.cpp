@@ -11,14 +11,20 @@ Window::Window(std::string_view title, glm::i32vec2 size)
                                   SDL_WindowFlags::SDL_WINDOW_ALLOW_HIGHDPI);
     if(mSdlWindow == nullptr)
     {
-        spdlog::critical("Failed to create window '{}' ({}, {})", title.data(), size.x, size.y);
+        spdlog::critical("Failed to create window '{}' ({}, {})", title, size.x, size.y);
         return;
     }
+
+    spdlog::info("Created new window '{}' ({}, {})", title, size.x, size.y);
 }
 
 Window::~Window()
 {
-    if(mSdlWindow != nullptr) { SDL_DestroyWindow(mSdlWindow); }
+    if(mSdlWindow != nullptr)
+    {
+        spdlog::info("Destroying window");
+        SDL_DestroyWindow(mSdlWindow);
+    }
 }
 
 Window::operator bool() const { return mSdlWindow != nullptr; }

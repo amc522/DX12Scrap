@@ -9,6 +9,8 @@ namespace scrap
 {
 Application::Application()
 {
+    spdlog::info("Starting application");
+
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0)
     {
         spdlog::critical("Failed to initialize SDL '{}'", SDL_GetError());
@@ -21,6 +23,7 @@ Application::Application()
 
     mD3D12Context = std::make_unique<D3D12Context>();
 
+    spdlog::info("Application initialized");
     mRunning = true;
 }
 
@@ -38,7 +41,9 @@ void Application::update()
     {
         switch(event.type)
         {
-        case SDL_QUIT: mRunning = false; break;
+        case SDL_QUIT: 
+            spdlog::info("Shutting down application");
+            mRunning = false; break;
         }
     }
 }
