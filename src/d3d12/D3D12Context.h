@@ -3,6 +3,7 @@
 #include <fmt/format.h>
 #include <wrl/client.h>
 
+enum D3D_FEATURE_LEVEL;
 struct IDXGIAdapter4;
 
 namespace scrap
@@ -38,6 +39,8 @@ public:
     operator bool() const { return mInitialized; }
 
 private:
+    void GetHardwareAdapter(GpuPreference gpuPreference, D3D_FEATURE_LEVEL featureLevel);
+
     Microsoft::WRL::ComPtr<IDXGIAdapter4> mAdapter;
     bool mInitialized = false;
 };
