@@ -21,7 +21,7 @@ Application::Application()
 
     if(!mMainWindow) { return; }
 
-    mD3D12Context = std::make_unique<D3D12Context>();
+    mD3D12Context = std::make_unique<D3D12Context>(GpuPreference::None);
 
     spdlog::info("Application initialized");
     mRunning = true;

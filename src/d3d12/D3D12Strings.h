@@ -6,7 +6,7 @@
 
 namespace scrap
 {
-std::string_view ToString(D3D_FEATURE_LEVEL featureLevel)
+constexpr std::string_view ToString(D3D_FEATURE_LEVEL featureLevel)
 {
     switch(featureLevel)
     {
