@@ -27,6 +27,7 @@
   <ItemGroup>
     <ClInclude Include="src\Application.h" />
     <ClInclude Include="src\d3d12\D3D12Context.h" />
+    <ClInclude Include="src\d3d12\D3D12Strings.h" />
     <ClInclude Include="src\Window.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -119,7 +120,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;SDL2maind.lib;%(AdditionalDependencies);</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;SDL2maind.lib;%(AdditionalDependencies);</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
     </Link>
@@ -139,7 +140,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;SDL2main.lib;%(AdditionalDependencies);</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;SDL2main.lib;%(AdditionalDependencies);</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -154,7 +155,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;SDL2maind.lib;%(AdditionalDependencies);</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;SDL2maind.lib;%(AdditionalDependencies);</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
     </Link>
@@ -174,7 +175,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;SDL2main.lib;%(AdditionalDependencies);</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;SDL2main.lib;%(AdditionalDependencies);</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
