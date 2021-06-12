@@ -1,6 +1,7 @@
 #include "Window.h"
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_syswm.h>
 #include <spdlog/spdlog.h>
 
 namespace scrap
@@ -30,6 +31,22 @@ Window::~Window()
 Window::operator bool() const { return mSdlWindow != nullptr; }
 
 void Window::setSize(glm::i32vec2 size) { SDL_SetWindowSize(mSdlWindow, size.x, size.y); }
+
+glm::i32vec2 Window::getSize() const
+{
+    glm::i32vec2 windowSize;
+    SDL_GetWindowSize(mSdlWindow, &windowSize.x, &windowSize.y);
+    return windowSize;
+}
+
+HWND Window::getHwnd() const
+{
+    SDL_SysWMinfo wmInfo;
+    SDL_VERSION(&wmInfo.version);
+    SDL_GetWindowWMInfo(mSdlWindow, &wmInfo);
+
+    return wmInfo.info.win.window;
+}
 
 void Window::show() { SDL_ShowWindow(mSdlWindow); }
 
