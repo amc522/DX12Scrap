@@ -1,13 +1,22 @@
 #pragma once
 
+#include <array>
 #include <fmt/format.h>
 #include <wrl/client.h>
 
 enum D3D_FEATURE_LEVEL;
+struct ID3D12CommandQueue;
+struct ID3D12DescriptorHeap;
+struct ID3D12Device;
+struct ID3D12Resource;
 struct IDXGIAdapter4;
+struct IDXGIFactory4;
+struct IDXGISwapChain3;
 
 namespace scrap
 {
+class Window;
+
 enum class GpuPreference
 {
     None,
@@ -33,15 +42,26 @@ constexpr std::string_view ToString(GpuPreference gpuPreference)
 class D3D12Context
 {
 public:
-    D3D12Context(GpuPreference gpuPreference);
+    D3D12Context(const Window& window, GpuPreference gpuPreference);
     ~D3D12Context();
 
     operator bool() const { return mInitialized; }
 
 private:
-    void GetHardwareAdapter(GpuPreference gpuPreference, D3D_FEATURE_LEVEL featureLevel);
+    void GetHardwareAdapter(GpuPreference gpuPreference, D3D_FEATURE_LEVEL featureLevel, IDXGIFactory4* dxgiFactory);
+
+    static constexpr size_t sFrameCount = 2;
 
     Microsoft::WRL::ComPtr<IDXGIAdapter4> mAdapter;
+    Microsoft::WRL::ComPtr<ID3D12Device> mDevice;
+    Microsoft::WRL::ComPtr<ID3D12CommandQueue> mCommandQueue;
+    Microsoft::WRL::ComPtr<IDXGISwapChain3> mSwapChain;
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mRtvHeap;
+    std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, sFrameCount> mRenderTargets;
+    uint32_t mRtvDescriptorSize = 0;
+
+    uint32_t mFrameIndex = 0;
+
     bool mInitialized = false;
 };
 

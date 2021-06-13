@@ -3,6 +3,7 @@
   "name": "dx12scrap",
   "version": "20210606",
   "dependencies": [
+    "d3dx12",
     "fmt",
     "glm",
     "sdl2",

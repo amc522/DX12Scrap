@@ -1,8 +1,10 @@
 #include "D3D12Context.h"
 
 #include "D3D12Strings.h"
+#include "Window.h"
 
 #include <d3d12.h>
+#include <d3dx12.h>
 #include <dxgi.h>
 #include <dxgi1_4.h>
 #include <dxgi1_6.h>
@@ -31,7 +33,7 @@ void LogAdapterDesc(const DXGI_ADAPTER_DESC1& desc, UINT adapterIndex)
                  desc.DedicatedVideoMemory, desc.DedicatedSystemMemory, desc.SharedSystemMemory);
 }
 
-D3D12Context::D3D12Context(GpuPreference gpuPreference)
+D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
 {
     spdlog::info("Initializing D3D12");
 
@@ -50,11 +52,124 @@ D3D12Context::D3D12Context(GpuPreference gpuPreference)
     spdlog::info("Enabled the d3d12 debug layer");
 #endif
 
+    ComPtr<IDXGIFactory4> dxgiFactory4;
+    UINT createFactoryFlags = 0;
+#ifdef _DEBUG
+    createFactoryFlags = DXGI_CREATE_FACTORY_DEBUG;
+#endif
+
+    if(FAILED(CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&dxgiFactory4))))
+    {
+        spdlog::critical("CreateDXGIFactory2 failed.");
+        return;
+    }
+
     // Feature level documentation
     // https://docs.microsoft.com/en-us/windows/win32/direct3d12/hardware-feature-levels
     constexpr D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
 
-    GetHardwareAdapter(gpuPreference, featureLevel);
+    GetHardwareAdapter(gpuPreference, featureLevel, dxgiFactory4.Get());
+
+    if(FAILED(D3D12CreateDevice(mAdapter.Get(), featureLevel, IID_PPV_ARGS(&mDevice))))
+    {
+        spdlog::critical("Failed to create d3d12 device");
+        return;
+    }
+
+    spdlog::info("Created d3d12 device");
+
+    { // create command queue
+        D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
+        commandQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+        commandQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+
+        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandqueue
+        if(FAILED(mDevice->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&mCommandQueue))))
+        {
+            spdlog::critical("Failed to create d3d12 command queue");
+            return;
+        }
+
+        spdlog::info("Created d3d12 command queue");
+    }
+
+    { // create swap chain
+        const glm::i32vec2 windowSize = window.getSize();
+
+        DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
+        swapChainDesc.BufferCount = 2;
+        swapChainDesc.Width = windowSize.x;
+        swapChainDesc.Height = windowSize.y;
+        swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+        swapChainDesc.SampleDesc.Count = 1;
+
+        ComPtr<IDXGISwapChain1> swapChain;
+
+        // https://docs.microsoft.com/en-us/windows/win32/api/dxgi1_2/nf-dxgi1_2-idxgifactory2-createswapchainforhwnd
+        if(FAILED(dxgiFactory4->CreateSwapChainForHwnd(
+               mCommandQueue.Get(), // Swap chain needs the queue so that it can force a flush on it.
+               window.getHwnd(), &swapChainDesc, nullptr, nullptr, &swapChain)))
+        {
+            spdlog::critical("Failed to create d3d12 swap chain");
+            return;
+        }
+
+        // Currently do not support fullscreen transitions.
+        // https://docs.microsoft.com/en-us/windows/win32/api/dxgi/nf-dxgi-idxgifactory-makewindowassociation
+        if(FAILED(dxgiFactory4->MakeWindowAssociation(window.getHwnd(), DXGI_MWA_NO_ALT_ENTER)))
+        {
+            spdlog::error("Failed to disable alt-enter fullscreen binding");
+        }
+
+        if(FAILED(swapChain.As(&mSwapChain))) { spdlog::critical("Failed to convert swap chain"); }
+
+        mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
+
+        spdlog::info("Created d3d12 swap chain");
+    }
+
+    { // Create descriptor heaps.
+        //https://docs.microsoft.com/en-us/windows/win32/direct3d12/creating-descriptor-heaps
+        
+        // Describe and create a render target view (RTV) descriptor heap.
+        D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
+        rtvHeapDesc.NumDescriptors = sFrameCount;
+        rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+        rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+
+        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createdescriptorheap
+        if(FAILED(mDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&mRtvHeap))))
+        {
+            spdlog::critical("Failed to create rtv descriptor heap");
+            return;
+        }
+
+        spdlog::info("Created rtv descriptor heap");
+
+        mRtvDescriptorSize = mDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    }
+
+    { // Create frame resources.
+        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(mRtvHeap->GetCPUDescriptorHandleForHeapStart());
+
+        // Create a RTV for each frame.
+        for(UINT frameIndex = 0; frameIndex < sFrameCount; frameIndex++)
+        {
+            if(FAILED(mSwapChain->GetBuffer(frameIndex, IID_PPV_ARGS(&mRenderTargets[frameIndex]))))
+            {
+                spdlog::critical("Failed to get render target buffer for frame {}", frameIndex);
+                return;
+            }
+
+            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createrendertargetview
+            mDevice->CreateRenderTargetView(mRenderTargets[frameIndex].Get(), nullptr, rtvHandle);
+            rtvHandle.Offset(1, mRtvDescriptorSize);
+        }
+
+        spdlog::info("Created render target views");
+    }
 }
 
 D3D12Context::~D3D12Context() { spdlog::info("Shutting down D3D12"); }
@@ -72,21 +187,11 @@ constexpr DXGI_GPU_PREFERENCE GetDxgiGpuPreference(GpuPreference gpuPreference)
     }
 }
 
-void D3D12Context::GetHardwareAdapter(GpuPreference gpuPreference, D3D_FEATURE_LEVEL featureLevel)
+void D3D12Context::GetHardwareAdapter(GpuPreference gpuPreference,
+                                      D3D_FEATURE_LEVEL featureLevel,
+                                      IDXGIFactory4* dxgiFactory4)
 {
     const DXGI_GPU_PREFERENCE dxgiGpuPreference = GetDxgiGpuPreference(gpuPreference);
-
-    ComPtr<IDXGIFactory4> dxgiFactory4;
-    UINT createFactoryFlags = 0;
-#ifdef _DEBUG
-    createFactoryFlags = DXGI_CREATE_FACTORY_DEBUG;
-#endif
-
-    if(FAILED(CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&dxgiFactory4))))
-    {
-        spdlog::critical("CreateDXGIFactory2 failed.");
-        return;
-    }
 
     spdlog::info("Enumerating adapters with preference '{}'", gpuPreference);
 
