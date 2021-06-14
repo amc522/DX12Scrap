@@ -171,6 +171,15 @@ D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
         spdlog::info("Created render target views");
     }
 
+    // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandallocator
+    if(FAILED(mDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&mCommandAllocator))))
+    {
+        spdlog::critical("Failed to create d3d12 command allocator");
+        return;
+    }
+
+    spdlog::info("Created d3d12 command allocator");
+
     mInitialized = true;
 }
 
@@ -188,6 +197,8 @@ constexpr DXGI_GPU_PREFERENCE GetDxgiGpuPreference(GpuPreference gpuPreference)
     default: return DXGI_GPU_PREFERENCE_UNSPECIFIED;
     }
 }
+
+void D3D12Context::swap() { mFrameIndex = mSwapChain->GetCurrentBackBufferIndex(); }
 
 void D3D12Context::GetHardwareAdapter(GpuPreference gpuPreference,
                                       D3D_FEATURE_LEVEL featureLevel,

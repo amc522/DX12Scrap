@@ -5,6 +5,7 @@
 #include <wrl/client.h>
 
 enum D3D_FEATURE_LEVEL;
+struct ID3D12CommandAllocator;
 struct ID3D12CommandQueue;
 struct ID3D12DescriptorHeap;
 struct ID3D12Device;
@@ -48,6 +49,10 @@ public:
     bool initialized() const { return mInitialized; }
 
     ID3D12Device* getDevice() { return mDevice.Get(); }
+    ID3D12CommandAllocator* getCommandAllocator() { return mCommandAllocator.Get(); }
+    ID3D12CommandQueue* getCommandQueue() { return mCommandQueue.Get(); }
+    
+    void swap();
 
 private:
     void GetHardwareAdapter(GpuPreference gpuPreference, D3D_FEATURE_LEVEL featureLevel, IDXGIFactory4* dxgiFactory);
@@ -57,6 +62,7 @@ private:
     Microsoft::WRL::ComPtr<IDXGIAdapter4> mAdapter;
     Microsoft::WRL::ComPtr<ID3D12Device> mDevice;
     Microsoft::WRL::ComPtr<ID3D12CommandQueue> mCommandQueue;
+    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> mCommandAllocator;
     Microsoft::WRL::ComPtr<IDXGISwapChain3> mSwapChain;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mRtvHeap;
     std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, sFrameCount> mRenderTargets;
