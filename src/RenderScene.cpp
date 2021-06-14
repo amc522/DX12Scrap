@@ -99,6 +99,7 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
 
 RenderScene::~RenderScene()
 {
+    spdlog::info("Destroying RenderScene");
     if(mFenceEvent != nullptr) { CloseHandle(mFenceEvent); }
 }
 
@@ -257,7 +258,11 @@ void RenderScene::render(D3D12Context& d3d12Context)
     waitForPreviousFrame(d3d12Context);
 }
 
-void RenderScene::shutdown(D3D12Context& d3d12Context) { waitForPreviousFrame(d3d12Context); }
+void RenderScene::shutdown(D3D12Context& d3d12Context)
+{
+    spdlog::info("Shutting down RenderScene");
+    waitForPreviousFrame(d3d12Context);
+}
 
 void RenderScene::waitForPreviousFrame(D3D12Context& d3d12Context)
 {
