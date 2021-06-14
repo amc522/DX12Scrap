@@ -2,6 +2,7 @@
 
 #include <array>
 #include <fmt/format.h>
+#include <glm/vec2.hpp>
 #include <wrl/client.h>
 
 enum D3D_FEATURE_LEVEL;
@@ -13,6 +14,7 @@ struct ID3D12Resource;
 struct IDXGIAdapter4;
 struct IDXGIFactory4;
 struct IDXGISwapChain3;
+struct D3D12_CPU_DESCRIPTOR_HANDLE;
 
 namespace scrap
 {
@@ -51,7 +53,14 @@ public:
     ID3D12Device* getDevice() { return mDevice.Get(); }
     ID3D12CommandAllocator* getCommandAllocator() { return mCommandAllocator.Get(); }
     ID3D12CommandQueue* getCommandQueue() { return mCommandQueue.Get(); }
-    
+
+    ID3D12Resource* getBackBuffer() { return mRenderTargets[mFrameIndex].Get(); }
+    D3D12_CPU_DESCRIPTOR_HANDLE getBackBufferRtv() const;
+
+    glm::i32vec2 frameSize() const { return mFrameSize; }
+
+    void present();
+
     void swap();
 
 private:
@@ -68,6 +77,7 @@ private:
     std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, sFrameCount> mRenderTargets;
     uint32_t mRtvDescriptorSize = 0;
 
+    glm::i32vec2 mFrameSize;
     uint32_t mFrameIndex = 0;
 
     bool mInitialized = false;

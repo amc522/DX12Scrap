@@ -184,7 +184,78 @@ bool RenderScene::loadShaders(ID3D12Device* device)
     return true;
 }
 
-void RenderScene::render(D3D12Context& d3d12Context) {}
+void RenderScene::render(D3D12Context& d3d12Context)
+{
+    // Command list allocators can only be reset when the associated
+    // command lists have finished execution on the GPU; apps should use
+    // fences to determine GPU execution progress.
+    if(FAILED(d3d12Context.getCommandAllocator()->Reset()))
+    {
+        spdlog::error("Failed to reset d3d12 command allocator");
+        return;
+    }
+
+    // However, when ExecuteCommandList() is called on a particular command
+    // list, that command list can then be reset at any time and must be before
+    // re-recording.
+    if(FAILED(mCommandList->Reset(d3d12Context.getCommandAllocator(), mPso.Get())))
+    {
+        spdlog::error("Failed to reset d3d12 command list");
+        return;
+    }
+
+    D3D12_VIEWPORT viewport{};
+    viewport.TopLeftX = 0.0f;
+    viewport.TopLeftY = 0.0f;
+    viewport.Width = static_cast<float>(d3d12Context.frameSize().x);
+    viewport.Height = static_cast<float>(d3d12Context.frameSize().y);
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+
+    D3D12_RECT scissorRect{static_cast<LONG>(viewport.TopLeftX), static_cast<LONG>(viewport.TopLeftY),
+                           static_cast<LONG>(viewport.Width), static_cast<LONG>(viewport.Height)};
+
+    // Set necessary state.
+    mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
+    mCommandList->RSSetViewports(1, &viewport);
+    mCommandList->RSSetScissorRects(1, &scissorRect);
+
+    // Indicate that the back buffer will be used as a render target.
+    D3D12_RESOURCE_BARRIER renderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+        d3d12Context.getBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+    mCommandList->ResourceBarrier(1, &renderTargetBarrier);
+
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = d3d12Context.getBackBufferRtv();
+    mCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+    // Record commands.
+    const float clearColor[] = {0.0f, 0.2f, 0.4f, 1.0f};
+    mCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+    mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    mCommandList->DrawInstanced(3, 1, 0, 0);
+
+    // Indicate that the back buffer will now be used to present.
+    renderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+        d3d12Context.getBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+
+    mCommandList->ResourceBarrier(1, &renderTargetBarrier);
+
+    if(FAILED(mCommandList->Close()))
+    {
+        spdlog::error("Failed to close d3d12 command list");
+        return;
+    }
+
+    // Execute the command list.
+    std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.Get()};
+    d3d12Context.getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()), commandLists.data());
+
+    // Present the frame.
+    d3d12Context.present();
+
+    waitForPreviousFrame(d3d12Context);
+}
 
 void RenderScene::shutdown(D3D12Context& d3d12Context) { waitForPreviousFrame(d3d12Context); }
 

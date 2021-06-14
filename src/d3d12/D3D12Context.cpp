@@ -125,6 +125,7 @@ D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
 
         if(FAILED(swapChain.As(&mSwapChain))) { spdlog::critical("Failed to convert swap chain"); }
 
+        mFrameSize = windowSize;
         mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
 
         spdlog::info("Created d3d12 swap chain");
@@ -196,6 +197,17 @@ constexpr DXGI_GPU_PREFERENCE GetDxgiGpuPreference(GpuPreference gpuPreference)
     case scrap::GpuPreference::None: [[fallthrough]];
     default: return DXGI_GPU_PREFERENCE_UNSPECIFIED;
     }
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE D3D12Context::getBackBufferRtv() const
+{
+    return CD3DX12_CPU_DESCRIPTOR_HANDLE(mRtvHeap->GetCPUDescriptorHandleForHeapStart(), mFrameIndex,
+                                         mRtvDescriptorSize);
+}
+
+void D3D12Context::present()
+{
+    if(FAILED(mSwapChain->Present(1, 0))) { spdlog::error("Present call failed"); }
 }
 
 void D3D12Context::swap() { mFrameIndex = mSwapChain->GetCurrentBackBufferIndex(); }

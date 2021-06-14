@@ -54,6 +54,8 @@ void Application::update()
             mRunning = false; break;
         }
     }
+
+    mRenderScene->render(*mD3D12Context);
 }
 
 } // namespace scrap
