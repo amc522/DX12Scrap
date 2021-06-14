@@ -131,8 +131,8 @@ D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
     }
 
     { // Create descriptor heaps.
-        //https://docs.microsoft.com/en-us/windows/win32/direct3d12/creating-descriptor-heaps
-        
+        // https://docs.microsoft.com/en-us/windows/win32/direct3d12/creating-descriptor-heaps
+
         // Describe and create a render target view (RTV) descriptor heap.
         D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
         rtvHeapDesc.NumDescriptors = sFrameCount;
@@ -170,6 +170,8 @@ D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
 
         spdlog::info("Created render target views");
     }
+
+    mInitialized = true;
 }
 
 D3D12Context::~D3D12Context() { spdlog::info("Shutting down D3D12"); }

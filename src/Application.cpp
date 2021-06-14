@@ -1,6 +1,7 @@
 #include "Application.h"
 
 #include "d3d12/D3D12Context.h"
+#include "RenderScene.h"
 
 #include <SDL2/SDL.h>
 #include <spdlog/spdlog.h>
@@ -22,6 +23,10 @@ Application::Application()
     if(!mMainWindow) { return; }
 
     mD3D12Context = std::make_unique<D3D12Context>(*mMainWindow, GpuPreference::None);
+
+    if(!mD3D12Context) { return; }
+
+    mRenderScene = std::make_unique<RenderScene>(*mD3D12Context);
 
     spdlog::info("Application initialized");
     mRunning = true;

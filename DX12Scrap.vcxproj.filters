@@ -22,6 +22,9 @@
     <ClCompile Include="src\d3d12\D3D12Context.cpp">
       <Filter>Source Files\d3d12</Filter>
     </ClCompile>
+    <ClCompile Include="src\RenderScene.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application.h">
@@ -35,6 +38,9 @@
     </ClInclude>
     <ClInclude Include="src\d3d12\D3D12Strings.h">
       <Filter>Source Files\d3d12</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RenderScene.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

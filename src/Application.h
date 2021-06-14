@@ -8,6 +8,7 @@
 namespace scrap
 {
 class D3D12Context;
+class RenderScene;
 
 class Application
 {
@@ -22,6 +23,7 @@ public:
 private:
     std::unique_ptr<Window> mMainWindow;
     std::unique_ptr<D3D12Context> mD3D12Context;
+    std::unique_ptr<RenderScene> mRenderScene;
     bool mRunning = false;
 };
 

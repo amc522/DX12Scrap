@@ -22,12 +22,14 @@
     <ClCompile Include="src\Application.cpp" />
     <ClCompile Include="src\d3d12\D3D12Context.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\RenderScene.cpp" />
     <ClCompile Include="src\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application.h" />
     <ClInclude Include="src\d3d12\D3D12Context.h" />
     <ClInclude Include="src\d3d12\D3D12Strings.h" />
+    <ClInclude Include="src\RenderScene.h" />
     <ClInclude Include="src\Window.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

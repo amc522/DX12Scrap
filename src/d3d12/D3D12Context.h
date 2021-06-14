@@ -47,6 +47,8 @@ public:
 
     operator bool() const { return mInitialized; }
 
+    ID3D12Device* getDevice() { return mDevice.Get(); }
+
 private:
     void GetHardwareAdapter(GpuPreference gpuPreference, D3D_FEATURE_LEVEL featureLevel, IDXGIFactory4* dxgiFactory);
 
