@@ -52,7 +52,7 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
         spdlog::info("Created d3d12 root signature");
     }
 
-    if(!LoadShaders(d3d12Context.getDevice())) { return; }
+    if(!loadShaders(d3d12Context.getDevice())) { return; }
 
     { // Create the command list.
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandlist
@@ -89,7 +89,7 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
         // Wait for the command list to execute; we are reusing the same command
         // list in our main loop but for now, we just want to wait for setup to
         // complete before continuing.
-        WaitForPreviousFrame(d3d12Context);
+        waitForPreviousFrame(d3d12Context);
 
         spdlog::info("Created syncronization objects");
     }
@@ -97,9 +97,12 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
     mInitialized = true;
 }
 
-RenderScene::~RenderScene() {}
+RenderScene::~RenderScene()
+{
+    if(mFenceEvent != nullptr) { CloseHandle(mFenceEvent); }
+}
 
-bool RenderScene::LoadShaders(ID3D12Device* device)
+bool RenderScene::loadShaders(ID3D12Device* device)
 {
     ComPtr<ID3DBlob> vertexShader;
     ComPtr<ID3DBlob> pixelShader;
@@ -181,9 +184,11 @@ bool RenderScene::LoadShaders(ID3D12Device* device)
     return true;
 }
 
-void RenderScene::Render(D3D12Context& d3d12Context) {}
+void RenderScene::render(D3D12Context& d3d12Context) {}
 
-void RenderScene::WaitForPreviousFrame(D3D12Context& d3d12Context)
+void RenderScene::shutdown(D3D12Context& d3d12Context) { waitForPreviousFrame(d3d12Context); }
+
+void RenderScene::waitForPreviousFrame(D3D12Context& d3d12Context)
 {
     // WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
     // This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
