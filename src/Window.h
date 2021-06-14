@@ -14,7 +14,7 @@ public:
     Window(std::string_view title, glm::i32vec2 size);
     ~Window();
 
-    operator bool() const;
+    bool initialized() const { return mSdlWindow != nullptr; }
 
     void setSize(glm::i32vec2 size);
     glm::i32vec2 getSize() const;

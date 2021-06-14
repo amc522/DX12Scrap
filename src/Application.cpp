@@ -20,13 +20,15 @@ Application::Application()
 
     mMainWindow = std::make_unique<Window>("DX12Scrap", glm::i32vec2{1280, 720});
 
-    if(!mMainWindow) { return; }
+    if(!mMainWindow->initialized()) { return; }
 
     mD3D12Context = std::make_unique<D3D12Context>(*mMainWindow, GpuPreference::None);
 
-    if(!mD3D12Context) { return; }
+    if(!mD3D12Context->initialized()) { return; }
 
     mRenderScene = std::make_unique<RenderScene>(*mD3D12Context);
+
+    if(!mRenderScene->initialized()) { return; }
 
     spdlog::info("Application initialized");
     mRunning = true;

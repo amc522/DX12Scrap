@@ -45,7 +45,7 @@ public:
     D3D12Context(const Window& window, GpuPreference gpuPreference);
     ~D3D12Context();
 
-    operator bool() const { return mInitialized; }
+    bool initialized() const { return mInitialized; }
 
     ID3D12Device* getDevice() { return mDevice.Get(); }
 

@@ -2,6 +2,8 @@
 
 #include <wrl/client.h>
 
+struct ID3D12Device;
+struct ID3D12PipelineState;
 struct ID3D12RootSignature;
 
 namespace scrap
@@ -16,7 +18,13 @@ public:
 
     void Render(D3D12Context& d3d12Context);
 
+    bool initialized() { return mInitialized; }
+
 private:
+    bool LoadShaders(ID3D12Device* device);
+
     Microsoft::WRL::ComPtr<ID3D12RootSignature> mRootSignature;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> mPso;
+    bool mInitialized = false;
 };
 } // namespace scrap

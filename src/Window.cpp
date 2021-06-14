@@ -28,8 +28,6 @@ Window::~Window()
     }
 }
 
-Window::operator bool() const { return mSdlWindow != nullptr; }
-
 void Window::setSize(glm::i32vec2 size) { SDL_SetWindowSize(mSdlWindow, size.x, size.y); }
 
 glm::i32vec2 Window::getSize() const
