@@ -52,47 +52,7 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
         spdlog::info("Created d3d12 root signature");
     }
 
-    if(!loadShaders(d3d12Context.getDevice())) { return; }
-
-    { // Create the command list.
-        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandlist
-        HRESULT hr = d3d12Context.getDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                                                 d3d12Context.getCommandAllocator(), mPso.Get(),
-                                                                 IID_PPV_ARGS(&mCommandList));
-
-        if(FAILED(hr))
-        {
-            spdlog::critical("Failed to create d3d12 command list");
-            return;
-        }
-
-        // Command lists are created in the recording state, but there is nothing
-        // to record yet. The main loop expects it to be closed, so close it now.
-        if(FAILED(mCommandList->Close())) { spdlog::error("Failed to close graphics command list"); }
-
-        spdlog::info("Created d3d12 command list");
-    }
-
-    { // Create synchronization objects and wait until assets have been uploaded to the GPU.
-        HRESULT hr = d3d12Context.getDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence));
-        mFenceValue = 1;
-
-        // Create an event handle to use for frame synchronization.
-        // https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createeventw
-        mFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-        if(mFenceEvent == nullptr)
-        {
-            hr = HRESULT_FROM_WIN32(GetLastError());
-            spdlog::critical("Failed to create fence event");
-        }
-
-        // Wait for the command list to execute; we are reusing the same command
-        // list in our main loop but for now, we just want to wait for setup to
-        // complete before continuing.
-        waitForPreviousFrame(d3d12Context);
-
-        spdlog::info("Created syncronization objects");
-    }
+    if(!LoadShaders(d3d12Context.getDevice())) { return; }
 
     { // Create the command list.
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandlist
@@ -137,11 +97,9 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
     mInitialized = true;
 }
 
-RenderScene::~RenderScene() { CloseHandle(mFenceEvent); }
+RenderScene::~RenderScene() {}
 
-void RenderScene::shutdown(D3D12Context& context) { waitForPreviousFrame(context); }
-
-bool RenderScene::loadShaders(ID3D12Device* device)
+bool RenderScene::LoadShaders(ID3D12Device* device)
 {
     ComPtr<ID3DBlob> vertexShader;
     ComPtr<ID3DBlob> pixelShader;
@@ -223,39 +181,7 @@ bool RenderScene::loadShaders(ID3D12Device* device)
     return true;
 }
 
-void RenderScene::render(D3D12Context& d3d12Context) {}
-
-void RenderScene::waitForPreviousFrame(D3D12Context& d3d12Context)
-{
-    // WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
-    // This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
-    // sample illustrates how to use fences for efficient resource usage and to
-    // maximize GPU utilization.
-
-    // Signal and increment the fence value.
-    const UINT64 fence = mFenceValue;
-    // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12commandqueue-signal
-    if(FAILED(d3d12Context.getCommandQueue()->Signal(mFence.Get(), fence)))
-    {
-        spdlog::error("Failed to update fence.");
-        return;
-    }
-    mFenceValue++;
-
-    // Wait until the previous frame is finished.
-    if(mFence->GetCompletedValue() < fence)
-    {
-        if(FAILED(mFence->SetEventOnCompletion(fence, mFenceEvent)))
-        {
-            spdlog::error("Fence SetEventOnCompletion call failed");
-            return;
-        }
-
-        WaitForSingleObject(mFenceEvent, INFINITE);
-    }
-
-    d3d12Context.swap();
-}
+void RenderScene::Render(D3D12Context& d3d12Context) {}
 
 void RenderScene::WaitForPreviousFrame(D3D12Context& d3d12Context)
 {

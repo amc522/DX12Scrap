@@ -36,8 +36,6 @@ Application::Application()
 
 Application::~Application()
 {
-    if(mRenderScene != nullptr) { mRenderScene->shutdown(*mD3D12Context); }
-
     if(SDL_WasInit(0) != 0) { SDL_Quit(); }
 }
 
