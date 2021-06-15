@@ -70,6 +70,18 @@ D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
         return;
     }
 
+#ifdef _DEBUG
+    // https://docs.microsoft.com/en-us/windows/win32/api/dxgidebug/nn-dxgidebug-idxgiinfoqueue
+    ComPtr<IDXGIInfoQueue> dxgiInfoQueue;
+
+    // https://docs.microsoft.com/en-us/windows/win32/api/dxgi1_3/nf-dxgi1_3-dxgigetdebuginterface1
+    if(SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiInfoQueue))))
+    {
+        dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+        dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, TRUE);
+    }
+#endif
+
     // Feature level documentation
     // https://docs.microsoft.com/en-us/windows/win32/direct3d12/hardware-feature-levels
     constexpr D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
