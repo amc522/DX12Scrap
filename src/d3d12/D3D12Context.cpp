@@ -143,17 +143,17 @@ D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
     }
 
     { // create swap chain
-        const glm::i32vec2 windowSize = window.getSize();
+        const glm::i32vec2 frameSize = window.getDrawableSize();
 
         DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
         swapChainDesc.BufferCount = 2;
-        swapChainDesc.Width = windowSize.x;
-        swapChainDesc.Height = windowSize.y;
+        swapChainDesc.Width = frameSize.x;
+        swapChainDesc.Height = frameSize.y;
         swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
         swapChainDesc.SampleDesc.Count = 1;
-
+        
         ComPtr<IDXGISwapChain1> swapChain;
 
         // https://docs.microsoft.com/en-us/windows/win32/api/dxgi1_2/nf-dxgi1_2-idxgifactory2-createswapchainforhwnd
@@ -174,7 +174,7 @@ D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
 
         if(FAILED(swapChain.As(&mSwapChain))) { spdlog::critical("Failed to convert swap chain"); }
 
-        mFrameSize = windowSize;
+        mFrameSize = frameSize;
         mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
 
         spdlog::info("Created d3d12 swap chain");
