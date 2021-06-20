@@ -14,6 +14,12 @@ struct ID3D12CommandAllocator;
 struct ID3D12CommandQueue;
 struct ID3D12DescriptorHeap;
 struct ID3D12Device;
+struct ID3D12Device1;
+struct ID3D12Device2;
+struct ID3D12Device3;
+struct ID3D12Device4;
+struct ID3D12Device5;
+struct ID3D12Device6;
 struct ID3D12Resource;
 struct IDXGIAdapter4;
 struct IDXGIFactory4;
@@ -55,6 +61,13 @@ public:
     bool initialized() const { return mInitialized; }
 
     ID3D12Device* getDevice() { return mDevice.Get(); }
+    ID3D12Device1* getDevice1() { return mDevice1.Get(); }
+    ID3D12Device2* getDevice2() { return mDevice2.Get(); }
+    ID3D12Device3* getDevice3() { return mDevice3.Get(); }
+    ID3D12Device4* getDevice4() { return mDevice4.Get(); }
+    ID3D12Device5* getDevice5() { return mDevice5.Get(); }
+    ID3D12Device6* getDevice6() { return mDevice6.Get(); }
+
     ID3D12CommandAllocator* getCommandAllocator() { return mCommandAllocator.Get(); }
     ID3D12CommandQueue* getCommandQueue() { return mCommandQueue.Get(); }
 
@@ -68,12 +81,19 @@ public:
     void swap();
 
 private:
-    void GetHardwareAdapter(GpuPreference gpuPreference, D3D_FEATURE_LEVEL featureLevel, IDXGIFactory4* dxgiFactory);
+    void getHardwareAdapter(GpuPreference gpuPreference, D3D_FEATURE_LEVEL featureLevel, IDXGIFactory4* dxgiFactory);
+    HRESULT createDevice(D3D_FEATURE_LEVEL featureLevel);
 
     static constexpr size_t sFrameCount = 2;
 
     Microsoft::WRL::ComPtr<IDXGIAdapter4> mAdapter;
     Microsoft::WRL::ComPtr<ID3D12Device> mDevice;
+    Microsoft::WRL::ComPtr<ID3D12Device1> mDevice1;
+    Microsoft::WRL::ComPtr<ID3D12Device2> mDevice2;
+    Microsoft::WRL::ComPtr<ID3D12Device3> mDevice3;
+    Microsoft::WRL::ComPtr<ID3D12Device4> mDevice4;
+    Microsoft::WRL::ComPtr<ID3D12Device5> mDevice5;
+    Microsoft::WRL::ComPtr<ID3D12Device6> mDevice6;
     Microsoft::WRL::ComPtr<ID3D12CommandQueue> mCommandQueue;
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> mCommandAllocator;
     Microsoft::WRL::ComPtr<IDXGISwapChain3> mSwapChain;

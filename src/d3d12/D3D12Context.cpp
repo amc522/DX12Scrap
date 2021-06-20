@@ -86,15 +86,9 @@ D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
     // https://docs.microsoft.com/en-us/windows/win32/direct3d12/hardware-feature-levels
     constexpr D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
 
-    GetHardwareAdapter(gpuPreference, featureLevel, dxgiFactory4.Get());
+    getHardwareAdapter(gpuPreference, featureLevel, dxgiFactory4.Get());
 
-    if(FAILED(D3D12CreateDevice(mAdapter.Get(), featureLevel, IID_PPV_ARGS(&mDevice))))
-    {
-        spdlog::critical("Failed to create d3d12 device");
-        return;
-    }
-
-    spdlog::info("Created d3d12 device");
+    createDevice(featureLevel);
 
 #ifdef _DEBUG
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12sdklayers/nn-d3d12sdklayers-id3d12infoqueue
@@ -153,7 +147,7 @@ D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
         swapChainDesc.SampleDesc.Count = 1;
-        
+
         ComPtr<IDXGISwapChain1> swapChain;
 
         // https://docs.microsoft.com/en-us/windows/win32/api/dxgi1_2/nf-dxgi1_2-idxgifactory2-createswapchainforhwnd
@@ -313,7 +307,7 @@ void D3D12Context::present()
 
 void D3D12Context::swap() { mFrameIndex = mSwapChain->GetCurrentBackBufferIndex(); }
 
-void D3D12Context::GetHardwareAdapter(GpuPreference gpuPreference,
+void D3D12Context::getHardwareAdapter(GpuPreference gpuPreference,
                                       D3D_FEATURE_LEVEL featureLevel,
                                       IDXGIFactory4* dxgiFactory4)
 {
@@ -403,6 +397,49 @@ void D3D12Context::GetHardwareAdapter(GpuPreference gpuPreference,
 
     mAdapter = std::move(dxgiAdapter4);
     spdlog::info("Using adapter {}", selectedAdapterIndex);
+}
+
+HRESULT D3D12Context::createDevice(D3D_FEATURE_LEVEL featureLevel)
+{
+    if(FAILED(D3D12CreateDevice(mAdapter.Get(), featureLevel, IID_PPV_ARGS(&mDevice))))
+    {
+        spdlog::critical("Failed to create d3d12 device");
+        return E_FAIL;
+    }
+
+    spdlog::info("Created d3d12 device");
+
+    ComPtr<ID3D12Device1> device1;
+    if(FAILED(mDevice->QueryInterface(IID_PPV_ARGS(&device1)))) { return S_OK; }
+    mDevice1 = std::move(device1);
+    spdlog::info("Create d3d12 device1");
+
+    ComPtr<ID3D12Device2> device2;
+    if(FAILED(mDevice->QueryInterface(IID_PPV_ARGS(&device2)))) { return S_OK; }
+    mDevice2 = std::move(device2);
+    spdlog::info("Create d3d12 device2");
+
+    ComPtr<ID3D12Device3> device3;
+    if(FAILED(mDevice->QueryInterface(IID_PPV_ARGS(&device3)))) { return S_OK; }
+    mDevice3 = std::move(device3);
+    spdlog::info("Create d3d12 device3");
+
+    ComPtr<ID3D12Device4> device4;
+    if(FAILED(mDevice->QueryInterface(IID_PPV_ARGS(&device4)))) { return S_OK; }
+    mDevice4 = std::move(device4);
+    spdlog::info("Create d3d12 device4");
+
+    ComPtr<ID3D12Device5> device5;
+    if(FAILED(mDevice->QueryInterface(IID_PPV_ARGS(&device5)))) { return S_OK; }
+    mDevice5 = std::move(device5);
+    spdlog::info("Create d3d12 device5");
+
+    ComPtr<ID3D12Device6> device6;
+    if(FAILED(mDevice->QueryInterface(IID_PPV_ARGS(&device6)))) { return S_OK; }
+    mDevice6 = std::move(device6);
+    spdlog::info("Create d3d12 device6");
+
+    return S_OK;
 }
 
 } // namespace scrap
