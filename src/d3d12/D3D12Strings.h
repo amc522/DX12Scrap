@@ -1,3 +1,5 @@
+// Collection of functions to help convert D3D12 objects and enums to strings for printing and debugging.
+
 #pragma once
 
 #include <d3dcommon.h>

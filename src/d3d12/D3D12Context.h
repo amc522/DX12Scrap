@@ -1,3 +1,7 @@
+// D3D12Context contains all the shared objects for the D3D12 pipeline. This includes (but is not limited to) the
+// hardware adapter, device, and swap chains. Specific D3D12 rendering related functions should NOT be implemented here.
+// D3D12Context is not responsible for loading and managing shaders, pipeline states, or resources.
+
 #pragma once
 
 #include <array>

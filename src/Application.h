@@ -1,14 +1,19 @@
+// Application is the glue for the whole program and there should only be one instance of Application for the program.
+// It collects all the high level objects into one place. It's responsible for handling the system events and passing
+// them along where appropriate. Additionally, Application calls update related fuctions for all the objects that it
+// holds (that need it).
+//
+// The event handling is routed by SDL and then handled as needed here.
+
 #pragma once
 
-#include "Window.h"
-
-#include <SDL2/SDL_video.h>
 #include <memory>
 
 namespace scrap
 {
 class D3D12Context;
 class RenderScene;
+class Window;
 
 class Application
 {

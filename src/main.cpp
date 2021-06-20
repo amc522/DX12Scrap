@@ -1,3 +1,5 @@
+// Main entry point into the program. Creates the Application instance and runs the update loop.
+
 #include "Application.h"
 
 #include <Windows.h>

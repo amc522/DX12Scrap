@@ -1,3 +1,7 @@
+// Window encapsulates the functionality of an OS window. This includes creating/destroying the window, resizing, and
+// reporting the status of the window. All window events from Application are routed to the approriate Window instance.
+// There can be as many Window instances as desired.
+
 #pragma once
 
 #include <Windows.h>

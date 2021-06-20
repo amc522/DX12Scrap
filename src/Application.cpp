@@ -1,6 +1,7 @@
 #include "Application.h"
 
 #include "RenderScene.h"
+#include "Window.h"
 #include "d3d12/D3D12Context.h"
 
 #include <SDL2/SDL.h>
@@ -83,8 +84,8 @@ void Application::update()
                 const DWORD dpiY = HIWORD(event.syswm.msg->msg.win.wParam);
                 const HWND windowHandle = event.syswm.msg->msg.win.hwnd;
 
-                spdlog::debug("Event SDL_SYSWMEVENT. WM_DPICHANGED: dpiX {}, dpiY {}, HWND {}",
-                              dpiX, dpiY, (void*)windowHandle);
+                spdlog::debug("Event SDL_SYSWMEVENT. WM_DPICHANGED: dpiX {}, dpiY {}, HWND {}", dpiX, dpiY,
+                              (void*)windowHandle);
 
                 // TODO: set the new window size based on the dpi
                 // TODO: remake the swap chain
