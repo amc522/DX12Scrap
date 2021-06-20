@@ -15,35 +15,91 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
 {
     // Create an empty root signature.
     {
-        D3D12_ROOT_SIGNATURE_FLAGS flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
-        CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-        rootSignatureDesc.Init(0,       // number of parameters
-                               nullptr, // array of D3D12_ROOT_PARAMETER
-                               0,       // number of static samplers,
-                               nullptr, // array of D3D12_STATIC_SAMPLER_DESC
-                               flags);
+        D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+
+        // This is the highest version the sample supports. If CheckFeatureSupport succeeds, the HighestVersion returned
+        // will not be greater than this.
+        featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+
+        if(FAILED(d3d12Context.getDevice()->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData,
+                                                                sizeof(featureData))))
+        {
+            featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+        }
+
+        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_descriptor_range1
+        // This describes the descriptors that will be available to the shader. A descriptor in this case being an SRV,
+        // UAV, or CBV. For this simple setup, we have a descriptor range saying it has 1 descriptor (SRV), our texture.
+        std::array<D3D12_DESCRIPTOR_RANGE1, 1> ranges = {};
+        D3D12_DESCRIPTOR_RANGE1& range = ranges[0];
+        range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        range.NumDescriptors = 1;
+        range.BaseShaderRegister = 0;
+        range.OffsetInDescriptorsFromTableStart = 0;
+        range.RegisterSpace = 0;
+        range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+
+        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_root_parameter1
+        // The root parameter describes a parameter or argument being passed into the shader as described or declared by
+        // the root signautre. Here we are saying we have a descriptor table (a list of descritor ranges), with one
+        // range in it.
+        std::array<D3D12_ROOT_PARAMETER1, 1> rootParameters = {};
+        D3D12_ROOT_PARAMETER1& rootParameter = rootParameters[0];
+        rootParameter.DescriptorTable.NumDescriptorRanges = 1;
+        rootParameter.DescriptorTable.pDescriptorRanges = ranges.data();
+        rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_static_sampler_desc
+        // Static samplers are the same as normal samplers, except that they are not going to change after creating the
+        // root signature. Static samplers can be used to describe all the basic samplers that are used by most shaders
+        // in an engine; point, bilinear, trilinear, anisotropic 1-16, etc. Probably only some samplers used for shadows
+        // will need to be dynammic. There can be an unlimited number of static samplers in the root signature at no
+        // cost.
+        std::array<D3D12_STATIC_SAMPLER_DESC, 1> staticSamplers = {};
+        D3D12_STATIC_SAMPLER_DESC& sampler = staticSamplers[0];
+        sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler.MipLODBias = 0;
+        sampler.MaxAnisotropy = 0;
+        sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+        sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        sampler.MinLOD = 0.0f;
+        sampler.MaxLOD = D3D12_FLOAT32_MAX;
+        sampler.ShaderRegister = 0;
+        sampler.RegisterSpace = 0;
+        sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_versioned_root_signature_desc
+        D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
+        rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
+        rootSignatureDesc.Desc_1_1.NumParameters = (UINT)rootParameters.size();
+        rootSignatureDesc.Desc_1_1.pParameters = rootParameters.data();
+        rootSignatureDesc.Desc_1_1.NumStaticSamplers = (UINT)staticSamplers.size();
+        rootSignatureDesc.Desc_1_1.pStaticSamplers = staticSamplers.data();
+        rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
 
         ComPtr<ID3DBlob> signature;
         ComPtr<ID3DBlob> error;
-
-        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-d3d12serializerootsignature
-        if(FAILED(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error)))
-        {
+        HRESULT hr = D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error);
+        if(FAILED(hr)) {
             if(error != nullptr)
             {
-                spdlog::critical(L"Failed to serialize d3d12 root signature. {}",
-                                 std::wstring_view((const WCHAR*)error->GetBufferPointer(), error->GetBufferSize()));
+                spdlog::critical("Failed to serialize d3d12 root signature. {}",
+                                 std::string_view((const CHAR*)error->GetBufferPointer(), error->GetBufferSize()));
             }
             else
             {
                 spdlog::critical("Failed to serialize d3d12 root signature");
             }
-
             return;
         }
 
-        if(FAILED(d3d12Context.getDevice()->CreateRootSignature(
-               0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&mRootSignature))))
+        hr = d3d12Context.getDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(),
+                                                      IID_PPV_ARGS(&mRootSignature));
+
+        if(FAILED(hr))
         {
             spdlog::critical("Failed to create d3d12 root signature");
             return;
