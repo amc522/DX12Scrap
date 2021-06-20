@@ -1,3 +1,8 @@
+// RenderScene is responsible for rendering the main scene and organizing the different rendering passes. RenderScene
+// will see a lot of change. In earlier implementations, it will have lots of inline creation of D3D12 objects.
+// Eventaully those D3D12 objects will be encapsulated in other classes and RenderScene will begin to look a lot more
+// platform agnostic.
+
 #pragma once
 
 #include <cstdint>
