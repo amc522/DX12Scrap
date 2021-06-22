@@ -146,7 +146,7 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
         //    c. Copy cpu texture data to mapped upload buffer data
         //    d. Signal to the upload texture that the memory copy is finished (via Unmap)
         // 4. Copy the upload buffer to the final GPU texture (via CopyTextureRegion)
-        // 5. Transition the resource from the copy state to the read state
+        // 5. Transition the resource from the copy state to the shader resource state
         // 6. Create the SRV
 
         // Q: Why use two different GPU textures?
@@ -379,6 +379,22 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
 
             // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12graphicscommandlist-copytextureregion
             mCommandList->CopyTextureRegion(&destCopyLocation, 0, 0, 0, &sourceCopyLocation, nullptr);
+        }
+
+        //=============================================================================
+        // 5. Transition the resource from the copy state to the shader resource state
+        //=============================================================================
+        {
+            D3D12_RESOURCE_BARRIER transitionBarrier = {};
+            transitionBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            transitionBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+            transitionBarrier.Transition.pResource = mTexture.Get();
+            transitionBarrier.Transition.Subresource = 0;
+            transitionBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+            transitionBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12graphicscommandlist-resourcebarrier
+            mCommandList->ResourceBarrier(1, &transitionBarrier);
         }
     }
 
