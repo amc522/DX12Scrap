@@ -82,8 +82,10 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
 
         ComPtr<ID3DBlob> signature;
         ComPtr<ID3DBlob> error;
-        HRESULT hr = D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error);
-        if(FAILED(hr)) {
+        HRESULT hr =
+            D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error);
+        if(FAILED(hr))
+        {
             if(error != nullptr)
             {
                 spdlog::critical("Failed to serialize d3d12 root signature. {}",
@@ -97,7 +99,7 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
         }
 
         hr = d3d12Context.getDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(),
-                                                      IID_PPV_ARGS(&mRootSignature));
+                                                           IID_PPV_ARGS(&mRootSignature));
 
         if(FAILED(hr))
         {
@@ -122,12 +124,99 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
             return;
         }
 
-        // Command lists are created in the recording state, but there is nothing
-        // to record yet. The main loop expects it to be closed, so close it now.
-        if(FAILED(mCommandList->Close())) { spdlog::error("Failed to close graphics command list"); }
-
         spdlog::info("Created d3d12 command list");
     }
+
+    // Note: ComPtr's are CPU objects but this resource needs to stay in scope until
+    // the command list that references it has finished executing on the GPU.
+    // We will flush the GPU at the end of this method to ensure the resource is not
+    // prematurely destroyed.
+    ComPtr<ID3D12Resource> textureUploadHeap;
+
+    { // Create the texture.
+        // 1. Create GPU texture
+        //    a. Get allocation info. This will get the byte aligment for the texture. You can set the alignment in
+        //       D3D12_RESOURCE_DESC to 0 and it will figure out the alignment. Expicitly grabbing it here to use later.
+        // 2. Create upload texture
+        // 3. Copy cpu texture data to upload texture
+        //    aa. Get some kind of texture data
+        //    a. Query for the actual hardware storage information of the texture (D3D12_PLACED_SUBRESOURCE_FOOTPRINT
+        //       via GetCopyableFootprints)
+        //    b. Acquire pointer to upload texture memory (via Map)
+        //    c. Copy cpu texture data to mapped upload texture data
+        //    d. Signal to the upload texture that the memory copy is finished (via Unmap)
+        // 4. Copy the upload texture to the final GPU texture (via CopyTextureRegion)
+        // 5. Transition the resource from the copy state to the read state
+        // 6. Create the SRV
+
+        // Q: Why use two different GPU textures?
+        // A: GPUs have different kinds of memory that are made faster for certain tasks but are slower for others. The
+        // "upload" memory if more efficient at reading from cpu memory, but has less bandwidth available for the gpu
+        // processor. The memory where the texture eventually ends up can't read from the cpu, and has full bandwidth to
+        // the gpu processor. This type of memory is most of the memory on the gpu.
+        // For more information read https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_heap_type.
+        // Specifically look at the descriptions for 'D3D12_HEAP_TYPE_UPLOAD' and 'D3D12_HEAP_TYPE_DEFAULT'.
+
+        constexpr UINT textureWidth = 1024;
+        constexpr UINT textureHeight = 1024;
+        constexpr UINT bytesPerPixel = 4;
+
+        D3D12_RESOURCE_ALLOCATION_INFO allocInfo;
+
+        //=======================
+        // 1. Create GPU texture
+        //=======================
+        D3D12_RESOURCE_DESC textureDesc = {};
+        {
+            // Describe a Texture2D.
+            textureDesc.MipLevels = 1;
+            textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            textureDesc.Width = textureWidth;
+            textureDesc.Height = textureHeight;
+            textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+            textureDesc.DepthOrArraySize = 1;
+            textureDesc.SampleDesc.Count = 1;
+            textureDesc.SampleDesc.Quality = 0;
+            textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+
+            //-----------------------------------------------------------------------------------
+            // 1.a.
+            // Get the alignment and size of the resource that will actually be used on the gpu.
+            // ----------------------------------------------------------------------------------
+
+            // Here's and article describing in detail what this memory alignment stuff is all about:
+            // https://asawicki.info/news_1726_secrets_of_direct3d_12_resource_alignment
+
+            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getresourceallocationinfo
+            allocInfo = d3d12Context.getDevice()->GetResourceAllocationInfo(0, 1, &textureDesc);
+            textureDesc.Alignment = allocInfo.Alignment;
+
+            // The destination heap of the texture. This is the heap where the texture will be for its lifetime on the
+            // gpu.
+            D3D12_HEAP_PROPERTIES defaultHeapProps = {};
+            defaultHeapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+            defaultHeapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+            defaultHeapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+            defaultHeapProps.CreationNodeMask = 0;
+            defaultHeapProps.VisibleNodeMask = 0;
+
+            // Actually create the resource
+            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommittedresource
+            HRESULT hr = d3d12Context.getDevice()->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE,
+                                                                           &textureDesc, D3D12_RESOURCE_STATE_COPY_DEST,
+                                                                           nullptr, IID_PPV_ARGS(&mTexture));
+
+            if(FAILED(hr))
+            {
+                spdlog::critical("Failed to create d3d12 gpu texture");
+                return;
+            }
+
+            mTexture->SetName(L"FirstTexture");
+        }
+    }
+
+    if(FAILED(mCommandList->Close())) { spdlog::error("Failed to close graphics command list"); }
 
     { // Create synchronization objects and wait until assets have been uploaded to the GPU.
         HRESULT hr = d3d12Context.getDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence));

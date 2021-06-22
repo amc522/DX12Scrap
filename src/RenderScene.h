@@ -12,6 +12,7 @@ struct ID3D12GraphicsCommandList;
 struct ID3D12Device;
 struct ID3D12Fence;
 struct ID3D12PipelineState;
+struct ID3D12Resource;
 struct ID3D12RootSignature;
 
 namespace scrap
@@ -39,6 +40,8 @@ private:
     Microsoft::WRL::ComPtr<ID3D12Fence> mFence;
     uint64_t mFenceValue = 0;
     HANDLE mFenceEvent = nullptr;
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> mTexture;
 
     bool mInitialized = false;
 };
