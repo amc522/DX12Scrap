@@ -137,15 +137,15 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
         // 1. Create GPU texture
         //    a. Get allocation info. This will get the byte aligment for the texture. You can set the alignment in
         //       D3D12_RESOURCE_DESC to 0 and it will figure out the alignment. Expicitly grabbing it here to use later.
-        // 2. Create upload texture
-        // 3. Copy cpu texture data to upload texture
+        // 2. Create upload buffer
+        // 3. Copy cpu texture data to upload buffer
         //    aa. Get some kind of texture data
         //    a. Query for the actual hardware storage information of the texture (D3D12_PLACED_SUBRESOURCE_FOOTPRINT
         //       via GetCopyableFootprints)
         //    b. Acquire pointer to upload texture memory (via Map)
-        //    c. Copy cpu texture data to mapped upload texture data
+        //    c. Copy cpu texture data to mapped upload buffer data
         //    d. Signal to the upload texture that the memory copy is finished (via Unmap)
-        // 4. Copy the upload texture to the final GPU texture (via CopyTextureRegion)
+        // 4. Copy the upload buffer to the final GPU texture (via CopyTextureRegion)
         // 5. Transition the resource from the copy state to the read state
         // 6. Create the SRV
 
@@ -213,6 +213,42 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
             }
 
             mTexture->SetName(L"FirstTexture");
+        }
+
+        //==========================
+        // 2. Create upload buffer
+        //==========================
+        D3D12_RESOURCE_DESC textureUploadDesc = {};
+        {
+            textureUploadDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+            textureUploadDesc.Alignment = allocInfo.Alignment;
+            textureUploadDesc.Width = allocInfo.SizeInBytes;
+            textureUploadDesc.Height = 1;
+            textureUploadDesc.DepthOrArraySize = 1;
+            textureUploadDesc.MipLevels = 1;
+            textureUploadDesc.Format = DXGI_FORMAT_UNKNOWN;
+            textureUploadDesc.SampleDesc.Count = 1;
+            textureUploadDesc.SampleDesc.Quality = 0;
+            textureUploadDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+            textureUploadDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+            D3D12_HEAP_PROPERTIES uploadHeapProps = {};
+            uploadHeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+            uploadHeapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+            uploadHeapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+            uploadHeapProps.CreationNodeMask = 0;
+            uploadHeapProps.VisibleNodeMask = 0;
+
+            HRESULT hr = d3d12Context.getDevice()->CreateCommittedResource(
+                &uploadHeapProps, D3D12_HEAP_FLAG_NONE, &textureUploadDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+                IID_PPV_ARGS(&textureUploadHeap));
+            if(FAILED(hr))
+            {
+                spdlog::critical("Failed to create texture upload resource.");
+                return;
+            }
+
+            textureUploadHeap->SetName(L"FirstTextureUpload");
         }
     }
 
