@@ -252,7 +252,7 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
         }
 
         //============================================
-        // 3. Copy cpu texture data to upload texture
+        // 3. Copy cpu texture data to upload buffer
         //============================================
         D3D12_PLACED_SUBRESOURCE_FOOTPRINT subresourceFootprint;
         {
@@ -361,6 +361,24 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
 
             // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12resource-unmap
             textureUploadHeap->Unmap(0, nullptr);
+        }
+
+        //=============================================================================
+        // 4. Copy the upload buffer to the final GPU texture (via CopyTextureRegion)
+        //=============================================================================
+        {
+            D3D12_TEXTURE_COPY_LOCATION destCopyLocation = {};
+            destCopyLocation.pResource = mTexture.Get();
+            destCopyLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+            destCopyLocation.SubresourceIndex = 0;
+
+            D3D12_TEXTURE_COPY_LOCATION sourceCopyLocation;
+            sourceCopyLocation.pResource = textureUploadHeap.Get();
+            sourceCopyLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+            sourceCopyLocation.PlacedFootprint = subresourceFootprint;
+
+            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12graphicscommandlist-copytextureregion
+            mCommandList->CopyTextureRegion(&destCopyLocation, 0, 0, 0, &sourceCopyLocation, nullptr);
         }
     }
 
