@@ -250,6 +250,118 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
 
             textureUploadHeap->SetName(L"FirstTextureUpload");
         }
+
+        //============================================
+        // 3. Copy cpu texture data to upload texture
+        //============================================
+        D3D12_PLACED_SUBRESOURCE_FOOTPRINT subresourceFootprint;
+        {
+            //-------------------------------------
+            // 3.aa. Generate a checkboard texture
+            //-------------------------------------
+
+            std::vector<UINT8> texture = [&]() {
+                const UINT rowPitch = textureWidth * bytesPerPixel;
+                const UINT cellPitch = rowPitch >> 3;      // The width of a cell in the checkboard texture.
+                const UINT cellHeight = textureWidth >> 3; // The height of a cell in the checkerboard texture.
+                const UINT textureSize = rowPitch * textureHeight;
+
+                std::vector<UINT8> data(textureSize);
+                UINT8* pData = &data[0];
+
+                for(UINT n = 0; n < textureSize; n += bytesPerPixel)
+                {
+                    UINT x = n % rowPitch;
+                    UINT y = n / rowPitch;
+                    UINT i = x / cellPitch;
+                    UINT j = y / cellHeight;
+
+                    if(i % 2 == j % 2)
+                    {
+                        pData[n] = 0x00;     // R
+                        pData[n + 1] = 0x00; // G
+                        pData[n + 2] = 0x00; // B
+                        pData[n + 3] = 0xff; // A
+                    }
+                    else
+                    {
+                        pData[n] = 0xff;     // R
+                        pData[n + 1] = 0xff; // G
+                        pData[n + 2] = 0xff; // B
+                        pData[n + 3] = 0xff; // A
+                    }
+                }
+
+                return data;
+            }();
+
+            D3D12_SUBRESOURCE_DATA textureData = {};
+            textureData.pData = texture.data();
+            textureData.RowPitch = textureWidth * bytesPerPixel;
+            textureData.SlicePitch = textureData.RowPitch * textureHeight;
+
+            //----------------------------------------------------------------------------------------------------------
+            // 3.a. Query for the actual hardware storage information of the texture (D3D12_PLACED_SUBRESOURCE_FOOTPRINT
+            //      via GetCopyableFootprints)
+            //----------------------------------------------------------------------------------------------------------
+
+            UINT64 rowByteSize;
+            UINT numRows;
+            UINT64 totalBytes;
+
+            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getcopyablefootprints
+            d3d12Context.getDevice()->GetCopyableFootprints(
+                &textureDesc,
+                0,                     // first subresource
+                1,                     // num subresources
+                0,                     // base offset
+                &subresourceFootprint, // (out) D3D12_PLACED_SUBRESOURCE_FOOTPRINT array
+                &numRows,              // (out) total bytes
+                &rowByteSize,          // (out) row byte size
+                &totalBytes            // (out) totalBytes
+            );
+
+            if(textureUploadDesc.Width < totalBytes + subresourceFootprint.Offset)
+            {
+                spdlog::critical("Texture upload heap is too small");
+                return;
+            }
+
+            //---------------------------------------------------------
+            // 3.b. Acquire pointer to upload texture memory (via Map)
+            //---------------------------------------------------------
+            BYTE* pMapData;
+            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12resource-map
+            HRESULT hr = textureUploadHeap->Map(0, nullptr, reinterpret_cast<void**>(&pMapData));
+            if(FAILED(hr))
+            {
+                spdlog::critical("Failed to map texture upload heap to a cpu buffer");
+                return;
+            }
+
+            //----------------------------------------------------------
+            // 3.c. Copy cpu texture data to mapped upload texture data
+            //----------------------------------------------------------
+            D3D12_MEMCPY_DEST destData = {};
+            destData.pData = pMapData + subresourceFootprint.Offset;
+            destData.RowPitch = subresourceFootprint.Footprint.RowPitch;
+            destData.SlicePitch = SIZE_T(subresourceFootprint.Footprint.RowPitch) * SIZE_T(numRows);
+
+            // d3d12x function
+            MemcpySubresource(&destData,                           // destination
+                              &textureData,                        // source
+                              static_cast<SIZE_T>(rowByteSize),    // row size in bytes
+                              numRows,                             // number of rows
+                              subresourceFootprint.Footprint.Depth // number of slices
+            );
+
+            //--------------------------------------------------------------------------------
+            // 3.d. Signal to the upload texture that the memory copy is finished (via Unmap)
+            //--------------------------------------------------------------------------------
+
+            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12resource-unmap
+            textureUploadHeap->Unmap(0, nullptr);
+        }
     }
 
     if(FAILED(mCommandList->Close())) { spdlog::error("Failed to close graphics command list"); }
