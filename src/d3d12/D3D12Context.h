@@ -74,6 +74,9 @@ public:
     ID3D12Resource* getBackBuffer() { return mRenderTargets[mFrameIndex].Get(); }
     D3D12_CPU_DESCRIPTOR_HANDLE getBackBufferRtv() const;
 
+    ID3D12DescriptorHeap* getSrvHeap() { return mSrvHeap.Get(); }
+    uint32_t getSrvDescriptorHeapSize() const { return mSrvDescriptorHeapSize; }
+
     glm::i32vec2 frameSize() const { return mFrameSize; }
 
     void present();
@@ -100,6 +103,9 @@ private:
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mRtvHeap;
     std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, sFrameCount> mRenderTargets;
     uint32_t mRtvDescriptorSize = 0;
+
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mSrvHeap;
+    uint32_t mSrvDescriptorHeapSize = 0;
 
     glm::i32vec2 mFrameSize;
     uint32_t mFrameIndex = 0;

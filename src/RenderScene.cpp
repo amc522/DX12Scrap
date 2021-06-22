@@ -396,6 +396,20 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
             // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12graphicscommandlist-resourcebarrier
             mCommandList->ResourceBarrier(1, &transitionBarrier);
         }
+
+        //===================
+        // 6. Create the SRV
+        //===================
+        {
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+            srvDesc.Format = textureDesc.Format;
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srvDesc.Texture2D.MipLevels = 1;
+
+            d3d12Context.getDevice()->CreateShaderResourceView(mTexture.Get(), &srvDesc,
+                                                               d3d12Context.getSrvHeap()->GetCPUDescriptorHandleForHeapStart());
+        }
     }
 
     if(FAILED(mCommandList->Close())) { spdlog::error("Failed to close graphics command list"); }
