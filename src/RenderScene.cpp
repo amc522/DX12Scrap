@@ -407,12 +407,16 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
             srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
             srvDesc.Texture2D.MipLevels = 1;
 
-            d3d12Context.getDevice()->CreateShaderResourceView(mTexture.Get(), &srvDesc,
-                                                               d3d12Context.getSrvHeap()->GetCPUDescriptorHandleForHeapStart());
+            d3d12Context.getDevice()->CreateShaderResourceView(
+                mTexture.Get(), &srvDesc, d3d12Context.getSrvHeap()->GetCPUDescriptorHandleForHeapStart());
         }
     }
 
     if(FAILED(mCommandList->Close())) { spdlog::error("Failed to close graphics command list"); }
+
+    // Execute the command list.
+    std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.Get()};
+    d3d12Context.getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()), commandLists.data());
 
     { // Create synchronization objects and wait until assets have been uploaded to the GPU.
         HRESULT hr = d3d12Context.getDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence));
@@ -559,6 +563,11 @@ void RenderScene::render(D3D12Context& d3d12Context)
 
     // Set necessary state.
     mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
+
+    std::array<ID3D12DescriptorHeap*, 1> descriptorHeaps = {d3d12Context.getSrvHeap()};
+    mCommandList->SetDescriptorHeaps((UINT)descriptorHeaps.size(), descriptorHeaps.data());
+    mCommandList->SetGraphicsRootDescriptorTable(0, d3d12Context.getSrvHeap()->GetGPUDescriptorHandleForHeapStart());
+
     mCommandList->RSSetViewports(1, &viewport);
     mCommandList->RSSetScissorRects(1, &scissorRect);
 
