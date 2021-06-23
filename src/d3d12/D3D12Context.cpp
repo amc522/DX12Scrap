@@ -253,6 +253,7 @@ D3D12Context::~D3D12Context()
         mCommandQueue.Reset();
         mRenderTargets.fill(nullptr);
         mRtvHeap.Reset();
+        mSrvHeap.Reset();
         mSwapChain.Reset();
 
         { // Check for d3d12 object leaks
@@ -260,6 +261,12 @@ D3D12Context::~D3D12Context()
             if(SUCCEEDED(mDevice->QueryInterface(IID_PPV_ARGS(&debugDevice))))
             {
                 mDevice.Reset();
+                mDevice1.Reset();
+                mDevice2.Reset();
+                mDevice3.Reset();
+                mDevice4.Reset();
+                mDevice5.Reset();
+                mDevice6.Reset();
 
                 spdlog::info("ID3D12DebugDevice::ReportLiveDeviceObjects");
 
@@ -278,6 +285,13 @@ D3D12Context::~D3D12Context()
         }
 
         mDevice.Reset();
+        mDevice1.Reset();
+        mDevice2.Reset();
+        mDevice3.Reset();
+        mDevice4.Reset();
+        mDevice5.Reset();
+        mDevice6.Reset();
+
         mAdapter.Reset();
 
         { // Check for dxgi and d3d12 object leaks
