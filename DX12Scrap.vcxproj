@@ -31,6 +31,7 @@
     <ClInclude Include="src\d3d12\D3D12Context.h" />
     <ClInclude Include="src\d3d12\D3D12Strings.h" />
     <ClInclude Include="src\RenderScene.h" />
+    <ClInclude Include="src\StringUtils.h" />
     <ClInclude Include="src\Window.h" />
   </ItemGroup>
   <ItemGroup>

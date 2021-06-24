@@ -101,7 +101,31 @@ D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
 
     getHardwareAdapter(gpuPreference, featureLevel, dxgiFactory4.Get());
 
-    createDevice(featureLevel);
+    if(FAILED(createDevice(featureLevel))) { return; }
+
+    { // check for hlsl dynamic resources support
+        // https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html
+        D3D12_FEATURE_DATA_D3D12_OPTIONS optionsData = {};
+        if(SUCCEEDED(mDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &optionsData, sizeof(optionsData))))
+        {
+            spdlog::info("{}", optionsData.ResourceBindingTier);
+        }
+
+        D3D12_FEATURE_DATA_SHADER_MODEL shaderModelData{D3D_SHADER_MODEL_6_6};
+        if(SUCCEEDED(
+               mDevice->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModelData, sizeof(shaderModelData))))
+        {
+            spdlog::info("{}", shaderModelData.HighestShaderModel);
+        }
+
+        if(optionsData.ResourceBindingTier < D3D12_RESOURCE_BINDING_TIER_3 ||
+           shaderModelData.HighestShaderModel < D3D_SHADER_MODEL_6_6)
+        {
+            spdlog::critical("D3D12 HLSL dynamic resources not supported");
+            // This feature isn't being used yet, so don't need to bail. But it will be used in the near future.
+            // return;
+        }
+    }
 
 #ifdef _DEBUG
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12sdklayers/nn-d3d12sdklayers-id3d12infoqueue
@@ -445,11 +469,11 @@ HRESULT D3D12Context::createDevice(D3D_FEATURE_LEVEL featureLevel)
 {
     if(FAILED(D3D12CreateDevice(mAdapter.Get(), featureLevel, IID_PPV_ARGS(&mDevice))))
     {
-        spdlog::critical("Failed to create d3d12 device");
+        spdlog::critical("Failed to create d3d12 device with {}", featureLevel);
         return E_FAIL;
     }
 
-    spdlog::info("Created d3d12 device");
+    spdlog::info("Created d3d12 device with {}", featureLevel);
 
     ComPtr<ID3D12Device1> device1;
     if(FAILED(mDevice->QueryInterface(IID_PPV_ARGS(&device1)))) { return S_OK; }
