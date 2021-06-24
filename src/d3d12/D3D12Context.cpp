@@ -14,6 +14,19 @@
 #endif
 #include <spdlog/spdlog.h>
 
+// These exports are needed for the DX12 Agility SDK. The agility sdk is a portable dx12 binary to be shipped with the
+// executable. It allows for later dx12 versions than the host machine might have installed.
+//
+// The DX12 Agility SDK is currently downloaded and installed for development through NuGet in the Visual Studio
+// project. Everything should happen automagically.
+//
+// https://devblogs.microsoft.com/directx/gettingstarted-dx12agility/#howto
+extern "C"
+{
+    __declspec(dllexport) extern const UINT D3D12SDKVersion = 4;
+    __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\";
+}
+
 using namespace Microsoft::WRL;
 
 namespace scrap
