@@ -4,9 +4,10 @@
 
 #pragma once
 
+#include <string_view>
+
 #include <Windows.h>
 #include <glm/vec2.hpp>
-#include <string_view>
 
 struct SDL_Window;
 struct SDL_WindowEvent;

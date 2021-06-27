@@ -2,10 +2,11 @@
 
 #pragma once
 
+#include <string_view>
+
 #include <d3d12.h>
 #include <d3dcommon.h>
 #include <fmt/format.h>
-#include <string_view>
 
 namespace scrap
 {

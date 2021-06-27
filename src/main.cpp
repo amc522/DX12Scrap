@@ -2,9 +2,10 @@
 
 #include "Application.h"
 
-#include <Windows.h>
 #include <array>
 #include <locale>
+
+#include <Windows.h>
 #include <spdlog/sinks/msvc_sink.h>
 #include <spdlog/sinks/stdout_sinks.h>
 #include <spdlog/spdlog.h>

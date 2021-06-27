@@ -1,7 +1,8 @@
 #pragma once
 
-#include <fmt/core.h>
 #include <string_view>
+
+#include <fmt/core.h>
 
 namespace scrap
 {

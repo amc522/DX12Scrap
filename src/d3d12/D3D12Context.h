@@ -5,6 +5,7 @@
 #pragma once
 
 #include <array>
+
 #include <fmt/format.h>
 #include <glm/vec2.hpp>
 #include <wrl/client.h>
@@ -68,6 +69,7 @@ public:
     ID3D12Device5* getDevice5() { return mDevice5.Get(); }
     ID3D12Device6* getDevice6() { return mDevice6.Get(); }
 
+    uint32_t getFrameIndex() const { return mFrameIndex; }
     ID3D12CommandAllocator* getCommandAllocator() { return mCommandAllocator.Get(); }
     ID3D12CommandQueue* getCommandQueue() { return mCommandQueue.Get(); }
 

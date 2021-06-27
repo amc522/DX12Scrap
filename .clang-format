@@ -24,6 +24,13 @@ ColumnLimit: '120'
 ConstructorInitializerAllOnOneLineOrOnePerLine: 'true'
 Cpp11BracedListStyle: 'true'
 IncludeBlocks: Regroup
+IncludeCategories:
+    - Regex:    '<[[:alnum:]|_]+>'
+      Priority: 2
+    - Regex:    '"[[:alnum:]|_|\/]+\.[[:alpha:]]+"'
+      Priority: 1
+    - Regex:    '<[[:alnum:]|_|\/]+\.[[:alpha:]]+>'
+      Priority: 3
 IndentCaseLabels: 'false'
 IndentPPDirectives: AfterHash
 IndentWidth: '4'
