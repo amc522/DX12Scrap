@@ -5,7 +5,9 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
+
 #include <wrl/client.h>
 
 struct ID3D12GraphicsCommandList;
@@ -32,13 +34,14 @@ public:
 
 private:
     bool loadShaders(ID3D12Device* device);
-    void waitForPreviousFrame(D3D12Context& d3d12Context);
+    void waitOnGpu(D3D12Context& d3d12Context);
+    void endFrame(D3D12Context& d3d12Context);
 
     Microsoft::WRL::ComPtr<ID3D12RootSignature> mRootSignature;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> mPso;
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> mCommandList;
     Microsoft::WRL::ComPtr<ID3D12Fence> mFence;
-    uint64_t mFenceValue = 0;
+    std::array<uint64_t, 2> mFenceValues{};
     HANDLE mFenceEvent = nullptr;
 
     Microsoft::WRL::ComPtr<ID3D12Resource> mTexture;

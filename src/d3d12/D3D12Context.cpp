@@ -267,14 +267,18 @@ D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
         spdlog::info("Created render target views");
     }
 
-    // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandallocator
-    if(FAILED(mDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&mCommandAllocator))))
+    for(size_t frameIndex = 0; frameIndex < sFrameCount; ++frameIndex)
     {
-        spdlog::critical("Failed to create d3d12 command allocator");
-        return;
+        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandallocator
+        if(FAILED(mDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                                  IID_PPV_ARGS(&mCommandAllocators[frameIndex]))))
+        {
+            spdlog::critical("Failed to create d3d12 command allocator");
+            return;
+        }
     }
 
-    spdlog::info("Created d3d12 command allocator");
+    spdlog::info("Created d3d12 command allocators");
 
     mInitialized = true;
 }
@@ -286,7 +290,7 @@ D3D12Context::~D3D12Context()
 #ifdef _DEBUG
     if(mDevice != nullptr)
     {
-        mCommandAllocator.Reset();
+        mCommandAllocators.fill(nullptr);
         mCommandQueue.Reset();
         mRenderTargets.fill(nullptr);
         mRtvHeap.Reset();

@@ -70,7 +70,7 @@ public:
     ID3D12Device6* getDevice6() { return mDevice6.Get(); }
 
     uint32_t getFrameIndex() const { return mFrameIndex; }
-    ID3D12CommandAllocator* getCommandAllocator() { return mCommandAllocator.Get(); }
+    ID3D12CommandAllocator* getCommandAllocator() { return mCommandAllocators[mFrameIndex].Get(); }
     ID3D12CommandQueue* getCommandQueue() { return mCommandQueue.Get(); }
 
     ID3D12Resource* getBackBuffer() { return mRenderTargets[mFrameIndex].Get(); }
@@ -100,7 +100,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D12Device5> mDevice5;
     Microsoft::WRL::ComPtr<ID3D12Device6> mDevice6;
     Microsoft::WRL::ComPtr<ID3D12CommandQueue> mCommandQueue;
-    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> mCommandAllocator;
+    std::array<Microsoft::WRL::ComPtr<ID3D12CommandAllocator>, 2> mCommandAllocators;
     Microsoft::WRL::ComPtr<IDXGISwapChain3> mSwapChain;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mRtvHeap;
     std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, sFrameCount> mRenderTargets;

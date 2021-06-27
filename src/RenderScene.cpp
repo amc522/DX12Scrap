@@ -419,8 +419,10 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
     d3d12Context.getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()), commandLists.data());
 
     { // Create synchronization objects and wait until assets have been uploaded to the GPU.
-        HRESULT hr = d3d12Context.getDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence));
-        mFenceValue = 1;
+        uint32_t currentFrameIndex = d3d12Context.getFrameIndex();
+        HRESULT hr = d3d12Context.getDevice()->CreateFence(mFenceValues[currentFrameIndex], D3D12_FENCE_FLAG_NONE,
+                                                           IID_PPV_ARGS(&mFence));
+        ++mFenceValues[currentFrameIndex];
 
         // Create an event handle to use for frame synchronization.
         // https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createeventw
@@ -434,7 +436,7 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
         // Wait for the command list to execute; we are reusing the same command
         // list in our main loop but for now, we just want to wait for setup to
         // complete before continuing.
-        waitForPreviousFrame(d3d12Context);
+        waitOnGpu(d3d12Context);
 
         spdlog::info("Created syncronization objects");
     }
@@ -605,45 +607,65 @@ void RenderScene::render(D3D12Context& d3d12Context)
     // Present the frame.
     d3d12Context.present();
 
-    waitForPreviousFrame(d3d12Context);
+    endFrame(d3d12Context);
 }
 
 void RenderScene::shutdown(D3D12Context& d3d12Context)
 {
     spdlog::info("Shutting down RenderScene");
-    waitForPreviousFrame(d3d12Context);
+    waitOnGpu(d3d12Context);
 }
 
-void RenderScene::waitForPreviousFrame(D3D12Context& d3d12Context)
+void RenderScene::waitOnGpu(D3D12Context& d3d12Context)
 {
-    // WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
-    // This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
-    // sample illustrates how to use fences for efficient resource usage and to
-    // maximize GPU utilization.
+    if(mFence == nullptr) { return; }
 
-    // Signal and increment the fence value.
-    const UINT64 fence = mFenceValue;
+    const uint64_t fenceValue = mFenceValues[d3d12Context.getFrameIndex()];
+
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12commandqueue-signal
-    if(FAILED(d3d12Context.getCommandQueue()->Signal(mFence.Get(), fence)))
+    if(FAILED(d3d12Context.getCommandQueue()->Signal(mFence.Get(), fenceValue)))
     {
         spdlog::error("Failed to update fence.");
         return;
     }
-    mFenceValue++;
 
-    // Wait until the previous frame is finished.
-    if(mFence->GetCompletedValue() < fence)
+    if(FAILED(mFence->SetEventOnCompletion(fenceValue, mFenceEvent)))
     {
-        if(FAILED(mFence->SetEventOnCompletion(fence, mFenceEvent)))
+        spdlog::error("Fence SetEventOnCompletion call failed");
+        return;
+    }
+
+    WaitForSingleObject(mFenceEvent, INFINITE);
+}
+
+void RenderScene::endFrame(D3D12Context& d3d12Context)
+{
+    // Schedule a Signal command in the queue.
+    const UINT64 currentFenceValue = mFenceValues[d3d12Context.getFrameIndex()];
+    if(FAILED(d3d12Context.getCommandQueue()->Signal(mFence.Get(), currentFenceValue)))
+    {
+        spdlog::error("Failed to signal command queue;");
+        return;
+    }
+
+    // Update the frame index.
+    d3d12Context.swap();
+    const uint32_t currentFrameIndex = d3d12Context.getFrameIndex();
+
+    // If the next frame is not ready to be rendered yet, wait until it is ready.
+    if(mFence->GetCompletedValue() < mFenceValues[currentFrameIndex])
+    {
+        if(FAILED(mFence->SetEventOnCompletion(mFenceValues[currentFrameIndex], mFenceEvent)))
         {
             spdlog::error("Fence SetEventOnCompletion call failed");
             return;
         }
 
-        WaitForSingleObject(mFenceEvent, INFINITE);
+        WaitForSingleObjectEx(mFenceEvent, INFINITE, FALSE);
     }
 
-    d3d12Context.swap();
+    // Set the fence value for the next frame.
+    mFenceValues[currentFrameIndex] = currentFenceValue + 1;
 }
 
 } // namespace scrap
