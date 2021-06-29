@@ -1,4 +1,4 @@
-#include "D3D12PermanentDescriporHeapAllocator.h"
+#include "D3D12PermanentDescriptorHeap.h"
 
 #include "d3d12/D3D12Context.h"
 #include "d3d12/D3D12Strings.h"

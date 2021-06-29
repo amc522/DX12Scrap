@@ -22,7 +22,7 @@
   <ItemGroup>
     <ClCompile Include="src\Application.cpp" />
     <ClCompile Include="src\d3d12\D3D12Context.cpp" />
-    <ClCompile Include="src\d3d12\D3D12PermanentDescriporHeapAllocator.cpp" />
+    <ClCompile Include="src\d3d12\D3D12PermanentDescriptorHeap.cpp" />
     <ClCompile Include="src\FreeBlockTracker.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\RenderScene.cpp" />
@@ -31,7 +31,7 @@
   <ItemGroup>
     <ClInclude Include="src\Application.h" />
     <ClInclude Include="src\d3d12\D3D12Context.h" />
-    <ClInclude Include="src\d3d12\D3D12PermanentDescriporHeapAllocator.h" />
+    <ClInclude Include="src\d3d12\D3D12PermanentDescriptorHeap.h" />
     <ClInclude Include="src\d3d12\D3D12Strings.h" />
     <ClInclude Include="src\FreeBlockTracker.h" />
     <ClInclude Include="src\RenderScene.h" />
