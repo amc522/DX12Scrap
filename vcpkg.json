@@ -4,6 +4,7 @@
   "version": "20210606",
   "dependencies": [
     "d3dx12",
+    "tl-expected",
     "fmt",
     "glm",
     "sdl2",
