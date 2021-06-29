@@ -28,6 +28,9 @@
     <ClCompile Include="src\FreeBlockTracker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\d3d12\D3D12PermanentDescriporHeapAllocator.cpp">
+      <Filter>Source Files\d3d12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application.h">
@@ -50,6 +53,9 @@
     </ClInclude>
     <ClInclude Include="src\FreeBlockTracker.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\d3d12\D3D12PermanentDescriporHeapAllocator.h">
+      <Filter>Source Files\d3d12</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
