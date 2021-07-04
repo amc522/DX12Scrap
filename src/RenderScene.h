@@ -5,6 +5,9 @@
 
 #pragma once
 
+#include "d3d12/D3D12Config.h"
+#include "d3d12/D3D12FixedDescriptorHeap.h"
+
 #include <array>
 #include <cstdint>
 
@@ -45,6 +48,7 @@ private:
     HANDLE mFenceEvent = nullptr;
 
     Microsoft::WRL::ComPtr<ID3D12Resource> mTexture;
+    d3d12::FixedDescriptorHeapDescriptor mTextureSrv;
 
     bool mInitialized = false;
 };

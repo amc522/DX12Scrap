@@ -37,7 +37,7 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
         range.BaseShaderRegister = 0;
         range.OffsetInDescriptorsFromTableStart = 0;
         range.RegisterSpace = 0;
-        range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+        range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
 
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_root_parameter1
         // The root parameter describes a parameter or argument being passed into the shader as described or declared by
@@ -407,8 +407,14 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
             srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
             srvDesc.Texture2D.MipLevels = 1;
 
-            d3d12Context.getDevice()->CreateShaderResourceView(
-                mTexture.Get(), &srvDesc, d3d12Context.getSrvHeap()->GetCPUDescriptorHandleForHeapStart());
+            auto descriptor = d3d12Context.getCbvSrvUavHeap().createShaderResourceView(d3d12Context, mTexture.Get(), srvDesc);
+            if(!descriptor)
+            {
+                spdlog::critical("Failed to create texture SRV");
+                return;
+            }
+
+            mTextureSrv = std::move(descriptor.value());
         }
     }
 
@@ -566,9 +572,9 @@ void RenderScene::render(D3D12Context& d3d12Context)
     // Set necessary state.
     mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
-    std::array<ID3D12DescriptorHeap*, 1> descriptorHeaps = {d3d12Context.getSrvHeap()};
+    std::array<ID3D12DescriptorHeap*, 1> descriptorHeaps = {d3d12Context.getCbvSrvUavHeap().getGpuDescriptorHeap()};
     mCommandList->SetDescriptorHeaps((UINT)descriptorHeaps.size(), descriptorHeaps.data());
-    mCommandList->SetGraphicsRootDescriptorTable(0, d3d12Context.getSrvHeap()->GetGPUDescriptorHandleForHeapStart());
+    mCommandList->SetGraphicsRootDescriptorTable(0, d3d12Context.getCbvSrvUavHeap().getGpuDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
 
     mCommandList->RSSetViewports(1, &viewport);
     mCommandList->RSSetScissorRects(1, &scissorRect);

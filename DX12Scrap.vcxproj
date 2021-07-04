@@ -31,6 +31,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application.h" />
+    <ClInclude Include="src\d3d12\D3D12Config.h" />
     <ClInclude Include="src\d3d12\D3D12Context.h" />
     <ClInclude Include="src\d3d12\D3D12FixedDescriptorHeap.h" />
     <ClInclude Include="src\d3d12\D3D12PermanentDescriptorHeap.h" />

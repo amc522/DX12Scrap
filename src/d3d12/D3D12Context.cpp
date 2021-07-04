@@ -213,45 +213,46 @@ D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
 
     { // Create descriptor heaps.
         // https://docs.microsoft.com/en-us/windows/win32/direct3d12/creating-descriptor-heaps
-
-        // Describe and create a render target view (RTV) descriptor heap.
-        D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-        rtvHeapDesc.NumDescriptors = sFrameCount;
-        rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-        rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-
-        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createdescriptorheap
-        if(FAILED(mDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&mRtvHeap))))
+        mRtvHeap = std::make_unique<d3d12::PermanentDescriptorHeap_RTV>(*this, (uint32_t)d3d12::kFrameBufferCount);
+        if(!mRtvHeap->isValid())
         {
-            spdlog::critical("Failed to create rtv descriptor heap");
+            spdlog::critical("Failed to create RTV descriptor heap");
             return;
         }
 
-        spdlog::info("Created rtv descriptor heap");
-
-        mRtvDescriptorSize = mDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+        spdlog::info("Created permanent RTV descriptor heap with {} descriptors. {} bytes",
+                     mRtvHeap->getDesctiptorCount(), mRtvHeap->getByteSize());
 
         // Describe and create a shader resource view (SRV) heap for the texture.
-        D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-        srvHeapDesc.NumDescriptors = 1;
-        srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        if(FAILED(mDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mSrvHeap))))
+        mCbvSrvUavHeap = std::make_unique<d3d12::FixedDescriptorHeap_CBV_SRV_UAV>(*this, 1024);
+        if(!mCbvSrvUavHeap->isValid())
         {
-            spdlog::critical("Failed to create srv descriptor heap");
+            spdlog::critical("Failed to create CBV/SRV/UAV descriptor heap");
             return;
         }
 
-        spdlog::info("Created srv descriptor heap");
-
-        mSrvDescriptorHeapSize = mDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        spdlog::info("Created fixed CBV/SRV/UAV descriptor heap with {} descriptors. {} bytes",
+                     mCbvSrvUavHeap->getDesctiptorCount(), mCbvSrvUavHeap->getByteSize());
     }
 
     { // Create frame resources.
-        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(mRtvHeap->GetCPUDescriptorHandleForHeapStart());
+        auto rtvDescriptors = mRtvHeap->allocate(2);
 
-        // Create a RTV for each frame.
-        for(UINT frameIndex = 0; frameIndex < sFrameCount; frameIndex++)
+        if(!rtvDescriptors)
+        {
+            spdlog::critical("Failed to create render target descriptors");
+            return;
+        }
+
+        mSwapChainRtvs = std::move(rtvDescriptors.value());
+
+        D3D12_RENDER_TARGET_VIEW_DESC desc{};
+        desc.Texture2D.MipSlice = 0;
+        desc.Texture2D.PlaneSlice = 0;
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
+        for(uint32_t frameIndex = 0; frameIndex < d3d12::kFrameBufferCount; ++frameIndex)
         {
             if(FAILED(mSwapChain->GetBuffer(frameIndex, IID_PPV_ARGS(&mRenderTargets[frameIndex]))))
             {
@@ -259,15 +260,13 @@ D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
                 return;
             }
 
-            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createrendertargetview
-            mDevice->CreateRenderTargetView(mRenderTargets[frameIndex].Get(), nullptr, rtvHandle);
-            rtvHandle.Offset(1, mRtvDescriptorSize);
+            mRtvHeap->createRenderTargetView(*this, mSwapChainRtvs, frameIndex, mRenderTargets[frameIndex].Get(), desc);
         }
 
         spdlog::info("Created render target views");
     }
 
-    for(size_t frameIndex = 0; frameIndex < sFrameCount; ++frameIndex)
+    for(size_t frameIndex = 0; frameIndex < d3d12::kFrameBufferCount; ++frameIndex)
     {
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandallocator
         if(FAILED(mDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -293,8 +292,8 @@ D3D12Context::~D3D12Context()
         mCommandAllocators.fill(nullptr);
         mCommandQueue.Reset();
         mRenderTargets.fill(nullptr);
-        mRtvHeap.Reset();
-        mSrvHeap.Reset();
+        mRtvHeap = {};
+        mCbvSrvUavHeap.reset();
         mSwapChain.Reset();
 
         { // Check for d3d12 object leaks
@@ -364,11 +363,9 @@ constexpr DXGI_GPU_PREFERENCE GetDxgiGpuPreference(GpuPreference gpuPreference)
     }
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE D3D12Context::getBackBufferRtv() const
-{
-    return CD3DX12_CPU_DESCRIPTOR_HANDLE(mRtvHeap->GetCPUDescriptorHandleForHeapStart(), mFrameIndex,
-                                         mRtvDescriptorSize);
-}
+D3D12_CPU_DESCRIPTOR_HANDLE D3D12Context::getBackBufferRtv() const { return mSwapChainRtvs.getCpuHandle(mFrameIndex); }
+
+void D3D12Context::beginFrame() { mCbvSrvUavHeap->uploadPendingDescriptors(*this); }
 
 void D3D12Context::present()
 {
