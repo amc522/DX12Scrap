@@ -1,7 +1,7 @@
 // Classes:
-//   scrap::d3d12::PermanentHeapAllocator
-//   scrap::d3d12::PermanentHeapAllocation
-//   scrap::d3d12::PermanentDescriptor
+//   scrap::d3d12::PermanentDescriptorHeapAllocator
+//   scrap::d3d12::PermanentDescriptorHeapAllocation
+//   scrap::d3d12::PermanentDescriptorHeapDescriptor
 //   scrap::d3d12::PermanentDescriptorHeap_CBV_SRV_UAV
 //   scrap::d3d12::PermanentDescriptorHeap_Sampler
 //   scrap::d3d12::PermanentDescriptorHeap_RTV
@@ -13,13 +13,14 @@
 // descriptors will never leave the heap. This means the heap does not need to worry about managing descriptor lifetimes
 // across multiple frames.
 //
-// A permanent heap desciptor is useful for known render/depth-stencil targets that are consistent from frame to frame
+// A permanent descriptor heap is useful for known render/depth-stencil targets that are consistent from frame to frame
 // like the swap chain or a set of g-buffer targets. Samplers can also be a good use case for a permanent descriptor.
 
 #pragma once
 
 #include "FreeBlockTracker.h"
 
+#include <atomic>
 #include <cstdint>
 
 #include <tl/expected.hpp>
@@ -62,18 +63,16 @@ public:
 
     [[nodiscard]] ID3D12DescriptorHeap* getDescriptorHeap() { return mHeap.Get(); }
     [[nodiscard]] uint32_t getDescriptorSize() const { return mDescriptorSize; }
-    [[nodiscard]] uint32_t getDesctiptorCount() const { return static_cast<uint32_t>(mFreeBlockTracker.getCapacity()); }
-    [[nodiscard]] size_t getByteSize() const
-    {
-        return static_cast<size_t>(mDescriptorSize) * mFreeBlockTracker.getCapacity();
-    }
+    [[nodiscard]] uint32_t getDesctiptorCount() const { return mCapacity; }
+    [[nodiscard]] size_t getByteSize() const { return static_cast<size_t>(mDescriptorSize) * mCapacity; }
 
     [[nodiscard]] tl::expected<PermanentDescriptorHeapAllocation, FreeBlockTracker::Error> allocate(
         uint32_t descriptorCount);
 
 protected:
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mHeap;
-    FreeBlockTracker mFreeBlockTracker;
+    uint32_t mCapacity = 0u;
+    std::atomic_uint32_t mAllocationCount = 0u;
     uint32_t mDescriptorSize = 0u;
 };
 
@@ -99,21 +98,21 @@ private:
     FreeBlockTracker::Range mRange{};
 };
 
-class PermanentDescriptor
+class PermanentDescriptorHeapDescriptor
 {
 public:
-    PermanentDescriptor() = default;
-    PermanentDescriptor(PermanentDescriptorHeapAllocation&& allocation, uint32_t allocationIndex)
+    PermanentDescriptorHeapDescriptor() = default;
+    PermanentDescriptorHeapDescriptor(PermanentDescriptorHeapAllocation&& allocation, uint32_t allocationIndex)
         : mAllocation(std::move(allocation)), mAllocationIndex(allocationIndex)
     {
     }
 
-    PermanentDescriptor(const PermanentDescriptor&) = delete;
-    PermanentDescriptor(PermanentDescriptor&&) noexcept = default;
-    ~PermanentDescriptor() = default;
+    PermanentDescriptorHeapDescriptor(const PermanentDescriptorHeapDescriptor&) = delete;
+    PermanentDescriptorHeapDescriptor(PermanentDescriptorHeapDescriptor&&) noexcept = default;
+    ~PermanentDescriptorHeapDescriptor() = default;
 
-    PermanentDescriptor& operator=(const PermanentDescriptor&) = delete;
-    PermanentDescriptor& operator=(PermanentDescriptor&&) noexcept = default;
+    PermanentDescriptorHeapDescriptor& operator=(const PermanentDescriptorHeapDescriptor&) = delete;
+    PermanentDescriptorHeapDescriptor& operator=(PermanentDescriptorHeapDescriptor&&) noexcept = default;
 
     [[nodiscard]] bool isValid() const { return mAllocation.isValid(); }
 
@@ -143,7 +142,7 @@ public:
                                   uint32_t allocationIndex,
                                   const D3D12_CONSTANT_BUFFER_VIEW_DESC& desc);
 
-    [[nodiscard]] tl::expected<PermanentDescriptor, FreeBlockTracker::Error> createConstantBufferView(
+    [[nodiscard]] tl::expected<PermanentDescriptorHeapDescriptor, FreeBlockTracker::Error> createConstantBufferView(
         D3D12Context& context,
         const D3D12_CONSTANT_BUFFER_VIEW_DESC& desc);
 
@@ -154,7 +153,7 @@ public:
                                   ID3D12Resource* resource,
                                   const D3D12_SHADER_RESOURCE_VIEW_DESC& desc);
 
-    [[nodiscard]] tl::expected<PermanentDescriptor, FreeBlockTracker::Error> createShaderResourceView(
+    [[nodiscard]] tl::expected<PermanentDescriptorHeapDescriptor, FreeBlockTracker::Error> createShaderResourceView(
         D3D12Context& context,
         ID3D12Resource* resource,
         const D3D12_SHADER_RESOURCE_VIEW_DESC& desc);
@@ -167,7 +166,7 @@ public:
                                    ID3D12Resource* counterResource,
                                    const D3D12_UNORDERED_ACCESS_VIEW_DESC& desc);
 
-    [[nodiscard]] tl::expected<PermanentDescriptor, FreeBlockTracker::Error> createUnorderedAccessView(
+    [[nodiscard]] tl::expected<PermanentDescriptorHeapDescriptor, FreeBlockTracker::Error> createUnorderedAccessView(
         D3D12Context& context,
         ID3D12Resource* resource,
         ID3D12Resource* counterResource,
@@ -191,7 +190,7 @@ public:
                        uint32_t allocationIndex,
                        const D3D12_SAMPLER_DESC& desc);
 
-    [[nodiscard]] tl::expected<PermanentDescriptor, FreeBlockTracker::Error> createSampler(
+    [[nodiscard]] tl::expected<PermanentDescriptorHeapDescriptor, FreeBlockTracker::Error> createSampler(
         D3D12Context& context,
         const D3D12_SAMPLER_DESC& desc);
 };
@@ -214,7 +213,7 @@ public:
                                 ID3D12Resource* renderTargetResource,
                                 const D3D12_RENDER_TARGET_VIEW_DESC& desc);
 
-    [[nodiscard]] tl::expected<PermanentDescriptor, FreeBlockTracker::Error> createRenderTargetView(
+    [[nodiscard]] tl::expected<PermanentDescriptorHeapDescriptor, FreeBlockTracker::Error> createRenderTargetView(
         D3D12Context& context,
         ID3D12Resource* renderTargetResource,
         const D3D12_RENDER_TARGET_VIEW_DESC& desc);
@@ -238,7 +237,7 @@ public:
                                 ID3D12Resource* depthStencilResource,
                                 const D3D12_DEPTH_STENCIL_VIEW_DESC& desc);
 
-    [[nodiscard]] tl::expected<PermanentDescriptor, FreeBlockTracker::Error> createDepthStencilView(
+    [[nodiscard]] tl::expected<PermanentDescriptorHeapDescriptor, FreeBlockTracker::Error> createDepthStencilView(
         D3D12Context& context,
         ID3D12Resource* depthStencilResource,
         const D3D12_DEPTH_STENCIL_VIEW_DESC& desc);
