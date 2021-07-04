@@ -1,6 +1,6 @@
-// D3D12Context contains all the shared objects for the D3D12 pipeline. This includes (but is not limited to) the
+// DeviceContext contains all the shared objects for the D3D12 pipeline. This includes (but is not limited to) the
 // hardware adapter, device, and swap chains. Specific D3D12 rendering related functions should NOT be implemented here.
-// D3D12Context is not responsible for loading and managing shaders, pipeline states, or resources.
+// DeviceContext is not responsible for loading and managing shaders, pipeline states, or resources.
 
 #pragma once
 
@@ -57,11 +57,13 @@ constexpr std::string_view ToString(GpuPreference gpuPreference)
     }
 }
 
-class D3D12Context
+namespace d3d12
+{
+class DeviceContext
 {
 public:
-    D3D12Context(const Window& window, GpuPreference gpuPreference);
-    ~D3D12Context();
+    DeviceContext(const Window& window, GpuPreference gpuPreference);
+    ~DeviceContext();
 
     bool initialized() const { return mInitialized; }
 
@@ -116,7 +118,7 @@ private:
 
     bool mInitialized = false;
 };
-
+} // namespace d3d12
 } // namespace scrap
 
 template<>

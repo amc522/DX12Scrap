@@ -11,7 +11,7 @@ using namespace Microsoft::WRL;
 
 namespace scrap
 {
-RenderScene::RenderScene(D3D12Context& d3d12Context)
+RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
 {
     // Create an empty root signature.
     {
@@ -407,7 +407,8 @@ RenderScene::RenderScene(D3D12Context& d3d12Context)
             srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
             srvDesc.Texture2D.MipLevels = 1;
 
-            auto descriptor = d3d12Context.getCbvSrvUavHeap().createShaderResourceView(d3d12Context, mTexture.Get(), srvDesc);
+            auto descriptor =
+                d3d12Context.getCbvSrvUavHeap().createShaderResourceView(d3d12Context, mTexture.Get(), srvDesc);
             if(!descriptor)
             {
                 spdlog::critical("Failed to create texture SRV");
@@ -538,7 +539,7 @@ bool RenderScene::loadShaders(ID3D12Device* device)
     return true;
 }
 
-void RenderScene::render(D3D12Context& d3d12Context)
+void RenderScene::render(d3d12::DeviceContext& d3d12Context)
 {
     // Command list allocators can only be reset when the associated
     // command lists have finished execution on the GPU; apps should use
@@ -574,7 +575,8 @@ void RenderScene::render(D3D12Context& d3d12Context)
 
     std::array<ID3D12DescriptorHeap*, 1> descriptorHeaps = {d3d12Context.getCbvSrvUavHeap().getGpuDescriptorHeap()};
     mCommandList->SetDescriptorHeaps((UINT)descriptorHeaps.size(), descriptorHeaps.data());
-    mCommandList->SetGraphicsRootDescriptorTable(0, d3d12Context.getCbvSrvUavHeap().getGpuDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
+    mCommandList->SetGraphicsRootDescriptorTable(
+        0, d3d12Context.getCbvSrvUavHeap().getGpuDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
 
     mCommandList->RSSetViewports(1, &viewport);
     mCommandList->RSSetScissorRects(1, &scissorRect);
@@ -616,13 +618,13 @@ void RenderScene::render(D3D12Context& d3d12Context)
     endFrame(d3d12Context);
 }
 
-void RenderScene::shutdown(D3D12Context& d3d12Context)
+void RenderScene::shutdown(d3d12::DeviceContext& d3d12Context)
 {
     spdlog::info("Shutting down RenderScene");
     waitOnGpu(d3d12Context);
 }
 
-void RenderScene::waitOnGpu(D3D12Context& d3d12Context)
+void RenderScene::waitOnGpu(d3d12::DeviceContext& d3d12Context)
 {
     if(mFence == nullptr) { return; }
 
@@ -644,7 +646,7 @@ void RenderScene::waitOnGpu(D3D12Context& d3d12Context)
     WaitForSingleObject(mFenceEvent, INFINITE);
 }
 
-void RenderScene::endFrame(D3D12Context& d3d12Context)
+void RenderScene::endFrame(d3d12::DeviceContext& d3d12Context)
 {
     // Schedule a Signal command in the queue.
     const UINT64 currentFenceValue = mFenceValues[d3d12Context.getFrameIndex()];

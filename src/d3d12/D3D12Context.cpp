@@ -50,7 +50,9 @@ void LogAdapterDesc(const DXGI_ADAPTER_DESC1& desc, UINT adapterIndex)
                  desc.DedicatedVideoMemory, desc.DedicatedSystemMemory, desc.SharedSystemMemory);
 }
 
-D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
+namespace d3d12
+{
+DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
 {
     spdlog::info("Initializing D3D12");
 
@@ -282,7 +284,7 @@ D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
     mInitialized = true;
 }
 
-D3D12Context::~D3D12Context()
+DeviceContext::~DeviceContext()
 {
     spdlog::info("Destroying D3D12");
 
@@ -363,20 +365,20 @@ constexpr DXGI_GPU_PREFERENCE GetDxgiGpuPreference(GpuPreference gpuPreference)
     }
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE D3D12Context::getBackBufferRtv() const { return mSwapChainRtvs.getCpuHandle(mFrameIndex); }
+D3D12_CPU_DESCRIPTOR_HANDLE DeviceContext::getBackBufferRtv() const { return mSwapChainRtvs.getCpuHandle(mFrameIndex); }
 
-void D3D12Context::beginFrame() { mCbvSrvUavHeap->uploadPendingDescriptors(*this); }
+void DeviceContext::beginFrame() { mCbvSrvUavHeap->uploadPendingDescriptors(*this); }
 
-void D3D12Context::present()
+void DeviceContext::present()
 {
     if(FAILED(mSwapChain->Present(1, 0))) { spdlog::error("Present call failed"); }
 }
 
-void D3D12Context::swap() { mFrameIndex = mSwapChain->GetCurrentBackBufferIndex(); }
+void DeviceContext::swap() { mFrameIndex = mSwapChain->GetCurrentBackBufferIndex(); }
 
-void D3D12Context::getHardwareAdapter(GpuPreference gpuPreference,
-                                      D3D_FEATURE_LEVEL featureLevel,
-                                      IDXGIFactory4* dxgiFactory4)
+void DeviceContext::getHardwareAdapter(GpuPreference gpuPreference,
+                                       D3D_FEATURE_LEVEL featureLevel,
+                                       IDXGIFactory4* dxgiFactory4)
 {
     const DXGI_GPU_PREFERENCE dxgiGpuPreference = GetDxgiGpuPreference(gpuPreference);
 
@@ -466,7 +468,7 @@ void D3D12Context::getHardwareAdapter(GpuPreference gpuPreference,
     spdlog::info("Using adapter {}", selectedAdapterIndex);
 }
 
-HRESULT D3D12Context::createDevice(D3D_FEATURE_LEVEL featureLevel)
+HRESULT DeviceContext::createDevice(D3D_FEATURE_LEVEL featureLevel)
 {
     if(FAILED(D3D12CreateDevice(mAdapter.Get(), featureLevel, IID_PPV_ARGS(&mDevice))))
     {
@@ -508,5 +510,5 @@ HRESULT D3D12Context::createDevice(D3D_FEATURE_LEVEL featureLevel)
 
     return S_OK;
 }
-
+} // namespace d3d12
 } // namespace scrap

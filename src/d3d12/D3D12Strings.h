@@ -100,11 +100,13 @@ struct fmt::formatter<scrap::HRESULT_t> : public fmt::formatter<std::string_view
         case E_UNEXPECTED: return fmt::formatter<std::string_view>::format("E_UNEXPECTED", ctx);
         case DXGI_ERROR_ACCESS_DENIED: return fmt::formatter<std::string_view>::format("DXGI_ERROR_ACCESS_DENIED", ctx);
         case DXGI_ERROR_ACCESS_LOST: return fmt::formatter<std::string_view>::format("DXGI_ERROR_ACCESS_LOST", ctx);
-        case DXGI_ERROR_ALREADY_EXISTS: return fmt::formatter<std::string_view>::format("DXGI_ERROR_ALREADY_EXISTS", ctx);
+        case DXGI_ERROR_ALREADY_EXISTS:
+            return fmt::formatter<std::string_view>::format("DXGI_ERROR_ALREADY_EXISTS", ctx);
         case DXGI_ERROR_CANNOT_PROTECT_CONTENT:
             return fmt::formatter<std::string_view>::format("DXGI_ERROR_CANNOT_PROTECT_CONTENT", ctx);
         case DXGI_ERROR_DEVICE_HUNG: return fmt::formatter<std::string_view>::format("DXGI_ERROR_DEVICE_HUNG", ctx);
-        case DXGI_ERROR_DEVICE_REMOVED: return fmt::formatter<std::string_view>::format("DXGI_ERROR_DEVICE_REMOVED", ctx);
+        case DXGI_ERROR_DEVICE_REMOVED:
+            return fmt::formatter<std::string_view>::format("DXGI_ERROR_DEVICE_REMOVED", ctx);
         case DXGI_ERROR_DEVICE_RESET: return fmt::formatter<std::string_view>::format("DXGI_ERROR_DEVICE_RESET", ctx);
         case DXGI_ERROR_DRIVER_INTERNAL_ERROR:
             return fmt::formatter<std::string_view>::format("DXGI_ERROR_DRIVER_INTERNAL_ERROR", ctx);
@@ -132,7 +134,8 @@ struct fmt::formatter<scrap::HRESULT_t> : public fmt::formatter<std::string_view
             return fmt::formatter<std::string_view>::format("DXGI_ERROR_SESSION_DISCONNECTED", ctx);
         case DXGI_ERROR_UNSUPPORTED: return fmt::formatter<std::string_view>::format("DXGI_ERROR_UNSUPPORTED", ctx);
         case DXGI_ERROR_WAIT_TIMEOUT: return fmt::formatter<std::string_view>::format("DXGI_ERROR_WAIT_TIMEOUT", ctx);
-        case DXGI_ERROR_WAS_STILL_DRAWING: return fmt::formatter<std::string_view>::format("DXGI_ERROR_WAS_STILL_DRAWING", ctx);
+        case DXGI_ERROR_WAS_STILL_DRAWING:
+            return fmt::formatter<std::string_view>::format("DXGI_ERROR_WAS_STILL_DRAWING", ctx);
         case D3D12_ERROR_ADAPTER_NOT_FOUND:
             return fmt::formatter<std::string_view>::format("D3D12_ERROR_ADAPTER_NOT_FOUND", ctx);
         case D3D12_ERROR_DRIVER_VERSION_MISMATCH:

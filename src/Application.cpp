@@ -26,7 +26,7 @@ Application::Application()
 
     if(!mMainWindow->initialized()) { return; }
 
-    mD3D12Context = std::make_unique<D3D12Context>(*mMainWindow, GpuPreference::None);
+    mD3D12Context = std::make_unique<d3d12::DeviceContext>(*mMainWindow, GpuPreference::None);
 
     if(!mD3D12Context->initialized()) { return; }
 

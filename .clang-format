@@ -35,7 +35,7 @@ IndentCaseLabels: 'false'
 IndentPPDirectives: AfterHash
 IndentWidth: '4'
 KeepEmptyLinesAtTheStartOfBlocks: 'false'
-NamespaceIndentation: Inner
+NamespaceIndentation: None
 PointerAlignment: Left
 SortIncludes: 'true'
 SortUsingDeclarations: 'true'

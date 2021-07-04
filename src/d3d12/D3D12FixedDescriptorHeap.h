@@ -42,13 +42,10 @@ struct ID3D12Resource;
 
 enum D3D12_DESCRIPTOR_HEAP_TYPE;
 
-namespace scrap
-{
-class D3D12Context;
-}
-
 namespace scrap::d3d12
 {
+class DeviceContext;
+
 class FixedDescriptorHeapAllocation;
 
 // This is the main class that manages allocations through a fixed sized descriptor heap. It allocates blocks of
@@ -57,7 +54,7 @@ class FixedDescriptorHeapAllocator
 {
 public:
     FixedDescriptorHeapAllocator() = default;
-    FixedDescriptorHeapAllocator(D3D12Context& context, D3D12_DESCRIPTOR_HEAP_TYPE heapType, uint32_t descriptorCount);
+    FixedDescriptorHeapAllocator(DeviceContext& context, D3D12_DESCRIPTOR_HEAP_TYPE heapType, uint32_t descriptorCount);
     FixedDescriptorHeapAllocator(const FixedDescriptorHeapAllocator&) = delete;
     FixedDescriptorHeapAllocator(FixedDescriptorHeapAllocator&&) noexcept = default;
     virtual ~FixedDescriptorHeapAllocator();
@@ -82,7 +79,7 @@ public:
     void deallocate(FreeBlockTracker::Range range);
 
     // should happen at the beginning or end of a frame
-    void uploadPendingDescriptors(D3D12Context& context);
+    void uploadPendingDescriptors(DeviceContext& context);
 
 protected:
     // Using two different heaps to help with upload performance. There's a flag for descriptor heaps,
@@ -159,7 +156,7 @@ class FixedDescriptorHeap_CBV_SRV_UAV final : public FixedDescriptorHeapAllocato
 {
 public:
     FixedDescriptorHeap_CBV_SRV_UAV() = default;
-    FixedDescriptorHeap_CBV_SRV_UAV(D3D12Context& context, uint32_t descriptorCount);
+    FixedDescriptorHeap_CBV_SRV_UAV(DeviceContext& context, uint32_t descriptorCount);
     FixedDescriptorHeap_CBV_SRV_UAV(const FixedDescriptorHeap_CBV_SRV_UAV&) = delete;
     FixedDescriptorHeap_CBV_SRV_UAV(FixedDescriptorHeap_CBV_SRV_UAV&&) noexcept = default;
     ~FixedDescriptorHeap_CBV_SRV_UAV() final = default;
@@ -168,29 +165,29 @@ public:
     FixedDescriptorHeap_CBV_SRV_UAV& operator=(FixedDescriptorHeap_CBV_SRV_UAV&&) noexcept = default;
 
     // CBV
-    void createConstantBufferView(D3D12Context& context,
+    void createConstantBufferView(DeviceContext& context,
                                   const FixedDescriptorHeapAllocation& allocation,
                                   uint32_t allocationIndex,
                                   const D3D12_CONSTANT_BUFFER_VIEW_DESC& desc);
 
     [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> createConstantBufferView(
-        D3D12Context& context,
+        DeviceContext& context,
         const D3D12_CONSTANT_BUFFER_VIEW_DESC& desc);
 
     // SRV
-    void createShaderResourceView(D3D12Context& context,
+    void createShaderResourceView(DeviceContext& context,
                                   const FixedDescriptorHeapAllocation& allocation,
                                   uint32_t allocationIndex,
                                   ID3D12Resource* resource,
                                   const D3D12_SHADER_RESOURCE_VIEW_DESC& desc);
 
     [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> createShaderResourceView(
-        D3D12Context& context,
+        DeviceContext& context,
         ID3D12Resource* resource,
         const D3D12_SHADER_RESOURCE_VIEW_DESC& desc);
 
     // UAV
-    void createUnorderedAccessView(D3D12Context& context,
+    void createUnorderedAccessView(DeviceContext& context,
                                    const FixedDescriptorHeapAllocation& allocation,
                                    uint32_t allocationIndex,
                                    ID3D12Resource* resource,
@@ -198,7 +195,7 @@ public:
                                    const D3D12_UNORDERED_ACCESS_VIEW_DESC& desc);
 
     [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> createUnorderedAccessView(
-        D3D12Context& context,
+        DeviceContext& context,
         ID3D12Resource* resource,
         ID3D12Resource* counterResource,
         const D3D12_UNORDERED_ACCESS_VIEW_DESC& desc);
@@ -209,7 +206,7 @@ class FixedDescriptorHeap_Sampler final : public FixedDescriptorHeapAllocator
 {
 public:
     FixedDescriptorHeap_Sampler() = default;
-    FixedDescriptorHeap_Sampler(D3D12Context& context, uint32_t descriptorCount);
+    FixedDescriptorHeap_Sampler(DeviceContext& context, uint32_t descriptorCount);
     FixedDescriptorHeap_Sampler(const FixedDescriptorHeap_Sampler&) = delete;
     FixedDescriptorHeap_Sampler(FixedDescriptorHeap_Sampler&&) noexcept = default;
     ~FixedDescriptorHeap_Sampler() final = default;
@@ -217,13 +214,13 @@ public:
     FixedDescriptorHeap_Sampler& operator=(const FixedDescriptorHeap_Sampler&) = delete;
     FixedDescriptorHeap_Sampler& operator=(FixedDescriptorHeap_Sampler&&) noexcept = default;
 
-    void createSampler(D3D12Context& context,
+    void createSampler(DeviceContext& context,
                        const FixedDescriptorHeapAllocation& allocation,
                        uint32_t allocationIndex,
                        const D3D12_SAMPLER_DESC& desc);
 
     [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> createSampler(
-        D3D12Context& context,
+        DeviceContext& context,
         const D3D12_SAMPLER_DESC& desc);
 };
 
@@ -232,7 +229,7 @@ class FixedDescriptorHeap_RTV final : public FixedDescriptorHeapAllocator
 {
 public:
     FixedDescriptorHeap_RTV() = default;
-    FixedDescriptorHeap_RTV(D3D12Context& context, uint32_t descriptorCount);
+    FixedDescriptorHeap_RTV(DeviceContext& context, uint32_t descriptorCount);
     FixedDescriptorHeap_RTV(const FixedDescriptorHeap_RTV&) = delete;
     FixedDescriptorHeap_RTV(FixedDescriptorHeap_RTV&&) noexcept = default;
     ~FixedDescriptorHeap_RTV() final = default;
@@ -240,14 +237,14 @@ public:
     FixedDescriptorHeap_RTV& operator=(const FixedDescriptorHeap_RTV&) = delete;
     FixedDescriptorHeap_RTV& operator=(FixedDescriptorHeap_RTV&&) noexcept = default;
 
-    void createRenderTargetView(D3D12Context& context,
+    void createRenderTargetView(DeviceContext& context,
                                 const FixedDescriptorHeapAllocation& allocation,
                                 uint32_t allocationIndex,
                                 ID3D12Resource* renderTargetResource,
                                 const D3D12_RENDER_TARGET_VIEW_DESC& desc);
 
     [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> createRenderTargetView(
-        D3D12Context& context,
+        DeviceContext& context,
         ID3D12Resource* renderTargetResource,
         const D3D12_RENDER_TARGET_VIEW_DESC& desc);
 };
@@ -257,7 +254,7 @@ class FixedDescriptorHeap_DSV final : public FixedDescriptorHeapAllocator
 {
 public:
     FixedDescriptorHeap_DSV() = default;
-    FixedDescriptorHeap_DSV(D3D12Context& context, uint32_t descriptorCount);
+    FixedDescriptorHeap_DSV(DeviceContext& context, uint32_t descriptorCount);
     FixedDescriptorHeap_DSV(const FixedDescriptorHeap_DSV&) = delete;
     FixedDescriptorHeap_DSV(FixedDescriptorHeap_DSV&&) noexcept = default;
     ~FixedDescriptorHeap_DSV() final = default;
@@ -265,14 +262,14 @@ public:
     FixedDescriptorHeap_DSV& operator=(const FixedDescriptorHeap_DSV&) = delete;
     FixedDescriptorHeap_DSV& operator=(FixedDescriptorHeap_DSV&&) noexcept = default;
 
-    void createDepthStencilView(D3D12Context& context,
+    void createDepthStencilView(DeviceContext& context,
                                 const FixedDescriptorHeapAllocation& allocation,
                                 uint32_t allocationIndex,
                                 ID3D12Resource* depthStencilResource,
                                 const D3D12_DEPTH_STENCIL_VIEW_DESC& desc);
 
     [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> createDepthStencilView(
-        D3D12Context& context,
+        DeviceContext& context,
         ID3D12Resource* depthStencilResource,
         const D3D12_DEPTH_STENCIL_VIEW_DESC& desc);
 };

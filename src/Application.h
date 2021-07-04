@@ -11,7 +11,11 @@
 
 namespace scrap
 {
-class D3D12Context;
+namespace d3d12
+{
+class DeviceContext;
+}
+
 class RenderScene;
 class Window;
 
@@ -27,7 +31,7 @@ public:
 
 private:
     std::unique_ptr<Window> mMainWindow;
-    std::unique_ptr<D3D12Context> mD3D12Context;
+    std::unique_ptr<d3d12::DeviceContext> mD3D12Context;
     std::unique_ptr<RenderScene> mRenderScene;
     bool mRunning = false;
 };
