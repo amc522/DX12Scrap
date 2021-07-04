@@ -213,7 +213,7 @@ D3D12Context::D3D12Context(const Window& window, GpuPreference gpuPreference)
 
     { // Create descriptor heaps.
         // https://docs.microsoft.com/en-us/windows/win32/direct3d12/creating-descriptor-heaps
-        mRtvHeap = std::make_unique<d3d12::PermanentDescriptorHeap_RTV>(*this, (uint32_t)d3d12::kFrameBufferCount);
+        mRtvHeap = std::make_unique<d3d12::MonotonicDescriptorHeap_RTV>(*this, (uint32_t)d3d12::kFrameBufferCount);
         if(!mRtvHeap->isValid())
         {
             spdlog::critical("Failed to create RTV descriptor heap");

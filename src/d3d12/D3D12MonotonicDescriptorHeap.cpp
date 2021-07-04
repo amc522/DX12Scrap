@@ -1,4 +1,4 @@
-#include "D3D12PermanentDescriptorHeap.h"
+#include "D3D12MonotonicDescriptorHeap.h"
 
 #include "d3d12/D3D12Context.h"
 #include "d3d12/D3D12Strings.h"
@@ -11,7 +11,7 @@ using namespace Microsoft::WRL;
 
 namespace scrap::d3d12
 {
-PermanentDescriptorHeapAllocator::PermanentDescriptorHeapAllocator(D3D12Context& context,
+MonotonicDescriptorHeapAllocator::MonotonicDescriptorHeapAllocator(D3D12Context& context,
                                                                    const D3D12_DESCRIPTOR_HEAP_DESC& desc)
 {
     ComPtr<ID3D12DescriptorHeap> heap;
@@ -29,7 +29,7 @@ PermanentDescriptorHeapAllocator::PermanentDescriptorHeapAllocator(D3D12Context&
     mCapacity = desc.NumDescriptors;
 }
 
-tl::expected<PermanentDescriptorHeapAllocation, FreeBlockTracker::Error> PermanentDescriptorHeapAllocator::allocate(
+tl::expected<MonotonicDescriptorHeapAllocation, FreeBlockTracker::Error> MonotonicDescriptorHeapAllocator::allocate(
     uint32_t descriptorCount)
 {
     bool success = false;
@@ -48,23 +48,23 @@ tl::expected<PermanentDescriptorHeapAllocation, FreeBlockTracker::Error> Permane
 
     uint32_t startIndex = expectedCurrAllocationCount;
 
-    return PermanentDescriptorHeapAllocation(*this, FreeBlockTracker::Range{startIndex, descriptorCount});
+    return MonotonicDescriptorHeapAllocation(*this, FreeBlockTracker::Range{startIndex, descriptorCount});
 }
 
-PermanentDescriptorHeapAllocation::PermanentDescriptorHeapAllocation(PermanentDescriptorHeapAllocator& heapAllocator,
+MonotonicDescriptorHeapAllocation::MonotonicDescriptorHeapAllocation(MonotonicDescriptorHeapAllocator& heapAllocator,
                                                                      FreeBlockTracker::Range range)
     : mHeap(&heapAllocator), mRange(range)
 {
 }
 
-PermanentDescriptorHeapAllocation::PermanentDescriptorHeapAllocation(PermanentDescriptorHeapAllocation&& other) noexcept
+MonotonicDescriptorHeapAllocation::MonotonicDescriptorHeapAllocation(MonotonicDescriptorHeapAllocation&& other) noexcept
     : mHeap(other.mHeap), mRange(other.mRange)
 {
     other.mHeap = nullptr;
 }
 
-PermanentDescriptorHeapAllocation& PermanentDescriptorHeapAllocation::operator=(
-    PermanentDescriptorHeapAllocation&& other) noexcept
+MonotonicDescriptorHeapAllocation& MonotonicDescriptorHeapAllocation::operator=(
+    MonotonicDescriptorHeapAllocation&& other) noexcept
 {
     mHeap = other.mHeap;
     mRange = other.mRange;
@@ -73,47 +73,47 @@ PermanentDescriptorHeapAllocation& PermanentDescriptorHeapAllocation::operator=(
     return *this;
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE PermanentDescriptorHeapAllocation::getCpuHandle(uint32_t index) const
+D3D12_CPU_DESCRIPTOR_HANDLE MonotonicDescriptorHeapAllocation::getCpuHandle(uint32_t index) const
 {
     return CD3DX12_CPU_DESCRIPTOR_HANDLE{mHeap->getDescriptorHeap()->GetCPUDescriptorHandleForHeapStart(), (INT)index,
                                          mHeap->getDescriptorSize()};
 }
 
-D3D12_GPU_DESCRIPTOR_HANDLE PermanentDescriptorHeapAllocation::getGpuHandle(uint32_t index) const
+D3D12_GPU_DESCRIPTOR_HANDLE MonotonicDescriptorHeapAllocation::getGpuHandle(uint32_t index) const
 {
     return CD3DX12_GPU_DESCRIPTOR_HANDLE(mHeap->getDescriptorHeap()->GetGPUDescriptorHandleForHeapStart(), (INT)index,
                                          mHeap->getDescriptorSize());
 }
 
-PermanentDescriptorHeap_CBV_SRV_UAV::PermanentDescriptorHeap_CBV_SRV_UAV(D3D12Context& context, uint32_t numDescriptors)
-    : PermanentDescriptorHeapAllocator(context,
+MonotonicDescriptorHeap_CBV_SRV_UAV::MonotonicDescriptorHeap_CBV_SRV_UAV(D3D12Context& context, uint32_t numDescriptors)
+    : MonotonicDescriptorHeapAllocator(context,
                                        D3D12_DESCRIPTOR_HEAP_DESC{D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
                                                                   numDescriptors,
                                                                   D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 0})
 {
 }
 
-void PermanentDescriptorHeap_CBV_SRV_UAV::createConstantBufferView(D3D12Context& context,
-                                                                   const PermanentDescriptorHeapAllocation& allocation,
+void MonotonicDescriptorHeap_CBV_SRV_UAV::createConstantBufferView(D3D12Context& context,
+                                                                   const MonotonicDescriptorHeapAllocation& allocation,
                                                                    uint32_t allocationIndex,
                                                                    const D3D12_CONSTANT_BUFFER_VIEW_DESC& desc)
 {
     context.getDevice()->CreateConstantBufferView(&desc, allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<PermanentDescriptorHeapDescriptor, FreeBlockTracker::Error> PermanentDescriptorHeap_CBV_SRV_UAV::
+tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error> MonotonicDescriptorHeap_CBV_SRV_UAV::
     createConstantBufferView(D3D12Context& context, const D3D12_CONSTANT_BUFFER_VIEW_DESC& desc)
 {
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
 
-    PermanentDescriptorHeapDescriptor descriptor{std::move(allocation.value()), 0};
+    MonotonicDescriptorHeapDescriptor descriptor{std::move(allocation.value()), 0};
     context.getDevice()->CreateConstantBufferView(&desc, descriptor.getCpuHandle());
     return descriptor;
 }
 
-void PermanentDescriptorHeap_CBV_SRV_UAV::createShaderResourceView(D3D12Context& context,
-                                                                   const PermanentDescriptorHeapAllocation& allocation,
+void MonotonicDescriptorHeap_CBV_SRV_UAV::createShaderResourceView(D3D12Context& context,
+                                                                   const MonotonicDescriptorHeapAllocation& allocation,
                                                                    uint32_t allocationIndex,
                                                                    ID3D12Resource* resource,
                                                                    const D3D12_SHADER_RESOURCE_VIEW_DESC& desc)
@@ -121,7 +121,7 @@ void PermanentDescriptorHeap_CBV_SRV_UAV::createShaderResourceView(D3D12Context&
     context.getDevice()->CreateShaderResourceView(resource, &desc, allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<PermanentDescriptorHeapDescriptor, FreeBlockTracker::Error> PermanentDescriptorHeap_CBV_SRV_UAV::
+tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error> MonotonicDescriptorHeap_CBV_SRV_UAV::
     createShaderResourceView(D3D12Context& context,
                              ID3D12Resource* resource,
                              const D3D12_SHADER_RESOURCE_VIEW_DESC& desc)
@@ -129,13 +129,13 @@ tl::expected<PermanentDescriptorHeapDescriptor, FreeBlockTracker::Error> Permane
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
 
-    PermanentDescriptorHeapDescriptor descriptor{std::move(allocation.value()), 0};
+    MonotonicDescriptorHeapDescriptor descriptor{std::move(allocation.value()), 0};
     context.getDevice()->CreateShaderResourceView(resource, &desc, descriptor.getCpuHandle());
     return descriptor;
 }
 
-void PermanentDescriptorHeap_CBV_SRV_UAV::createUnorderedAccessView(D3D12Context& context,
-                                                                    const PermanentDescriptorHeapAllocation& allocation,
+void MonotonicDescriptorHeap_CBV_SRV_UAV::createUnorderedAccessView(D3D12Context& context,
+                                                                    const MonotonicDescriptorHeapAllocation& allocation,
                                                                     uint32_t allocationIndex,
                                                                     ID3D12Resource* resource,
                                                                     ID3D12Resource* counterResource,
@@ -145,7 +145,7 @@ void PermanentDescriptorHeap_CBV_SRV_UAV::createUnorderedAccessView(D3D12Context
                                                    allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<PermanentDescriptorHeapDescriptor, FreeBlockTracker::Error> PermanentDescriptorHeap_CBV_SRV_UAV::
+tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error> MonotonicDescriptorHeap_CBV_SRV_UAV::
     createUnorderedAccessView(D3D12Context& context,
                               ID3D12Resource* resource,
                               ID3D12Resource* counterResource,
@@ -154,47 +154,47 @@ tl::expected<PermanentDescriptorHeapDescriptor, FreeBlockTracker::Error> Permane
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
 
-    PermanentDescriptorHeapDescriptor descriptor{std::move(allocation.value()), 0};
+    MonotonicDescriptorHeapDescriptor descriptor{std::move(allocation.value()), 0};
     context.getDevice()->CreateUnorderedAccessView(resource, counterResource, &desc, descriptor.getCpuHandle());
     return descriptor;
 }
 
-PermanentDescriptorHeap_Sampler::PermanentDescriptorHeap_Sampler(D3D12Context& context, uint32_t numDescriptors)
-    : PermanentDescriptorHeapAllocator(context,
+MonotonicDescriptorHeap_Sampler::MonotonicDescriptorHeap_Sampler(D3D12Context& context, uint32_t numDescriptors)
+    : MonotonicDescriptorHeapAllocator(context,
                                        D3D12_DESCRIPTOR_HEAP_DESC{D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, numDescriptors,
                                                                   D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 0})
 {
 }
 
-void PermanentDescriptorHeap_Sampler::createSampler(D3D12Context& context,
-                                                    const PermanentDescriptorHeapAllocation& allocation,
+void MonotonicDescriptorHeap_Sampler::createSampler(D3D12Context& context,
+                                                    const MonotonicDescriptorHeapAllocation& allocation,
                                                     uint32_t allocationIndex,
                                                     const D3D12_SAMPLER_DESC& desc)
 {
     context.getDevice()->CreateSampler(&desc, allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<PermanentDescriptorHeapDescriptor, FreeBlockTracker::Error> PermanentDescriptorHeap_Sampler::createSampler(
+tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error> MonotonicDescriptorHeap_Sampler::createSampler(
     D3D12Context& context,
     const D3D12_SAMPLER_DESC& desc)
 {
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
 
-    PermanentDescriptorHeapDescriptor descriptor{std::move(allocation.value()), 0};
+    MonotonicDescriptorHeapDescriptor descriptor{std::move(allocation.value()), 0};
     context.getDevice()->CreateSampler(&desc, descriptor.getCpuHandle());
     return descriptor;
 }
 
-PermanentDescriptorHeap_RTV::PermanentDescriptorHeap_RTV(D3D12Context& context, uint32_t numDescriptors)
-    : PermanentDescriptorHeapAllocator(context,
+MonotonicDescriptorHeap_RTV::MonotonicDescriptorHeap_RTV(D3D12Context& context, uint32_t numDescriptors)
+    : MonotonicDescriptorHeapAllocator(context,
                                        D3D12_DESCRIPTOR_HEAP_DESC{D3D12_DESCRIPTOR_HEAP_TYPE_RTV, numDescriptors,
                                                                   D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 0})
 {
 }
 
-void PermanentDescriptorHeap_RTV::createRenderTargetView(D3D12Context& context,
-                                                         const PermanentDescriptorHeapAllocation& allocation,
+void MonotonicDescriptorHeap_RTV::createRenderTargetView(D3D12Context& context,
+                                                         const MonotonicDescriptorHeapAllocation& allocation,
                                                          uint32_t allocationIndex,
                                                          ID3D12Resource* renderTarget,
                                                          const D3D12_RENDER_TARGET_VIEW_DESC& desc)
@@ -202,7 +202,7 @@ void PermanentDescriptorHeap_RTV::createRenderTargetView(D3D12Context& context,
     context.getDevice()->CreateRenderTargetView(renderTarget, &desc, allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<PermanentDescriptorHeapDescriptor, FreeBlockTracker::Error> PermanentDescriptorHeap_RTV::createRenderTargetView(
+tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error> MonotonicDescriptorHeap_RTV::createRenderTargetView(
     D3D12Context& context,
     ID3D12Resource* renderTarget,
     const D3D12_RENDER_TARGET_VIEW_DESC& desc)
@@ -210,19 +210,19 @@ tl::expected<PermanentDescriptorHeapDescriptor, FreeBlockTracker::Error> Permane
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
 
-    PermanentDescriptorHeapDescriptor descriptor{std::move(allocation.value()), 0};
+    MonotonicDescriptorHeapDescriptor descriptor{std::move(allocation.value()), 0};
     context.getDevice()->CreateRenderTargetView(renderTarget, &desc, descriptor.getCpuHandle());
     return descriptor;
 }
-PermanentDescriptorHeap_DSV::PermanentDescriptorHeap_DSV(D3D12Context& context, uint32_t numDescriptors)
-    : PermanentDescriptorHeapAllocator(context,
+MonotonicDescriptorHeap_DSV::MonotonicDescriptorHeap_DSV(D3D12Context& context, uint32_t numDescriptors)
+    : MonotonicDescriptorHeapAllocator(context,
                                        D3D12_DESCRIPTOR_HEAP_DESC{D3D12_DESCRIPTOR_HEAP_TYPE_DSV, numDescriptors,
                                                                   D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 0})
 {
 }
 
-void PermanentDescriptorHeap_DSV::createDepthStencilView(D3D12Context& context,
-                                                         const PermanentDescriptorHeapAllocation& allocation,
+void MonotonicDescriptorHeap_DSV::createDepthStencilView(D3D12Context& context,
+                                                         const MonotonicDescriptorHeapAllocation& allocation,
                                                          uint32_t allocationIndex,
                                                          ID3D12Resource* depthStencilResource,
                                                          const D3D12_DEPTH_STENCIL_VIEW_DESC& desc)
@@ -230,7 +230,7 @@ void PermanentDescriptorHeap_DSV::createDepthStencilView(D3D12Context& context,
     context.getDevice()->CreateDepthStencilView(depthStencilResource, &desc, allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<PermanentDescriptorHeapDescriptor, FreeBlockTracker::Error> PermanentDescriptorHeap_DSV::createDepthStencilView(
+tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error> MonotonicDescriptorHeap_DSV::createDepthStencilView(
     D3D12Context& context,
     ID3D12Resource* depthStencilResource,
     const D3D12_DEPTH_STENCIL_VIEW_DESC& desc)
@@ -238,17 +238,17 @@ tl::expected<PermanentDescriptorHeapDescriptor, FreeBlockTracker::Error> Permane
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
 
-    PermanentDescriptorHeapDescriptor descriptor{std::move(allocation.value()), 0};
+    MonotonicDescriptorHeapDescriptor descriptor{std::move(allocation.value()), 0};
     context.getDevice()->CreateDepthStencilView(depthStencilResource, &desc, descriptor.getCpuHandle());
     return descriptor;
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE PermanentDescriptorHeapDescriptor::getCpuHandle() const
+D3D12_CPU_DESCRIPTOR_HANDLE MonotonicDescriptorHeapDescriptor::getCpuHandle() const
 {
     return mAllocation.getCpuHandle(mAllocationIndex);
 }
 
-D3D12_GPU_DESCRIPTOR_HANDLE PermanentDescriptorHeapDescriptor::getGpuHandle() const
+D3D12_GPU_DESCRIPTOR_HANDLE MonotonicDescriptorHeapDescriptor::getGpuHandle() const
 {
     return mAllocation.getGpuHandle(mAllocationIndex);
 }

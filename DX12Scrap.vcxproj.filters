@@ -28,7 +28,7 @@
     <ClCompile Include="src\FreeBlockTracker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\d3d12\D3D12PermanentDescriptorHeap.cpp">
+    <ClCompile Include="src\d3d12\D3D12MonotonicDescriptorHeap.cpp">
       <Filter>Source Files\d3d12</Filter>
     </ClCompile>
     <ClCompile Include="src\d3d12\D3D12FixedDescriptorHeap.cpp">
@@ -57,7 +57,7 @@
     <ClInclude Include="src\FreeBlockTracker.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\d3d12\D3D12PermanentDescriptorHeap.h">
+    <ClInclude Include="src\d3d12\D3D12MonotonicDescriptorHeap.h">
       <Filter>Source Files\d3d12</Filter>
     </ClInclude>
     <ClInclude Include="src\d3d12\D3D12FixedDescriptorHeap.h">

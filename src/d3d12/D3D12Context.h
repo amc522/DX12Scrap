@@ -6,7 +6,7 @@
 
 #include "d3d12/D3D12Config.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
-#include "d3d12/D3D12PermanentDescriptorHeap.h"
+#include "d3d12/D3D12MonotonicDescriptorHeap.h"
 
 #include <array>
 
@@ -105,8 +105,8 @@ private:
     Microsoft::WRL::ComPtr<ID3D12CommandQueue> mCommandQueue;
     std::array<Microsoft::WRL::ComPtr<ID3D12CommandAllocator>, d3d12::kFrameBufferCount> mCommandAllocators;
     Microsoft::WRL::ComPtr<IDXGISwapChain3> mSwapChain;
-    std::unique_ptr<d3d12::PermanentDescriptorHeap_RTV> mRtvHeap;
-    d3d12::PermanentDescriptorHeapAllocation mSwapChainRtvs;
+    std::unique_ptr<d3d12::MonotonicDescriptorHeap_RTV> mRtvHeap;
+    d3d12::MonotonicDescriptorHeapAllocation mSwapChainRtvs;
     std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, d3d12::kFrameBufferCount> mRenderTargets;
 
     std::unique_ptr<d3d12::FixedDescriptorHeap_CBV_SRV_UAV> mCbvSrvUavHeap;
