@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -29,7 +30,37 @@ public:
         size_t start = 0;
         size_t count = 0;
 
-        size_t lastBlock() const { return start + count - 1; }
+        bool operator==(Range other) const { return start == other.start && count == other.count; }
+
+        [[nodiscard]] size_t inclusiveEnd() const { return start + count - 1; }
+        [[nodiscard]] size_t exclusiveEnd() const { return start + count; }
+
+        [[nodiscard]] bool contains(Range range) const
+        {
+            return start <= range.start && range.exclusiveEnd() <= exclusiveEnd();
+        }
+
+        [[nodiscard]] static std::optional<Range> merged(Range r1, Range r2)
+        {
+            if(r2.start > r1.exclusiveEnd() || r1.start > r2.exclusiveEnd()) { return std::nullopt; }
+
+            size_t start = std::min(r1.start, r2.start);
+            size_t exclusiveEnd = std::max(r1.exclusiveEnd(), r2.exclusiveEnd());
+
+            return Range{start, exclusiveEnd - start};
+        }
+
+        bool merge(Range other)
+        {
+            auto result = merged(*this, other);
+            if(result)
+            {
+                *this = result.value();
+                return true;
+            }
+
+            return false;
+        }
     };
 
     enum class Error

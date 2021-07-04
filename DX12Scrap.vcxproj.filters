@@ -31,6 +31,9 @@
     <ClCompile Include="src\d3d12\D3D12PermanentDescriptorHeap.cpp">
       <Filter>Source Files\d3d12</Filter>
     </ClCompile>
+    <ClCompile Include="src\d3d12\D3D12FixedDescriptorHeap.cpp">
+      <Filter>Source Files\d3d12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application.h">
@@ -55,6 +58,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="src\d3d12\D3D12PermanentDescriptorHeap.h">
+      <Filter>Source Files\d3d12</Filter>
+    </ClInclude>
+    <ClInclude Include="src\d3d12\D3D12FixedDescriptorHeap.h">
       <Filter>Source Files\d3d12</Filter>
     </ClInclude>
   </ItemGroup>

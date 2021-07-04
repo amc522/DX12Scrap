@@ -37,9 +37,9 @@ tl::expected<size_t, FreeBlockTracker::Error> FreeBlockTracker::unsafeReserve(si
 void FreeBlockTracker::unsafeRelease(Range blockRange)
 {
     if(blockRange.count == 0) { return; }
-    if(blockRange.lastBlock() >= mCapacity) { return; }
+    if(blockRange.inclusiveEnd() >= mCapacity) { return; }
 
-    const size_t releasedEndBlock = blockRange.lastBlock();
+    const size_t releasedEndBlock = blockRange.inclusiveEnd();
 
     for(auto itr = mFreeRanges.begin(); itr != mFreeRanges.end(); ++itr)
     {
@@ -50,7 +50,7 @@ void FreeBlockTracker::unsafeRelease(Range blockRange)
             mFreeCount += blockRange.count;
             return;
         }
-        else if(itr->lastBlock() + 1 == blockRange.start)
+        else if(itr->inclusiveEnd() + 1 == blockRange.start)
         {
             itr->count += blockRange.count;
             mFreeCount += blockRange.count;
