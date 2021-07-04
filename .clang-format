@@ -1,15 +1,18 @@
 ﻿---
-BasedOnStyle: Microsoft
 AccessModifierOffset: '-4'
 AlignAfterOpenBracket: Align
+AlignConsecutiveMacros: 'false'
 AlignConsecutiveAssignments: 'false'
 AlignConsecutiveDeclarations: 'false'
+AlignEscapedNewlines: Left
 AlignOperands: 'true'
+AlignTrailingComments: 'true'
 AllowAllArgumentsOnNextLine: 'false'
+AllowAllConstructorInitializersOnNextLine: 'false'
 AllowAllParametersOfDeclarationOnNextLine: 'false'
 AllowShortBlocksOnASingleLine: 'true'
 AllowShortCaseLabelsOnASingleLine: 'true'
-AllowShortFunctionsOnASingleLine: All
+AllowShortFunctionsOnASingleLine: Inline
 AllowShortIfStatementsOnASingleLine: WithoutElse
 AllowShortLambdasOnASingleLine: All
 AllowShortLoopsOnASingleLine: 'false'
@@ -19,10 +22,29 @@ AlwaysBreakTemplateDeclarations: 'Yes'
 BinPackArguments: 'true'
 BinPackParameters: 'false'
 BreakBeforeBinaryOperators: None
+BreakBeforeBraces: Custom
+BraceWrapping:
+    AfterCaseLabel: true
+    AfterClass: true
+    AfterControlStatement: true
+    AfterEnum: true
+    AfterFunction: true
+    AfterNamespace: true
+    AfterStruct: true
+    AfterUnion: true
+    AfterExternBlock: true
+    BeforeCatch: true
+    BeforeElse: true
+    IndentBraces: false
+    SplitEmptyFunction: false
+    SplitEmptyRecord: false
+    SplitEmptyNamespace: false
+BreakBeforeTernaryOperators: 'true'
 BreakConstructorInitializers: BeforeComma
 ColumnLimit: '120'
 ConstructorInitializerAllOnOneLineOrOnePerLine: 'true'
 Cpp11BracedListStyle: 'true'
+FixNamespaceComments: 'true'
 IncludeBlocks: Regroup
 IncludeCategories:
     - Regex:    '<[[:alnum:]|_]+>'
@@ -35,14 +57,17 @@ IndentCaseLabels: 'false'
 IndentPPDirectives: AfterHash
 IndentWidth: '4'
 KeepEmptyLinesAtTheStartOfBlocks: 'false'
+Language: Cpp
 NamespaceIndentation: None
 PointerAlignment: Left
+ReflowComments: 'true'
 SortIncludes: 'true'
 SortUsingDeclarations: 'true'
 SpaceAfterCStyleCast: 'false'
 SpaceAfterLogicalNot: 'false'
 SpaceAfterTemplateKeyword: 'false'
 SpaceBeforeAssignmentOperators: 'true'
+SpaceBeforeCpp11BracedList: 'false'
 SpaceBeforeCtorInitializerColon: 'false'
 SpaceBeforeInheritanceColon: 'true'
 SpaceBeforeParens: Never

@@ -73,8 +73,8 @@ public:
         return static_cast<size_t>(mDescriptorSize) * mFreeBlockTracker.getCapacity() * 2;
     }
 
-    [[nodiscard]] tl::expected<FixedDescriptorHeapAllocation, FreeBlockTracker::Error> allocate(
-        uint32_t descriptorCount);
+    [[nodiscard]] tl::expected<FixedDescriptorHeapAllocation, FreeBlockTracker::Error>
+    allocate(uint32_t descriptorCount);
 
     void deallocate(FreeBlockTracker::Range range);
 
@@ -170,9 +170,8 @@ public:
                                   uint32_t allocationIndex,
                                   const D3D12_CONSTANT_BUFFER_VIEW_DESC& desc);
 
-    [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> createConstantBufferView(
-        DeviceContext& context,
-        const D3D12_CONSTANT_BUFFER_VIEW_DESC& desc);
+    [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
+    createConstantBufferView(DeviceContext& context, const D3D12_CONSTANT_BUFFER_VIEW_DESC& desc);
 
     // SRV
     void createShaderResourceView(DeviceContext& context,
@@ -181,10 +180,10 @@ public:
                                   ID3D12Resource* resource,
                                   const D3D12_SHADER_RESOURCE_VIEW_DESC& desc);
 
-    [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> createShaderResourceView(
-        DeviceContext& context,
-        ID3D12Resource* resource,
-        const D3D12_SHADER_RESOURCE_VIEW_DESC& desc);
+    [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
+    createShaderResourceView(DeviceContext& context,
+                             ID3D12Resource* resource,
+                             const D3D12_SHADER_RESOURCE_VIEW_DESC& desc);
 
     // UAV
     void createUnorderedAccessView(DeviceContext& context,
@@ -194,11 +193,11 @@ public:
                                    ID3D12Resource* counterResource,
                                    const D3D12_UNORDERED_ACCESS_VIEW_DESC& desc);
 
-    [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> createUnorderedAccessView(
-        DeviceContext& context,
-        ID3D12Resource* resource,
-        ID3D12Resource* counterResource,
-        const D3D12_UNORDERED_ACCESS_VIEW_DESC& desc);
+    [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
+    createUnorderedAccessView(DeviceContext& context,
+                              ID3D12Resource* resource,
+                              ID3D12Resource* counterResource,
+                              const D3D12_UNORDERED_ACCESS_VIEW_DESC& desc);
 };
 
 // Fixed descriptor heap for samplers.
@@ -219,9 +218,8 @@ public:
                        uint32_t allocationIndex,
                        const D3D12_SAMPLER_DESC& desc);
 
-    [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> createSampler(
-        DeviceContext& context,
-        const D3D12_SAMPLER_DESC& desc);
+    [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
+    createSampler(DeviceContext& context, const D3D12_SAMPLER_DESC& desc);
 };
 
 // Fixed descriptor heap for render target views.
@@ -243,10 +241,10 @@ public:
                                 ID3D12Resource* renderTargetResource,
                                 const D3D12_RENDER_TARGET_VIEW_DESC& desc);
 
-    [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> createRenderTargetView(
-        DeviceContext& context,
-        ID3D12Resource* renderTargetResource,
-        const D3D12_RENDER_TARGET_VIEW_DESC& desc);
+    [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
+    createRenderTargetView(DeviceContext& context,
+                           ID3D12Resource* renderTargetResource,
+                           const D3D12_RENDER_TARGET_VIEW_DESC& desc);
 };
 
 // Fixed descriptor heap for depth stencil views.
@@ -268,10 +266,10 @@ public:
                                 ID3D12Resource* depthStencilResource,
                                 const D3D12_DEPTH_STENCIL_VIEW_DESC& desc);
 
-    [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> createDepthStencilView(
-        DeviceContext& context,
-        ID3D12Resource* depthStencilResource,
-        const D3D12_DEPTH_STENCIL_VIEW_DESC& desc);
+    [[nodiscard]] tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
+    createDepthStencilView(DeviceContext& context,
+                           ID3D12Resource* depthStencilResource,
+                           const D3D12_DEPTH_STENCIL_VIEW_DESC& desc);
 };
 
 } // namespace scrap::d3d12

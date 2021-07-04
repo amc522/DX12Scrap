@@ -48,8 +48,8 @@ FixedDescriptorHeapAllocator::~FixedDescriptorHeapAllocator()
     assert(mFreeBlockTracker.getReservedBlockCount() == 0);
 }
 
-tl::expected<FixedDescriptorHeapAllocation, FreeBlockTracker::Error> FixedDescriptorHeapAllocator::allocate(
-    uint32_t descriptorCount)
+tl::expected<FixedDescriptorHeapAllocation, FreeBlockTracker::Error>
+FixedDescriptorHeapAllocator::allocate(uint32_t descriptorCount)
 {
     std::lock_guard lockGuard{mMutex};
 
@@ -152,9 +152,9 @@ void FixedDescriptorHeapAllocator::uploadPendingDescriptors(DeviceContext& conte
 
 FixedDescriptorHeapAllocation::FixedDescriptorHeapAllocation(FixedDescriptorHeapAllocator& fixedHeap,
                                                              FreeBlockTracker::Range range)
-    : mHeap(&fixedHeap), mReservedHeapBlocks(range)
-{
-}
+    : mHeap(&fixedHeap)
+    , mReservedHeapBlocks(range)
+{}
 
 FixedDescriptorHeapAllocation::FixedDescriptorHeapAllocation(FixedDescriptorHeapAllocation&& other) noexcept
     : mHeap(other.mHeap)
@@ -223,13 +223,18 @@ void FixedDescriptorHeapAllocation::release(uint32_t index)
     releaseUnsynchronized(index);
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE FixedDescriptorHeapDescriptor::getCpuHandle() const { return mAllocation.getCpuHandle(0); }
-D3D12_GPU_DESCRIPTOR_HANDLE FixedDescriptorHeapDescriptor::getGpuHandle() const { return mAllocation.getGpuHandle(0); }
+D3D12_CPU_DESCRIPTOR_HANDLE FixedDescriptorHeapDescriptor::getCpuHandle() const
+{
+    return mAllocation.getCpuHandle(0);
+}
+D3D12_GPU_DESCRIPTOR_HANDLE FixedDescriptorHeapDescriptor::getGpuHandle() const
+{
+    return mAllocation.getGpuHandle(0);
+}
 
 FixedDescriptorHeap_CBV_SRV_UAV::FixedDescriptorHeap_CBV_SRV_UAV(DeviceContext& context, uint32_t descriptorCount)
     : FixedDescriptorHeapAllocator(context, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, descriptorCount)
-{
-}
+{}
 
 void FixedDescriptorHeap_CBV_SRV_UAV::createConstantBufferView(DeviceContext& context,
                                                                const FixedDescriptorHeapAllocation& allocation,
@@ -240,8 +245,9 @@ void FixedDescriptorHeap_CBV_SRV_UAV::createConstantBufferView(DeviceContext& co
     context.getDevice()->CreateConstantBufferView(&desc, allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> FixedDescriptorHeap_CBV_SRV_UAV::
-    createConstantBufferView(DeviceContext& context, const D3D12_CONSTANT_BUFFER_VIEW_DESC& desc)
+tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
+FixedDescriptorHeap_CBV_SRV_UAV::createConstantBufferView(DeviceContext& context,
+                                                          const D3D12_CONSTANT_BUFFER_VIEW_DESC& desc)
 {
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
@@ -261,10 +267,10 @@ void FixedDescriptorHeap_CBV_SRV_UAV::createShaderResourceView(DeviceContext& co
     context.getDevice()->CreateShaderResourceView(resource, &desc, allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> FixedDescriptorHeap_CBV_SRV_UAV::
-    createShaderResourceView(DeviceContext& context,
-                             ID3D12Resource* resource,
-                             const D3D12_SHADER_RESOURCE_VIEW_DESC& desc)
+tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
+FixedDescriptorHeap_CBV_SRV_UAV::createShaderResourceView(DeviceContext& context,
+                                                          ID3D12Resource* resource,
+                                                          const D3D12_SHADER_RESOURCE_VIEW_DESC& desc)
 {
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
@@ -286,11 +292,11 @@ void FixedDescriptorHeap_CBV_SRV_UAV::createUnorderedAccessView(DeviceContext& c
                                                    allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> FixedDescriptorHeap_CBV_SRV_UAV::
-    createUnorderedAccessView(DeviceContext& context,
-                              ID3D12Resource* resource,
-                              ID3D12Resource* counterResource,
-                              const D3D12_UNORDERED_ACCESS_VIEW_DESC& desc)
+tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
+FixedDescriptorHeap_CBV_SRV_UAV::createUnorderedAccessView(DeviceContext& context,
+                                                           ID3D12Resource* resource,
+                                                           ID3D12Resource* counterResource,
+                                                           const D3D12_UNORDERED_ACCESS_VIEW_DESC& desc)
 {
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
@@ -302,8 +308,7 @@ tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> FixedDescri
 
 FixedDescriptorHeap_Sampler::FixedDescriptorHeap_Sampler(DeviceContext& context, uint32_t descriptorCount)
     : FixedDescriptorHeapAllocator(context, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, descriptorCount)
-{
-}
+{}
 
 void FixedDescriptorHeap_Sampler::createSampler(DeviceContext& context,
                                                 const FixedDescriptorHeapAllocation& allocation,
@@ -314,9 +319,8 @@ void FixedDescriptorHeap_Sampler::createSampler(DeviceContext& context,
     context.getDevice()->CreateSampler(&desc, allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> FixedDescriptorHeap_Sampler::createSampler(
-    DeviceContext& context,
-    const D3D12_SAMPLER_DESC& desc)
+tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
+FixedDescriptorHeap_Sampler::createSampler(DeviceContext& context, const D3D12_SAMPLER_DESC& desc)
 {
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
@@ -328,8 +332,7 @@ tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> FixedDescri
 
 FixedDescriptorHeap_RTV::FixedDescriptorHeap_RTV(DeviceContext& context, uint32_t descriptorCount)
     : FixedDescriptorHeapAllocator(context, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, descriptorCount)
-{
-}
+{}
 
 void FixedDescriptorHeap_RTV::createRenderTargetView(DeviceContext& context,
                                                      const FixedDescriptorHeapAllocation& allocation,
@@ -341,10 +344,10 @@ void FixedDescriptorHeap_RTV::createRenderTargetView(DeviceContext& context,
     context.getDevice()->CreateRenderTargetView(renderTargetResource, &desc, allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> FixedDescriptorHeap_RTV::createRenderTargetView(
-    DeviceContext& context,
-    ID3D12Resource* renderTargetResource,
-    const D3D12_RENDER_TARGET_VIEW_DESC& desc)
+tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
+FixedDescriptorHeap_RTV::createRenderTargetView(DeviceContext& context,
+                                                ID3D12Resource* renderTargetResource,
+                                                const D3D12_RENDER_TARGET_VIEW_DESC& desc)
 {
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
@@ -356,8 +359,7 @@ tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> FixedDescri
 
 FixedDescriptorHeap_DSV::FixedDescriptorHeap_DSV(DeviceContext& context, uint32_t descriptorCount)
     : FixedDescriptorHeapAllocator(context, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, descriptorCount)
-{
-}
+{}
 
 void FixedDescriptorHeap_DSV::createDepthStencilView(DeviceContext& context,
                                                      const FixedDescriptorHeapAllocation& allocation,
@@ -369,10 +371,10 @@ void FixedDescriptorHeap_DSV::createDepthStencilView(DeviceContext& context,
     context.getDevice()->CreateDepthStencilView(depthStencilResource, &desc, allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error> FixedDescriptorHeap_DSV::createDepthStencilView(
-    DeviceContext& context,
-    ID3D12Resource* depthStencilResource,
-    const D3D12_DEPTH_STENCIL_VIEW_DESC& desc)
+tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
+FixedDescriptorHeap_DSV::createDepthStencilView(DeviceContext& context,
+                                                ID3D12Resource* depthStencilResource,
+                                                const D3D12_DEPTH_STENCIL_VIEW_DESC& desc)
 {
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }

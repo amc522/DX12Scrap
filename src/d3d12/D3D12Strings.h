@@ -147,20 +147,16 @@ struct fmt::formatter<scrap::HRESULT_t> : public fmt::formatter<std::string_view
 
 template<>
 struct fmt::formatter<D3D_FEATURE_LEVEL> : public scrap::ToStringViewFormatter<D3D_FEATURE_LEVEL>
-{
-};
+{};
 
 template<>
 struct fmt::formatter<D3D_SHADER_MODEL> : public scrap::ToStringViewFormatter<D3D_SHADER_MODEL>
-{
-};
+{};
 
 template<>
 struct fmt::formatter<D3D12_DESCRIPTOR_HEAP_TYPE> : public scrap::ToStringViewFormatter<D3D12_DESCRIPTOR_HEAP_TYPE>
-{
-};
+{};
 
 template<>
 struct fmt::formatter<D3D12_RESOURCE_BINDING_TIER> : public scrap::ToStringViewFormatter<D3D12_RESOURCE_BINDING_TIER>
-{
-};
+{};

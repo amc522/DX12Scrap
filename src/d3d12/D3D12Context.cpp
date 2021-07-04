@@ -365,16 +365,25 @@ constexpr DXGI_GPU_PREFERENCE GetDxgiGpuPreference(GpuPreference gpuPreference)
     }
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE DeviceContext::getBackBufferRtv() const { return mSwapChainRtvs.getCpuHandle(mFrameIndex); }
+D3D12_CPU_DESCRIPTOR_HANDLE DeviceContext::getBackBufferRtv() const
+{
+    return mSwapChainRtvs.getCpuHandle(mFrameIndex);
+}
 
-void DeviceContext::beginFrame() { mCbvSrvUavHeap->uploadPendingDescriptors(*this); }
+void DeviceContext::beginFrame()
+{
+    mCbvSrvUavHeap->uploadPendingDescriptors(*this);
+}
 
 void DeviceContext::present()
 {
     if(FAILED(mSwapChain->Present(1, 0))) { spdlog::error("Present call failed"); }
 }
 
-void DeviceContext::swap() { mFrameIndex = mSwapChain->GetCurrentBackBufferIndex(); }
+void DeviceContext::swap()
+{
+    mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
+}
 
 void DeviceContext::getHardwareAdapter(GpuPreference gpuPreference,
                                        D3D_FEATURE_LEVEL featureLevel,

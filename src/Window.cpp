@@ -63,7 +63,10 @@ Window::~Window()
     }
 }
 
-void Window::setSize(glm::i32vec2 size) { SDL_SetWindowSize(mSdlWindow, size.x, size.y); }
+void Window::setSize(glm::i32vec2 size)
+{
+    SDL_SetWindowSize(mSdlWindow, size.x, size.y);
+}
 
 HWND Window::getHwnd() const
 {
@@ -74,7 +77,10 @@ HWND Window::getHwnd() const
     return wmInfo.info.win.window;
 }
 
-void Window::show() { SDL_ShowWindow(mSdlWindow); }
+void Window::show()
+{
+    SDL_ShowWindow(mSdlWindow);
+}
 
 void Window::handleEvent(const SDL_WindowEvent& windowEvent)
 {

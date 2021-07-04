@@ -44,7 +44,10 @@ Application::~Application()
     if(SDL_WasInit(0) != 0) { SDL_Quit(); }
 }
 
-Application::operator bool() const { return mRunning; }
+Application::operator bool() const
+{
+    return mRunning;
+}
 
 void Application::update()
 {

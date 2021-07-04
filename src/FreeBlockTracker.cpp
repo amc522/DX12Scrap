@@ -3,9 +3,10 @@
 namespace scrap
 {
 FreeBlockTracker::FreeBlockTracker(size_t capacity)
-    : mFreeRanges(1, Range{size_t(0), size_t(capacity)}), mCapacity(capacity), mFreeCount(capacity)
-{
-}
+    : mFreeRanges(1, Range{size_t(0), size_t(capacity)})
+    , mCapacity(capacity)
+    , mFreeCount(capacity)
+{}
 
 tl::expected<ScopedReservedBlocks, FreeBlockTracker::Error> FreeBlockTracker::reserve(size_t contiguousBlockCount)
 {

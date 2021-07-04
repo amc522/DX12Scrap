@@ -29,8 +29,8 @@ MonotonicDescriptorHeapAllocator::MonotonicDescriptorHeapAllocator(DeviceContext
     mCapacity = desc.NumDescriptors;
 }
 
-tl::expected<MonotonicDescriptorHeapAllocation, FreeBlockTracker::Error> MonotonicDescriptorHeapAllocator::allocate(
-    uint32_t descriptorCount)
+tl::expected<MonotonicDescriptorHeapAllocation, FreeBlockTracker::Error>
+MonotonicDescriptorHeapAllocator::allocate(uint32_t descriptorCount)
 {
     bool success = false;
     uint32_t newAllocationCount;
@@ -53,18 +53,19 @@ tl::expected<MonotonicDescriptorHeapAllocation, FreeBlockTracker::Error> Monoton
 
 MonotonicDescriptorHeapAllocation::MonotonicDescriptorHeapAllocation(MonotonicDescriptorHeapAllocator& heapAllocator,
                                                                      FreeBlockTracker::Range range)
-    : mHeap(&heapAllocator), mRange(range)
-{
-}
+    : mHeap(&heapAllocator)
+    , mRange(range)
+{}
 
 MonotonicDescriptorHeapAllocation::MonotonicDescriptorHeapAllocation(MonotonicDescriptorHeapAllocation&& other) noexcept
-    : mHeap(other.mHeap), mRange(other.mRange)
+    : mHeap(other.mHeap)
+    , mRange(other.mRange)
 {
     other.mHeap = nullptr;
 }
 
-MonotonicDescriptorHeapAllocation& MonotonicDescriptorHeapAllocation::operator=(
-    MonotonicDescriptorHeapAllocation&& other) noexcept
+MonotonicDescriptorHeapAllocation&
+MonotonicDescriptorHeapAllocation::operator=(MonotonicDescriptorHeapAllocation&& other) noexcept
 {
     mHeap = other.mHeap;
     mRange = other.mRange;
@@ -91,8 +92,7 @@ MonotonicDescriptorHeap_CBV_SRV_UAV::MonotonicDescriptorHeap_CBV_SRV_UAV(DeviceC
                                        D3D12_DESCRIPTOR_HEAP_DESC{D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
                                                                   numDescriptors,
                                                                   D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 0})
-{
-}
+{}
 
 void MonotonicDescriptorHeap_CBV_SRV_UAV::createConstantBufferView(DeviceContext& context,
                                                                    const MonotonicDescriptorHeapAllocation& allocation,
@@ -102,8 +102,9 @@ void MonotonicDescriptorHeap_CBV_SRV_UAV::createConstantBufferView(DeviceContext
     context.getDevice()->CreateConstantBufferView(&desc, allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error> MonotonicDescriptorHeap_CBV_SRV_UAV::
-    createConstantBufferView(DeviceContext& context, const D3D12_CONSTANT_BUFFER_VIEW_DESC& desc)
+tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error>
+MonotonicDescriptorHeap_CBV_SRV_UAV::createConstantBufferView(DeviceContext& context,
+                                                              const D3D12_CONSTANT_BUFFER_VIEW_DESC& desc)
 {
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
@@ -122,10 +123,10 @@ void MonotonicDescriptorHeap_CBV_SRV_UAV::createShaderResourceView(DeviceContext
     context.getDevice()->CreateShaderResourceView(resource, &desc, allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error> MonotonicDescriptorHeap_CBV_SRV_UAV::
-    createShaderResourceView(DeviceContext& context,
-                             ID3D12Resource* resource,
-                             const D3D12_SHADER_RESOURCE_VIEW_DESC& desc)
+tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error>
+MonotonicDescriptorHeap_CBV_SRV_UAV::createShaderResourceView(DeviceContext& context,
+                                                              ID3D12Resource* resource,
+                                                              const D3D12_SHADER_RESOURCE_VIEW_DESC& desc)
 {
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
@@ -146,11 +147,11 @@ void MonotonicDescriptorHeap_CBV_SRV_UAV::createUnorderedAccessView(DeviceContex
                                                    allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error> MonotonicDescriptorHeap_CBV_SRV_UAV::
-    createUnorderedAccessView(DeviceContext& context,
-                              ID3D12Resource* resource,
-                              ID3D12Resource* counterResource,
-                              const D3D12_UNORDERED_ACCESS_VIEW_DESC& desc)
+tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error>
+MonotonicDescriptorHeap_CBV_SRV_UAV::createUnorderedAccessView(DeviceContext& context,
+                                                               ID3D12Resource* resource,
+                                                               ID3D12Resource* counterResource,
+                                                               const D3D12_UNORDERED_ACCESS_VIEW_DESC& desc)
 {
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
@@ -164,8 +165,7 @@ MonotonicDescriptorHeap_Sampler::MonotonicDescriptorHeap_Sampler(DeviceContext& 
     : MonotonicDescriptorHeapAllocator(context,
                                        D3D12_DESCRIPTOR_HEAP_DESC{D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, numDescriptors,
                                                                   D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 0})
-{
-}
+{}
 
 void MonotonicDescriptorHeap_Sampler::createSampler(DeviceContext& context,
                                                     const MonotonicDescriptorHeapAllocation& allocation,
@@ -175,9 +175,8 @@ void MonotonicDescriptorHeap_Sampler::createSampler(DeviceContext& context,
     context.getDevice()->CreateSampler(&desc, allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error> MonotonicDescriptorHeap_Sampler::createSampler(
-    DeviceContext& context,
-    const D3D12_SAMPLER_DESC& desc)
+tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error>
+MonotonicDescriptorHeap_Sampler::createSampler(DeviceContext& context, const D3D12_SAMPLER_DESC& desc)
 {
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
@@ -191,8 +190,7 @@ MonotonicDescriptorHeap_RTV::MonotonicDescriptorHeap_RTV(DeviceContext& context,
     : MonotonicDescriptorHeapAllocator(context,
                                        D3D12_DESCRIPTOR_HEAP_DESC{D3D12_DESCRIPTOR_HEAP_TYPE_RTV, numDescriptors,
                                                                   D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 0})
-{
-}
+{}
 
 void MonotonicDescriptorHeap_RTV::createRenderTargetView(DeviceContext& context,
                                                          const MonotonicDescriptorHeapAllocation& allocation,
@@ -203,10 +201,10 @@ void MonotonicDescriptorHeap_RTV::createRenderTargetView(DeviceContext& context,
     context.getDevice()->CreateRenderTargetView(renderTarget, &desc, allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error> MonotonicDescriptorHeap_RTV::
-    createRenderTargetView(DeviceContext& context,
-                           ID3D12Resource* renderTarget,
-                           const D3D12_RENDER_TARGET_VIEW_DESC& desc)
+tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error>
+MonotonicDescriptorHeap_RTV::createRenderTargetView(DeviceContext& context,
+                                                    ID3D12Resource* renderTarget,
+                                                    const D3D12_RENDER_TARGET_VIEW_DESC& desc)
 {
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
@@ -219,8 +217,7 @@ MonotonicDescriptorHeap_DSV::MonotonicDescriptorHeap_DSV(DeviceContext& context,
     : MonotonicDescriptorHeapAllocator(context,
                                        D3D12_DESCRIPTOR_HEAP_DESC{D3D12_DESCRIPTOR_HEAP_TYPE_DSV, numDescriptors,
                                                                   D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 0})
-{
-}
+{}
 
 void MonotonicDescriptorHeap_DSV::createDepthStencilView(DeviceContext& context,
                                                          const MonotonicDescriptorHeapAllocation& allocation,
@@ -231,10 +228,10 @@ void MonotonicDescriptorHeap_DSV::createDepthStencilView(DeviceContext& context,
     context.getDevice()->CreateDepthStencilView(depthStencilResource, &desc, allocation.getCpuHandle(allocationIndex));
 }
 
-tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error> MonotonicDescriptorHeap_DSV::
-    createDepthStencilView(DeviceContext& context,
-                           ID3D12Resource* depthStencilResource,
-                           const D3D12_DEPTH_STENCIL_VIEW_DESC& desc)
+tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error>
+MonotonicDescriptorHeap_DSV::createDepthStencilView(DeviceContext& context,
+                                                    ID3D12Resource* depthStencilResource,
+                                                    const D3D12_DEPTH_STENCIL_VIEW_DESC& desc)
 {
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
