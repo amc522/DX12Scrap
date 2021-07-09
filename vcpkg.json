@@ -1,13 +1,14 @@
 {
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/scripts/vcpkg.schema.json",
   "name": "dx12scrap",
-  "version": "20210606",
+  "version": "20210707",
   "dependencies": [
     "d3dx12",
     "tl-expected",
     "fmt",
     "glm",
     "sdl2",
+    "span-lite",
     "spdlog"
   ]
 }

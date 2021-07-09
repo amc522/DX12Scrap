@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="include">
+      <UniqueIdentifier>{89AF369E-F58E-B539-FEA6-40106A051C9B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\cputex">
+      <UniqueIdentifier>{D1744346-BD42-374C-A6D6-A772924313B1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\cputex\internal">
+      <UniqueIdentifier>{3D12608B-A949-A822-B253-0C461E0ACF1B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{2DAB880B-99B4-887C-2230-9F7C8E38947C}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\include\cputex\config.h">
+      <Filter>include\cputex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cputex\converter.h">
+      <Filter>include\cputex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cputex\definitions.h">
+      <Filter>include\cputex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cputex\fwd.h">
+      <Filter>include\cputex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cputex\internal\texture_storage.h">
+      <Filter>include\cputex\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cputex\sampler.h">
+      <Filter>include\cputex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cputex\shared_texture.h">
+      <Filter>include\cputex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cputex\texture_operations.h">
+      <Filter>include\cputex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cputex\texture_view.h">
+      <Filter>include\cputex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cputex\unique_texture.h">
+      <Filter>include\cputex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\cputex\utility.h">
+      <Filter>include\cputex</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\converter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\sampler.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared_texture.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\texture_operations.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\unique_texture.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,16 @@
+About
+------
+This file describes the changes and modifications made to DirectXTex to bring it in as a minimal, cross platform dependency.
+
+Usage
+------
+DirectX source is being used to decompress BC6h and BC7 compressed textures.
+
+Changes
+--------
+
+- Created a header to define macros originally from DirectXMath or DirectXTex. These macros are for the explicit purpose of getting BC6HBC7.cpp to compile. The header also contains structs and functions from DirectXMath. Again, these were copied with the explicit purpose of getting BC6HBC7.cpp to compile
+- Added a new class 'HDRColor' to BC.h. It is exactly the same as HDRColorA but without an alpha channel.
+- Added two new overrides of D3DXDecodeBC6HS to take a pointer to HDRColor instead of XMVECTOR
+- D3DX_BC6H::Decode is now a template function and has logic to either take HDRColorA or HDRColor as an out parameter.
+- Removed all unnecessary code from BC.h and BC6HBC7.cpp

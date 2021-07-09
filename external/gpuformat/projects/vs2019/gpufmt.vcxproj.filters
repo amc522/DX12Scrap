@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="include">
+      <UniqueIdentifier>{89AF369E-F58E-B539-FEA6-40106A051C9B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\gpufmt">
+      <UniqueIdentifier>{CBDC974F-B7AA-8B55-A03E-FC7B8CAB67BA}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\gpufmt\internal">
+      <UniqueIdentifier>{7713EA85-E34A-321D-EC54-9640580B5916}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{2DAB880B-99B4-887C-2230-9F7C8E38947C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty">
+      <UniqueIdentifier>{50A5DA7C-3C5D-1CCA-A564-F525913BB7BA}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\DirectXTex">
+      <UniqueIdentifier>{A3291381-0F96-CE7B-D889-66D944B5F0E3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\DirectXTex\DirectXTex">
+      <UniqueIdentifier>{167458CD-02C5-430F-2B29-32D117D9D678}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\PowerVR_SDK">
+      <UniqueIdentifier>{7567C67E-6161-EFD0-4ACE-85E13667553D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\PowerVR_SDK\PowerVR">
+      <UniqueIdentifier>{7972F5AC-6598-BF13-4EDE-44DF3AA3E4DF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\astc_dec">
+      <UniqueIdentifier>{1504F136-8165-CE44-0AD3-14F776330504}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\astc_dec\astc_dec">
+      <UniqueIdentifier>{7AD032A7-668B-2253-0F43-9B9DFBDC6CE3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\swiftshader">
+      <UniqueIdentifier>{83F36447-6FED-8D99-585A-24AA44F3F305}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\swiftshader\switftshader">
+      <UniqueIdentifier>{4A737C88-B62C-E732-3F8C-010DAB449DA2}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\include\gpufmt\config.h">
+      <Filter>include\gpufmt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\decompress.h">
+      <Filter>include\gpufmt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\definitions.h">
+      <Filter>include\gpufmt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\dxgi.h">
+      <Filter>include\gpufmt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\format.h">
+      <Filter>include\gpufmt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\internal\astc.h">
+      <Filter>include\gpufmt\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\internal\bc.h">
+      <Filter>include\gpufmt\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\internal\bit_packing.h">
+      <Filter>include\gpufmt\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\internal\byte_packing.h">
+      <Filter>include\gpufmt\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\internal\etc.h">
+      <Filter>include\gpufmt\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\internal\format_packing.h">
+      <Filter>include\gpufmt\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\internal\format_traits_common.h">
+      <Filter>include\gpufmt\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\internal\packing_common.h">
+      <Filter>include\gpufmt\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\internal\pvrtc.h">
+      <Filter>include\gpufmt\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\internal\sample_variant.h">
+      <Filter>include\gpufmt\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\opengl.h">
+      <Filter>include\gpufmt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\sample.h">
+      <Filter>include\gpufmt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\storage.h">
+      <Filter>include\gpufmt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\string.h">
+      <Filter>include\gpufmt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\traits.h">
+      <Filter>include\gpufmt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\utility.h">
+      <Filter>include\gpufmt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\visit.h">
+      <Filter>include\gpufmt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\vulkan.h">
+      <Filter>include\gpufmt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\gpufmt\write.h">
+      <Filter>include\gpufmt</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\astc.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\bc.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\decompress.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\etc.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\pvrtc.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\sample.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\write.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\thirdparty\DirectXTex\DirectXTex\BC6HBC7.cpp">
+      <Filter>thirdparty\DirectXTex\DirectXTex</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\thirdparty\PowerVR_SDK\PowerVR\PVRTDecompress.cpp">
+      <Filter>thirdparty\PowerVR_SDK\PowerVR</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\thirdparty\astc_dec\astc_dec\astc_decomp.cpp">
+      <Filter>thirdparty\astc_dec\astc_dec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\thirdparty\swiftshader\switftshader\ETC_Decoder.cpp">
+      <Filter>thirdparty\swiftshader\switftshader</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
