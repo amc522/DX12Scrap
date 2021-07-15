@@ -3,6 +3,7 @@
 #include "d3d12/D3D12Context.h"
 #include "d3d12/D3D12Texture.h"
 
+#include <cputex/utility.h>
 #include <d3d12.h>
 #include <d3dcompiler.h>
 #include <d3dx12.h>
@@ -132,7 +133,7 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
     textureParams.dimension = cputex::TextureDimension::Texture2D;
     textureParams.extent = {1024, 1024, 1};
     textureParams.faces = 1;
-    textureParams.mips = 1;
+    textureParams.mips = cputex::maxMips(textureParams.extent);
     textureParams.arraySize = 1;
     textureParams.format = gpufmt::Format::R8G8B8A8_UNORM;
     cputex::UniqueTexture cpuTexture{textureParams};
@@ -141,14 +142,17 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
     //-------------------------------------
     // Generate a checkboard texture
     //-------------------------------------
-    [&]() {
+    for(uint32_t mip = 0; mip < textureParams.mips; ++mip)
+    {
+        cputex::SurfaceSpan surface = cpuTexture.accessMipSurface(0, 0, mip);
         const UINT bytesPerPixel = gpufmt::formatInfo(textureParams.format).blockByteSize;
-        const UINT rowPitch = textureParams.extent.x * bytesPerPixel;
-        const UINT cellPitch = rowPitch >> 3;      // The width of a cell in the checkboard texture.
-        const UINT cellHeight = textureParams.extent.x >> 3; // The height of a cell in the checkerboard texture.
-        const UINT textureSize = rowPitch * textureParams.extent.y;
+        const UINT rowPitch = surface.extent().x * bytesPerPixel;
+        const UINT cellPitch = std::max(rowPitch >> 3, 1u); // The width of a cell in the checkboard texture.
+        const UINT cellHeight =
+            std::max(surface.extent().x >> 3, std::max(cellPitch / bytesPerPixel, 1u)); // The height of a cell in the checkerboard texture.
+        const UINT textureSize = static_cast<UINT>(surface.sizeInBytes());
 
-        UINT8 *pData = cpuTexture.accessMipSurfaceDataAs<UINT8>().data();
+        UINT8* pData = surface.accessDataAs<UINT8>().data();
 
         for(UINT n = 0; n < textureSize; n += bytesPerPixel)
         {
@@ -172,9 +176,10 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
                 pData[n + 3] = 0xff; // A
             }
         }
-    }();
+    }
 
-    texture.initFromMemory(d3d12Context, mCommandList.Get(), cpuTexture, d3d12::Texture::AccessFlags::GpuRead, "Firsrt Texture");
+    texture.initFromMemory(d3d12Context, mCommandList.Get(), cpuTexture, d3d12::Texture::AccessFlags::GpuRead,
+                           "Firsrt Texture");
     mTexture = std::move(texture);
 
     if(FAILED(mCommandList->Close())) { spdlog::error("Failed to close graphics command list"); }
