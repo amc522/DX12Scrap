@@ -1,6 +1,8 @@
 // Classes:
 //   scrap::d3d12::FixedDescriptorHeapAllocator
-//   scrap::d3d12::FixedDescriptorHeapAllocation
+//   scrap::d3d12::FixedDescriptorHeapResevation
+//   scrap::d3d12::FixedDescriptorHeapSubAllocator
+//   scrap::d3d12::FixedDescriptorHeapMonotonicSubAllocator
 //   scrap::d3d12::FixedDescriptorHeapDescriptor
 //   scrap::d3d12::FixedDescriptorHeap_CBV_SRV_UAV
 //   scrap::d3d12::FixedDescriptorHeap_Sampler
@@ -46,10 +48,21 @@ namespace scrap::d3d12
 {
 class DeviceContext;
 
-class FixedDescriptorHeapAllocation;
+class FixedDescriptorHeapReservation;
+class FixedDescriptorHeapSubAllocator;
+class FixedDescriptorHeapMonotonicSubAllocator;
 
-// This is the main class that manages allocations through a fixed sized descriptor heap. It allocates blocks of
-// descriptors wrapped in the FixedDescriptorHeapAllocation class.
+// This is the main class that manages allocations through a fixed sized descriptor heap. It allocates ranges of the
+// descriptor heap to be used by other object however they want. There's two types of allocations that can be made;
+// normal and monotonic. The normal allocation can have each block allocated and deallocated as many times as needed.
+// The monotonic allocation can only be allocated to and once all its blocks have been used, it can no longer allocate.
+//
+// An example use for the normal allocation would be for a system that needs to create vertex buffers every frame. Each
+// frame that system would be creating new SRVs and possibly UAVs and then destroying them at the end of the frame.
+//
+// An example use for the monotonic allocation would be a texture object. The texture object might need to create
+// several different views into the texture. Those views will be create all at once and destroyed when the texture is
+// destroyed. No deallocation needs to happen on a per descriptor basis.
 class FixedDescriptorHeapAllocator
 {
 public:
@@ -73,8 +86,14 @@ public:
         return static_cast<size_t>(mDescriptorSize) * mFreeBlockTracker.getCapacity() * 2;
     }
 
-    [[nodiscard]] tl::expected<FixedDescriptorHeapAllocation, FreeBlockTracker::Error>
-    allocate(uint32_t descriptorCount);
+    [[nodiscard]] tl::expected<std::shared_ptr<FixedDescriptorHeapSubAllocator>, FreeBlockTracker::Error>
+    allocateSubHeap(uint32_t descriptorCount);
+
+    [[nodiscard]] tl::expected<std::shared_ptr<FixedDescriptorHeapMonotonicSubAllocator>, FreeBlockTracker::Error>
+    allocateMonotonicSubHeap(uint32_t descriptorCount);
+
+    [[nodiscard]] tl::expected<FixedDescriptorHeapReservation, FreeBlockTracker::Error>
+    reserve(uint32_t descriptorCount);
 
     void deallocate(FreeBlockTracker::Range range);
 
@@ -96,36 +115,79 @@ protected:
     uint32_t mDescriptorSize = 0u;
 };
 
-// Represents a contiguous block of allocated descriptors from a FixedDescriptorHeapAllocator. The allocation block held
-// by this class can be further subdivided as need by other code. FixedDescriptorHeapAllocation will deallocate it's
-// allocation block from the FixedDescriptorHeapAllocator it orginally allocated from upon destruction.
-class FixedDescriptorHeapAllocation
+// Represents a contiguous block of descriptors from a FixedDescriptorHeapAllocator. It does not keep track of any
+// allocations within its range. On destruction it will deallocate the range of reserved descriptors.
+class FixedDescriptorHeapReservation
 {
 public:
-    FixedDescriptorHeapAllocation() = default;
-    FixedDescriptorHeapAllocation(FixedDescriptorHeapAllocator& fixedHeap, FreeBlockTracker::Range range);
-    FixedDescriptorHeapAllocation(const FixedDescriptorHeapAllocation&) = delete;
-    FixedDescriptorHeapAllocation(FixedDescriptorHeapAllocation&&) noexcept;
-    ~FixedDescriptorHeapAllocation();
+public:
+    FixedDescriptorHeapReservation() = default;
+    FixedDescriptorHeapReservation(FixedDescriptorHeapAllocator& fixedHeap, FreeBlockTracker::Range range);
+    FixedDescriptorHeapReservation(const FixedDescriptorHeapReservation&) = delete;
+    FixedDescriptorHeapReservation(FixedDescriptorHeapReservation&& other) noexcept;
+    virtual ~FixedDescriptorHeapReservation();
 
-    FixedDescriptorHeapAllocation& operator=(const FixedDescriptorHeapAllocation&) = delete;
-    FixedDescriptorHeapAllocation& operator=(FixedDescriptorHeapAllocation&&) noexcept;
+    FixedDescriptorHeapReservation& operator=(const FixedDescriptorHeapReservation&) = delete;
+    FixedDescriptorHeapReservation& operator=(FixedDescriptorHeapReservation&& other) noexcept;
 
     [[nodiscard]] bool isValid() const { return mHeap != nullptr && mReservedHeapBlocks.count > 0; }
 
     [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE getCpuHandle(uint32_t index) const;
     [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE getGpuHandle(uint32_t index) const;
 
+protected:
+    FixedDescriptorHeapAllocator* mHeap = nullptr;
+    FreeBlockTracker::Range mReservedHeapBlocks;
+};
+
+// Represents a contiguous block of allocated descriptors from a FixedDescriptorHeapAllocator. The allocation block held
+// by this class can be further allocated and deallocated as needed. FixedDescriptorHeapSubAllocator will deallocate
+// its allocation block from the FixedDescriptorHeapAllocator it orginally allocated from upon destruction.
+class FixedDescriptorHeapSubAllocator final : public FixedDescriptorHeapReservation
+{
+public:
+    FixedDescriptorHeapSubAllocator() = default;
+    FixedDescriptorHeapSubAllocator(FixedDescriptorHeapAllocator& fixedHeap, FreeBlockTracker::Range range);
+    FixedDescriptorHeapSubAllocator(const FixedDescriptorHeapSubAllocator&) = delete;
+    FixedDescriptorHeapSubAllocator(FixedDescriptorHeapSubAllocator&&) noexcept = delete;
+    ~FixedDescriptorHeapSubAllocator() final;
+
+    FixedDescriptorHeapSubAllocator& operator=(const FixedDescriptorHeapSubAllocator&) = delete;
+    FixedDescriptorHeapSubAllocator& operator=(FixedDescriptorHeapSubAllocator&&) noexcept = delete;
+
     tl::expected<uint32_t, FreeBlockTracker::Error> reserveUnsynchronized();
     tl::expected<uint32_t, FreeBlockTracker::Error> reserve();
     void releaseUnsynchronized(uint32_t index);
     void release(uint32_t index);
+    void releaseAllUnsynchronized();
+    void releaseAll();
 
 private:
-    FixedDescriptorHeapAllocator* mHeap = nullptr;
-    FreeBlockTracker::Range mReservedHeapBlocks;
     FreeBlockTracker mSubAllocationTracker;
     std::mutex mMutex;
+};
+
+// Represents a contiguous block of allocated descriptors from a FixedDescriptorHeapAllocator. Descriptors can be
+// allocated, but cannot be deallocated. Once the number of descriptors available have been allocated, no further
+// allocations will succeed. FixedDescriptorHeapSubAllocator will deallocate its allocation block from the
+// FixedDescriptorHeapAllocator it orginally allocated from upon destruction.
+class FixedDescriptorHeapMonotonicSubAllocator final : public FixedDescriptorHeapReservation
+{
+public:
+    FixedDescriptorHeapMonotonicSubAllocator() = default;
+    FixedDescriptorHeapMonotonicSubAllocator(FixedDescriptorHeapAllocator& fixedHeap, FreeBlockTracker::Range range);
+    FixedDescriptorHeapMonotonicSubAllocator(const FixedDescriptorHeapMonotonicSubAllocator&) = delete;
+    FixedDescriptorHeapMonotonicSubAllocator(FixedDescriptorHeapMonotonicSubAllocator&& other) noexcept = delete;
+    ~FixedDescriptorHeapMonotonicSubAllocator() final = default;
+
+    FixedDescriptorHeapMonotonicSubAllocator& operator=(const FixedDescriptorHeapMonotonicSubAllocator&) = delete;
+    FixedDescriptorHeapMonotonicSubAllocator&
+    operator=(FixedDescriptorHeapMonotonicSubAllocator&& other) noexcept = delete;
+
+    tl::expected<uint32_t, FreeBlockTracker::Error> reserve();
+
+private:
+    std::atomic_uint32_t mAllocationCount = 0;
 };
 
 // Represents a single descriptor allocation from a FixedDescriptorHeapAllocator
@@ -133,7 +195,7 @@ class FixedDescriptorHeapDescriptor
 {
 public:
     FixedDescriptorHeapDescriptor() = default;
-    FixedDescriptorHeapDescriptor(FixedDescriptorHeapAllocation&& allocation): mAllocation(std::move(allocation)) {}
+    FixedDescriptorHeapDescriptor(FixedDescriptorHeapReservation&& reservation): mReservation(std::move(reservation)) {}
 
     FixedDescriptorHeapDescriptor(const FixedDescriptorHeapDescriptor&) = delete;
     FixedDescriptorHeapDescriptor(FixedDescriptorHeapDescriptor&&) noexcept = default;
@@ -142,13 +204,13 @@ public:
     FixedDescriptorHeapDescriptor& operator=(const FixedDescriptorHeapDescriptor&) = delete;
     FixedDescriptorHeapDescriptor& operator=(FixedDescriptorHeapDescriptor&&) noexcept = default;
 
-    [[nodiscard]] bool isValid() const { return mAllocation.isValid(); }
+    [[nodiscard]] bool isValid() const { return mReservation.isValid(); }
 
     [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE getCpuHandle() const;
     [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE getGpuHandle() const;
 
 private:
-    FixedDescriptorHeapAllocation mAllocation;
+    FixedDescriptorHeapReservation mReservation;
 };
 
 // Fixed descriptor heap allocator for constant buffer views, shader resource views, and unordered access views.
@@ -166,7 +228,7 @@ public:
 
     // CBV
     void createConstantBufferView(DeviceContext& context,
-                                  const FixedDescriptorHeapAllocation& allocation,
+                                  const FixedDescriptorHeapReservation& allocation,
                                   uint32_t allocationIndex,
                                   const D3D12_CONSTANT_BUFFER_VIEW_DESC& desc);
 
@@ -175,7 +237,7 @@ public:
 
     // SRV
     void createShaderResourceView(DeviceContext& context,
-                                  const FixedDescriptorHeapAllocation& allocation,
+                                  const FixedDescriptorHeapReservation& allocation,
                                   uint32_t allocationIndex,
                                   ID3D12Resource* resource,
                                   const D3D12_SHADER_RESOURCE_VIEW_DESC& desc);
@@ -187,7 +249,7 @@ public:
 
     // UAV
     void createUnorderedAccessView(DeviceContext& context,
-                                   const FixedDescriptorHeapAllocation& allocation,
+                                   const FixedDescriptorHeapReservation& allocation,
                                    uint32_t allocationIndex,
                                    ID3D12Resource* resource,
                                    ID3D12Resource* counterResource,
@@ -214,7 +276,7 @@ public:
     FixedDescriptorHeap_Sampler& operator=(FixedDescriptorHeap_Sampler&&) noexcept = default;
 
     void createSampler(DeviceContext& context,
-                       const FixedDescriptorHeapAllocation& allocation,
+                       const FixedDescriptorHeapReservation& allocation,
                        uint32_t allocationIndex,
                        const D3D12_SAMPLER_DESC& desc);
 
@@ -236,7 +298,7 @@ public:
     FixedDescriptorHeap_RTV& operator=(FixedDescriptorHeap_RTV&&) noexcept = default;
 
     void createRenderTargetView(DeviceContext& context,
-                                const FixedDescriptorHeapAllocation& allocation,
+                                const FixedDescriptorHeapReservation& allocation,
                                 uint32_t allocationIndex,
                                 ID3D12Resource* renderTargetResource,
                                 const D3D12_RENDER_TARGET_VIEW_DESC& desc);
@@ -261,7 +323,7 @@ public:
     FixedDescriptorHeap_DSV& operator=(FixedDescriptorHeap_DSV&&) noexcept = default;
 
     void createDepthStencilView(DeviceContext& context,
-                                const FixedDescriptorHeapAllocation& allocation,
+                                const FixedDescriptorHeapReservation& allocation,
                                 uint32_t allocationIndex,
                                 ID3D12Resource* depthStencilResource,
                                 const D3D12_DEPTH_STENCIL_VIEW_DESC& desc);

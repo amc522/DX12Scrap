@@ -24,6 +24,7 @@
     <ClCompile Include="src\d3d12\D3D12Context.cpp" />
     <ClCompile Include="src\d3d12\D3D12FixedDescriptorHeap.cpp" />
     <ClCompile Include="src\d3d12\D3D12MonotonicDescriptorHeap.cpp" />
+    <ClCompile Include="src\d3d12\D3D12Texture.cpp" />
     <ClCompile Include="src\FreeBlockTracker.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\RenderScene.cpp" />
@@ -36,9 +37,11 @@
     <ClInclude Include="src\d3d12\D3D12FixedDescriptorHeap.h" />
     <ClInclude Include="src\d3d12\D3D12MonotonicDescriptorHeap.h" />
     <ClInclude Include="src\d3d12\D3D12Strings.h" />
+    <ClInclude Include="src\d3d12\D3D12Texture.h" />
     <ClInclude Include="src\FreeBlockTracker.h" />
     <ClInclude Include="src\RenderScene.h" />
     <ClInclude Include="src\StringUtils.h" />
+    <ClInclude Include="src\Utility.h" />
     <ClInclude Include="src\Window.h" />
   </ItemGroup>
   <ItemGroup>
@@ -139,15 +142,16 @@
       <PreprocessorDefinitions>SPDLOG_WCHAR_TO_UTF8_SUPPORT;NOMINMAX;WIN32_LEAN_AND_MEAN;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>./src/</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./src/;external\gpuformat\include;external\cputexture\include</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;SDL2maind.lib;%(AdditionalDependencies);</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;d3dcompiler.lib;gpufmt.lib;cputex.lib;dxguid.lib;SDL2maind.lib;%(AdditionalDependencies);</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
+      <AdditionalLibraryDirectories>$(SolutionDir)intermediate\$(Platform)\$(Configuration)\gpufmt\;$(SolutionDir)intermediate\$(Platform)\$(Configuration)\cputex\;</AdditionalLibraryDirectories>
     </Link>
     <Manifest>
       <EnableDpiAwareness>true</EnableDpiAwareness>
@@ -162,7 +166,7 @@
       <PreprocessorDefinitions>SPDLOG_WCHAR_TO_UTF8_SUPPORT;NOMINMAX;WIN32_LEAN_AND_MEAN;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>./src/</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./src/;external\gpuformat\include;external\cputexture\include</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
@@ -170,8 +174,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;d3dcompiler.lib;SDL2main.lib;%(AdditionalDependencies);</AdditionalDependencies>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;d3dcompiler.lib;gpufmt.lib;cputex.lib;SDL2main.lib;%(AdditionalDependencies);</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)intermediate\$(Platform)\$(Configuration)\gpufmt\;$(SolutionDir)intermediate\$(Platform)\$(Configuration)\cputex\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Manifest>
       <EnableDpiAwareness>true</EnableDpiAwareness>
@@ -184,15 +188,16 @@
       <PreprocessorDefinitions>SPDLOG_WCHAR_TO_UTF8_SUPPORT;NOMINMAX;WIN32_LEAN_AND_MEAN;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>./src/</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./src/;external\gpuformat\include;external\cputexture\include</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;SDL2maind.lib;%(AdditionalDependencies);</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;d3dcompiler.lib;gpufmt.lib;cputex.lib;dxguid.lib;SDL2maind.lib;%(AdditionalDependencies);</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
+      <AdditionalLibraryDirectories>$(SolutionDir)intermediate\$(Platform)\$(Configuration)\gpufmt\;$(SolutionDir)intermediate\$(Platform)\$(Configuration)\cputex\;</AdditionalLibraryDirectories>
     </Link>
     <Manifest>
       <EnableDpiAwareness>true</EnableDpiAwareness>
@@ -207,7 +212,7 @@
       <PreprocessorDefinitions>SPDLOG_WCHAR_TO_UTF8_SUPPORT;NOMINMAX;WIN32_LEAN_AND_MEAN;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>./src/</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./src/;external\gpuformat\include;external\cputexture\include</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
@@ -215,8 +220,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;d3dcompiler.lib;SDL2main.lib;%(AdditionalDependencies);</AdditionalDependencies>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;d3dcompiler.lib;gpufmt.lib;cputex.lib;SDL2main.lib;%(AdditionalDependencies);</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)intermediate\$(Platform)\$(Configuration)\gpufmt\;$(SolutionDir)intermediate\$(Platform)\$(Configuration)\cputex\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Manifest>
       <EnableDpiAwareness>true</EnableDpiAwareness>

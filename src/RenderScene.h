@@ -7,6 +7,7 @@
 
 #include "d3d12/D3D12Config.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
+#include "d3d12/D3D12Texture.h"
 
 #include <array>
 #include <cstdint>
@@ -50,9 +51,7 @@ private:
     std::array<uint64_t, 2> mFenceValues{};
     HANDLE mFenceEvent = nullptr;
 
-    Microsoft::WRL::ComPtr<ID3D12Resource> mTexture;
-    d3d12::FixedDescriptorHeapDescriptor mTextureSrv;
-
+    d3d12::Texture mTexture;
     bool mInitialized = false;
 };
 } // namespace scrap

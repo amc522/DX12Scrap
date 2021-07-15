@@ -1,6 +1,7 @@
 #include "RenderScene.h"
 
 #include "d3d12/D3D12Context.h"
+#include "d3d12/D3D12Texture.h"
 
 #include <d3d12.h>
 #include <d3dcompiler.h>
@@ -127,297 +128,54 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         spdlog::info("Created d3d12 command list");
     }
 
-    // Note: ComPtr's are CPU objects but this resource needs to stay in scope until
-    // the command list that references it has finished executing on the GPU.
-    // We will flush the GPU at the end of this method to ensure the resource is not
-    // prematurely destroyed.
-    ComPtr<ID3D12Resource> textureUploadHeap;
+    cputex::TextureParams textureParams;
+    textureParams.dimension = cputex::TextureDimension::Texture2D;
+    textureParams.extent = {1024, 1024, 1};
+    textureParams.faces = 1;
+    textureParams.mips = 1;
+    textureParams.arraySize = 1;
+    textureParams.format = gpufmt::Format::R8G8B8A8_UNORM;
+    cputex::UniqueTexture cpuTexture{textureParams};
+    d3d12::Texture texture;
 
-    { // Create the texture.
-        // 1. Create GPU texture
-        //    a. Get allocation info. This will get the byte aligment for the texture. You can set the alignment in
-        //       D3D12_RESOURCE_DESC to 0 and it will figure out the alignment. Expicitly grabbing it here to use later.
-        // 2. Create upload buffer
-        // 3. Copy cpu texture data to upload buffer
-        //    aa. Get some kind of texture data
-        //    a. Query for the actual hardware storage information of the texture (D3D12_PLACED_SUBRESOURCE_FOOTPRINT
-        //       via GetCopyableFootprints)
-        //    b. Acquire pointer to upload texture memory (via Map)
-        //    c. Copy cpu texture data to mapped upload buffer data
-        //    d. Signal to the upload texture that the memory copy is finished (via Unmap)
-        // 4. Copy the upload buffer to the final GPU texture (via CopyTextureRegion)
-        // 5. Transition the resource from the copy state to the shader resource state
-        // 6. Create the SRV
+    //-------------------------------------
+    // Generate a checkboard texture
+    //-------------------------------------
+    [&]() {
+        const UINT bytesPerPixel = gpufmt::formatInfo(textureParams.format).blockByteSize;
+        const UINT rowPitch = textureParams.extent.x * bytesPerPixel;
+        const UINT cellPitch = rowPitch >> 3;      // The width of a cell in the checkboard texture.
+        const UINT cellHeight = textureParams.extent.x >> 3; // The height of a cell in the checkerboard texture.
+        const UINT textureSize = rowPitch * textureParams.extent.y;
 
-        // Q: Why use two different GPU textures?
-        // A: GPUs have different kinds of memory that are made faster for certain tasks but are slower for others. The
-        // "upload" memory if more efficient at reading from cpu memory, but has less bandwidth available for the gpu
-        // processor. The memory where the texture eventually ends up can't read from the cpu, and has full bandwidth to
-        // the gpu processor. This type of memory is most of the memory on the gpu.
-        // For more information read https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_heap_type.
-        // Specifically look at the descriptions for 'D3D12_HEAP_TYPE_UPLOAD' and 'D3D12_HEAP_TYPE_DEFAULT'.
+        UINT8 *pData = cpuTexture.accessMipSurfaceDataAs<UINT8>().data();
 
-        constexpr UINT textureWidth = 1024;
-        constexpr UINT textureHeight = 1024;
-        constexpr UINT bytesPerPixel = 4;
-
-        D3D12_RESOURCE_ALLOCATION_INFO allocInfo;
-
-        //=======================
-        // 1. Create GPU texture
-        //=======================
-        D3D12_RESOURCE_DESC textureDesc = {};
+        for(UINT n = 0; n < textureSize; n += bytesPerPixel)
         {
-            // Describe a Texture2D.
-            textureDesc.MipLevels = 1;
-            textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            textureDesc.Width = textureWidth;
-            textureDesc.Height = textureHeight;
-            textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-            textureDesc.DepthOrArraySize = 1;
-            textureDesc.SampleDesc.Count = 1;
-            textureDesc.SampleDesc.Quality = 0;
-            textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+            UINT x = n % rowPitch;
+            UINT y = n / rowPitch;
+            UINT i = x / cellPitch;
+            UINT j = y / cellHeight;
 
-            //-----------------------------------------------------------------------------------
-            // 1.a.
-            // Get the alignment and size of the resource that will actually be used on the gpu.
-            // ----------------------------------------------------------------------------------
-
-            // Here's and article describing in detail what this memory alignment stuff is all about:
-            // https://asawicki.info/news_1726_secrets_of_direct3d_12_resource_alignment
-
-            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getresourceallocationinfo
-            allocInfo = d3d12Context.getDevice()->GetResourceAllocationInfo(0, 1, &textureDesc);
-            textureDesc.Alignment = allocInfo.Alignment;
-
-            // The destination heap of the texture. This is the heap where the texture will be for its lifetime on the
-            // gpu.
-            D3D12_HEAP_PROPERTIES defaultHeapProps = {};
-            defaultHeapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-            defaultHeapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-            defaultHeapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-            defaultHeapProps.CreationNodeMask = 0;
-            defaultHeapProps.VisibleNodeMask = 0;
-
-            // Actually create the resource
-            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommittedresource
-            HRESULT hr = d3d12Context.getDevice()->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE,
-                                                                           &textureDesc, D3D12_RESOURCE_STATE_COPY_DEST,
-                                                                           nullptr, IID_PPV_ARGS(&mTexture));
-
-            if(FAILED(hr))
+            if(i % 2 == j % 2)
             {
-                spdlog::critical("Failed to create d3d12 gpu texture");
-                return;
+                pData[n] = 0x00;     // R
+                pData[n + 1] = 0x00; // G
+                pData[n + 2] = 0x00; // B
+                pData[n + 3] = 0xff; // A
             }
-
-            mTexture->SetName(L"FirstTexture");
-        }
-
-        //==========================
-        // 2. Create upload buffer
-        //==========================
-        D3D12_RESOURCE_DESC textureUploadDesc = {};
-        {
-            textureUploadDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            textureUploadDesc.Alignment = allocInfo.Alignment;
-            textureUploadDesc.Width = allocInfo.SizeInBytes;
-            textureUploadDesc.Height = 1;
-            textureUploadDesc.DepthOrArraySize = 1;
-            textureUploadDesc.MipLevels = 1;
-            textureUploadDesc.Format = DXGI_FORMAT_UNKNOWN;
-            textureUploadDesc.SampleDesc.Count = 1;
-            textureUploadDesc.SampleDesc.Quality = 0;
-            textureUploadDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-            textureUploadDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-            D3D12_HEAP_PROPERTIES uploadHeapProps = {};
-            uploadHeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-            uploadHeapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-            uploadHeapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-            uploadHeapProps.CreationNodeMask = 0;
-            uploadHeapProps.VisibleNodeMask = 0;
-
-            HRESULT hr = d3d12Context.getDevice()->CreateCommittedResource(
-                &uploadHeapProps, D3D12_HEAP_FLAG_NONE, &textureUploadDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-                IID_PPV_ARGS(&textureUploadHeap));
-            if(FAILED(hr))
+            else
             {
-                spdlog::critical("Failed to create texture upload resource.");
-                return;
+                pData[n] = 0xff;     // R
+                pData[n + 1] = 0xff; // G
+                pData[n + 2] = 0xff; // B
+                pData[n + 3] = 0xff; // A
             }
-
-            textureUploadHeap->SetName(L"FirstTextureUpload");
         }
+    }();
 
-        //============================================
-        // 3. Copy cpu texture data to upload buffer
-        //============================================
-        D3D12_PLACED_SUBRESOURCE_FOOTPRINT subresourceFootprint;
-        {
-            //-------------------------------------
-            // 3.aa. Generate a checkboard texture
-            //-------------------------------------
-
-            std::vector<UINT8> texture = [&]() {
-                const UINT rowPitch = textureWidth * bytesPerPixel;
-                const UINT cellPitch = rowPitch >> 3;      // The width of a cell in the checkboard texture.
-                const UINT cellHeight = textureWidth >> 3; // The height of a cell in the checkerboard texture.
-                const UINT textureSize = rowPitch * textureHeight;
-
-                std::vector<UINT8> data(textureSize);
-                UINT8* pData = &data[0];
-
-                for(UINT n = 0; n < textureSize; n += bytesPerPixel)
-                {
-                    UINT x = n % rowPitch;
-                    UINT y = n / rowPitch;
-                    UINT i = x / cellPitch;
-                    UINT j = y / cellHeight;
-
-                    if(i % 2 == j % 2)
-                    {
-                        pData[n] = 0x00;     // R
-                        pData[n + 1] = 0x00; // G
-                        pData[n + 2] = 0x00; // B
-                        pData[n + 3] = 0xff; // A
-                    }
-                    else
-                    {
-                        pData[n] = 0xff;     // R
-                        pData[n + 1] = 0xff; // G
-                        pData[n + 2] = 0xff; // B
-                        pData[n + 3] = 0xff; // A
-                    }
-                }
-
-                return data;
-            }();
-
-            D3D12_SUBRESOURCE_DATA textureData = {};
-            textureData.pData = texture.data();
-            textureData.RowPitch = textureWidth * bytesPerPixel;
-            textureData.SlicePitch = textureData.RowPitch * textureHeight;
-
-            //----------------------------------------------------------------------------------------------------------
-            // 3.a. Query for the actual hardware storage information of the texture (D3D12_PLACED_SUBRESOURCE_FOOTPRINT
-            //      via GetCopyableFootprints)
-            //----------------------------------------------------------------------------------------------------------
-
-            UINT64 rowByteSize;
-            UINT numRows;
-            UINT64 totalBytes;
-
-            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getcopyablefootprints
-            d3d12Context.getDevice()->GetCopyableFootprints(
-                &textureDesc,
-                0,                     // first subresource
-                1,                     // num subresources
-                0,                     // base offset
-                &subresourceFootprint, // (out) D3D12_PLACED_SUBRESOURCE_FOOTPRINT array
-                &numRows,              // (out) total bytes
-                &rowByteSize,          // (out) row byte size
-                &totalBytes            // (out) totalBytes
-            );
-
-            if(textureUploadDesc.Width < totalBytes + subresourceFootprint.Offset)
-            {
-                spdlog::critical("Texture upload heap is too small");
-                return;
-            }
-
-            //---------------------------------------------------------
-            // 3.b. Acquire pointer to upload texture memory (via Map)
-            //---------------------------------------------------------
-            BYTE* pMapData;
-            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12resource-map
-            HRESULT hr = textureUploadHeap->Map(0, nullptr, reinterpret_cast<void**>(&pMapData));
-            if(FAILED(hr))
-            {
-                spdlog::critical("Failed to map texture upload heap to a cpu buffer");
-                return;
-            }
-
-            //----------------------------------------------------------
-            // 3.c. Copy cpu texture data to mapped upload texture data
-            //----------------------------------------------------------
-            D3D12_MEMCPY_DEST destData = {};
-            destData.pData = pMapData + subresourceFootprint.Offset;
-            destData.RowPitch = subresourceFootprint.Footprint.RowPitch;
-            destData.SlicePitch = SIZE_T(subresourceFootprint.Footprint.RowPitch) * SIZE_T(numRows);
-
-            // d3d12x function
-            MemcpySubresource(&destData,                           // destination
-                              &textureData,                        // source
-                              static_cast<SIZE_T>(rowByteSize),    // row size in bytes
-                              numRows,                             // number of rows
-                              subresourceFootprint.Footprint.Depth // number of slices
-            );
-
-            //--------------------------------------------------------------------------------
-            // 3.d. Signal to the upload texture that the memory copy is finished (via Unmap)
-            //--------------------------------------------------------------------------------
-
-            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12resource-unmap
-            textureUploadHeap->Unmap(0, nullptr);
-        }
-
-        //=============================================================================
-        // 4. Copy the upload buffer to the final GPU texture (via CopyTextureRegion)
-        //=============================================================================
-        {
-            D3D12_TEXTURE_COPY_LOCATION destCopyLocation = {};
-            destCopyLocation.pResource = mTexture.Get();
-            destCopyLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-            destCopyLocation.SubresourceIndex = 0;
-
-            D3D12_TEXTURE_COPY_LOCATION sourceCopyLocation;
-            sourceCopyLocation.pResource = textureUploadHeap.Get();
-            sourceCopyLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-            sourceCopyLocation.PlacedFootprint = subresourceFootprint;
-
-            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12graphicscommandlist-copytextureregion
-            mCommandList->CopyTextureRegion(&destCopyLocation, 0, 0, 0, &sourceCopyLocation, nullptr);
-        }
-
-        //=============================================================================
-        // 5. Transition the resource from the copy state to the shader resource state
-        //=============================================================================
-        {
-            D3D12_RESOURCE_BARRIER transitionBarrier = {};
-            transitionBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            transitionBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-            transitionBarrier.Transition.pResource = mTexture.Get();
-            transitionBarrier.Transition.Subresource = 0;
-            transitionBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-            transitionBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-
-            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12graphicscommandlist-resourcebarrier
-            mCommandList->ResourceBarrier(1, &transitionBarrier);
-        }
-
-        //===================
-        // 6. Create the SRV
-        //===================
-        {
-            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-            srvDesc.Format = textureDesc.Format;
-            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            srvDesc.Texture2D.MipLevels = 1;
-
-            auto descriptor =
-                d3d12Context.getCbvSrvUavHeap().createShaderResourceView(d3d12Context, mTexture.Get(), srvDesc);
-            if(!descriptor)
-            {
-                spdlog::critical("Failed to create texture SRV");
-                return;
-            }
-
-            mTextureSrv = std::move(descriptor.value());
-        }
-    }
+    texture.initFromMemory(d3d12Context, mCommandList.Get(), cpuTexture, d3d12::Texture::AccessFlags::GpuRead, "Firsrt Texture");
+    mTexture = std::move(texture);
 
     if(FAILED(mCommandList->Close())) { spdlog::error("Failed to close graphics command list"); }
 

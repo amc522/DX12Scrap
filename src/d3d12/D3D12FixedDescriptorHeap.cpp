@@ -48,8 +48,8 @@ FixedDescriptorHeapAllocator::~FixedDescriptorHeapAllocator()
     assert(mFreeBlockTracker.getReservedBlockCount() == 0);
 }
 
-tl::expected<FixedDescriptorHeapAllocation, FreeBlockTracker::Error>
-FixedDescriptorHeapAllocator::allocate(uint32_t descriptorCount)
+tl::expected<std::shared_ptr<FixedDescriptorHeapSubAllocator>, FreeBlockTracker::Error>
+FixedDescriptorHeapAllocator::allocateSubHeap(uint32_t descriptorCount)
 {
     std::lock_guard lockGuard{mMutex};
 
@@ -59,7 +59,35 @@ FixedDescriptorHeapAllocator::allocate(uint32_t descriptorCount)
     FreeBlockTracker::Range range{reservation.value(), descriptorCount};
     mCpuRangesToCopy.push_back(range);
 
-    return FixedDescriptorHeapAllocation{*this, range};
+    return std::make_shared<FixedDescriptorHeapSubAllocator>(*this, range);
+}
+
+tl::expected<std::shared_ptr<FixedDescriptorHeapMonotonicSubAllocator>, FreeBlockTracker::Error>
+FixedDescriptorHeapAllocator::allocateMonotonicSubHeap(uint32_t descriptorCount)
+{
+    std::lock_guard lockGuard{mMutex};
+
+    auto reservation = mFreeBlockTracker.unsafeReserve(descriptorCount);
+    if(!reservation) { return tl::make_unexpected(reservation.error()); }
+
+    FreeBlockTracker::Range range{reservation.value(), descriptorCount};
+    mCpuRangesToCopy.push_back(range);
+
+    return std::make_shared<FixedDescriptorHeapMonotonicSubAllocator>(*this, range);
+}
+
+tl::expected<FixedDescriptorHeapReservation, FreeBlockTracker::Error>
+FixedDescriptorHeapAllocator::reserve(uint32_t descriptorCount)
+{
+    std::lock_guard lockGuard{ mMutex };
+
+    auto reservation = mFreeBlockTracker.unsafeReserve(descriptorCount);
+    if(!reservation) { return tl::make_unexpected(reservation.error()); }
+
+    FreeBlockTracker::Range range{ reservation.value(), descriptorCount };
+    mCpuRangesToCopy.push_back(range);
+
+    return FixedDescriptorHeapReservation(*this, range);
 }
 
 void FixedDescriptorHeapAllocator::deallocate(FreeBlockTracker::Range range)
@@ -150,54 +178,61 @@ void FixedDescriptorHeapAllocator::uploadPendingDescriptors(DeviceContext& conte
     mCpuRangesToCopy.clear();
 }
 
-FixedDescriptorHeapAllocation::FixedDescriptorHeapAllocation(FixedDescriptorHeapAllocator& fixedHeap,
-                                                             FreeBlockTracker::Range range)
+FixedDescriptorHeapReservation::FixedDescriptorHeapReservation(FixedDescriptorHeapAllocator& fixedHeap,
+                                                               FreeBlockTracker::Range range)
     : mHeap(&fixedHeap)
     , mReservedHeapBlocks(range)
 {}
 
-FixedDescriptorHeapAllocation::FixedDescriptorHeapAllocation(FixedDescriptorHeapAllocation&& other) noexcept
+FixedDescriptorHeapReservation::FixedDescriptorHeapReservation(FixedDescriptorHeapReservation&& other) noexcept
     : mHeap(other.mHeap)
-    , mReservedHeapBlocks(other.mReservedHeapBlocks)
-    , mSubAllocationTracker(std::move(other.mSubAllocationTracker))
+    , mReservedHeapBlocks(std::move(other.mReservedHeapBlocks))
 {
     other.mHeap = nullptr;
 }
 
-FixedDescriptorHeapAllocation::~FixedDescriptorHeapAllocation()
+FixedDescriptorHeapReservation::~FixedDescriptorHeapReservation()
 {
     if(mHeap != nullptr) { mHeap->deallocate(mReservedHeapBlocks); }
-
-    assert(mSubAllocationTracker.getReservedBlockCount() == 0);
 }
 
-FixedDescriptorHeapAllocation& FixedDescriptorHeapAllocation::operator=(FixedDescriptorHeapAllocation&& other) noexcept
+D3D12_CPU_DESCRIPTOR_HANDLE FixedDescriptorHeapReservation::getCpuHandle(uint32_t index) const
+{
+    return CD3DX12_CPU_DESCRIPTOR_HANDLE(mHeap->getCpuDescriptorHeap()->GetCPUDescriptorHandleForHeapStart(),
+                                         static_cast<INT>(mReservedHeapBlocks.start + index),
+                                         mHeap->getDescriptorSize());
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE FixedDescriptorHeapReservation::getGpuHandle(uint32_t index) const
+{
+    return CD3DX12_GPU_DESCRIPTOR_HANDLE(mHeap->getGpuDescriptorHeap()->GetGPUDescriptorHandleForHeapStart(),
+                                         static_cast<INT>(mReservedHeapBlocks.start + index),
+                                         mHeap->getDescriptorSize());
+}
+
+FixedDescriptorHeapReservation&
+FixedDescriptorHeapReservation::operator=(FixedDescriptorHeapReservation&& other) noexcept
 {
     if(mHeap != nullptr) { mHeap->deallocate(mReservedHeapBlocks); }
 
     mHeap = other.mHeap;
-    mReservedHeapBlocks = other.mReservedHeapBlocks;
-    mSubAllocationTracker = std::move(other.mSubAllocationTracker);
+    mReservedHeapBlocks = std::move(other.mReservedHeapBlocks);
     other.mHeap = nullptr;
 
     return *this;
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE FixedDescriptorHeapAllocation::getCpuHandle(uint32_t index) const
+FixedDescriptorHeapSubAllocator::FixedDescriptorHeapSubAllocator(FixedDescriptorHeapAllocator& fixedHeap,
+                                                                 FreeBlockTracker::Range range)
+    : FixedDescriptorHeapReservation(fixedHeap, range)
+{}
+
+FixedDescriptorHeapSubAllocator::~FixedDescriptorHeapSubAllocator()
 {
-    return CD3DX12_CPU_DESCRIPTOR_HANDLE(mHeap->getCpuDescriptorHeap()->GetCPUDescriptorHandleForHeapStart(),
-                                         static_cast<UINT>(mReservedHeapBlocks.start + index),
-                                         mHeap->getDescriptorSize());
+    assert(mSubAllocationTracker.getReservedBlockCount() == 0);
 }
 
-D3D12_GPU_DESCRIPTOR_HANDLE FixedDescriptorHeapAllocation::getGpuHandle(uint32_t index) const
-{
-    return CD3DX12_GPU_DESCRIPTOR_HANDLE(mHeap->getGpuDescriptorHeap()->GetGPUDescriptorHandleForHeapStart(),
-                                         static_cast<UINT>(mReservedHeapBlocks.start + index),
-                                         mHeap->getDescriptorSize());
-}
-
-tl::expected<uint32_t, FreeBlockTracker::Error> FixedDescriptorHeapAllocation::reserveUnsynchronized()
+tl::expected<uint32_t, FreeBlockTracker::Error> FixedDescriptorHeapSubAllocator::reserveUnsynchronized()
 {
     auto reservation = mSubAllocationTracker.unsafeReserve(1);
 
@@ -205,31 +240,69 @@ tl::expected<uint32_t, FreeBlockTracker::Error> FixedDescriptorHeapAllocation::r
     return static_cast<uint32_t>(reservation.value());
 }
 
-tl::expected<uint32_t, FreeBlockTracker::Error> FixedDescriptorHeapAllocation::reserve()
+tl::expected<uint32_t, FreeBlockTracker::Error> FixedDescriptorHeapSubAllocator::reserve()
 {
     std::lock_guard lockGuard{mMutex};
 
     return reserveUnsynchronized();
 }
 
-void FixedDescriptorHeapAllocation::releaseUnsynchronized(uint32_t index)
+void FixedDescriptorHeapSubAllocator::releaseUnsynchronized(uint32_t index)
 {
     mSubAllocationTracker.unsafeRelease(index, 1);
 }
 
-void FixedDescriptorHeapAllocation::release(uint32_t index)
+void FixedDescriptorHeapSubAllocator::release(uint32_t index)
 {
     std::lock_guard lockGuard{mMutex};
     releaseUnsynchronized(index);
 }
 
+void FixedDescriptorHeapSubAllocator::releaseAllUnsynchronized()
+{
+    mSubAllocationTracker.unsafeRelease(0, mSubAllocationTracker.getCapacity());
+}
+
+void FixedDescriptorHeapSubAllocator::releaseAll()
+{
+    std::lock_guard lockGuard(mMutex);
+    releaseAllUnsynchronized();
+}
+
+FixedDescriptorHeapMonotonicSubAllocator::FixedDescriptorHeapMonotonicSubAllocator(
+    FixedDescriptorHeapAllocator& fixedHeap,
+    FreeBlockTracker::Range range)
+    : FixedDescriptorHeapReservation(fixedHeap, range)
+{}
+
+tl::expected<uint32_t, FreeBlockTracker::Error> FixedDescriptorHeapMonotonicSubAllocator::reserve()
+{
+    bool success = false;
+    uint32_t newAllocationCount;
+    uint32_t expectedCurrAllocationCount = mAllocationCount;
+    do
+    {
+        newAllocationCount = expectedCurrAllocationCount + 1;
+        if(newAllocationCount > mReservedHeapBlocks.count)
+        {
+            return tl::make_unexpected(FreeBlockTracker::Error::InsufficientCapacity);
+        }
+
+        success = mAllocationCount.compare_exchange_weak(expectedCurrAllocationCount, newAllocationCount);
+    } while(!success);
+
+    uint32_t startIndex = expectedCurrAllocationCount;
+
+    return newAllocationCount;
+}
+
 D3D12_CPU_DESCRIPTOR_HANDLE FixedDescriptorHeapDescriptor::getCpuHandle() const
 {
-    return mAllocation.getCpuHandle(0);
+    return mReservation.getCpuHandle(0);
 }
 D3D12_GPU_DESCRIPTOR_HANDLE FixedDescriptorHeapDescriptor::getGpuHandle() const
 {
-    return mAllocation.getGpuHandle(0);
+    return mReservation.getGpuHandle(0);
 }
 
 FixedDescriptorHeap_CBV_SRV_UAV::FixedDescriptorHeap_CBV_SRV_UAV(DeviceContext& context, uint32_t descriptorCount)
@@ -237,34 +310,34 @@ FixedDescriptorHeap_CBV_SRV_UAV::FixedDescriptorHeap_CBV_SRV_UAV(DeviceContext& 
 {}
 
 void FixedDescriptorHeap_CBV_SRV_UAV::createConstantBufferView(DeviceContext& context,
-                                                               const FixedDescriptorHeapAllocation& allocation,
+                                                               const FixedDescriptorHeapReservation& reservation,
                                                                uint32_t allocationIndex,
                                                                const D3D12_CONSTANT_BUFFER_VIEW_DESC& desc)
 {
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createconstantbufferview
-    context.getDevice()->CreateConstantBufferView(&desc, allocation.getCpuHandle(allocationIndex));
+    context.getDevice()->CreateConstantBufferView(&desc, reservation.getCpuHandle(allocationIndex));
 }
 
 tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
 FixedDescriptorHeap_CBV_SRV_UAV::createConstantBufferView(DeviceContext& context,
                                                           const D3D12_CONSTANT_BUFFER_VIEW_DESC& desc)
 {
-    auto allocation = allocate(1);
-    if(!allocation) { return tl::make_unexpected(allocation.error()); }
+    auto reservation = reserve(1);
+    if(!reservation) { return tl::make_unexpected(reservation.error()); }
 
-    createConstantBufferView(context, allocation.value(), 0, desc);
+    createConstantBufferView(context, reservation.value(), 0, desc);
 
-    return FixedDescriptorHeapDescriptor{std::move(allocation.value())};
+    return FixedDescriptorHeapDescriptor{std::move(reservation.value())};
 }
 
 void FixedDescriptorHeap_CBV_SRV_UAV::createShaderResourceView(DeviceContext& context,
-                                                               const FixedDescriptorHeapAllocation& allocation,
+                                                               const FixedDescriptorHeapReservation& reservation,
                                                                uint32_t allocationIndex,
                                                                ID3D12Resource* resource,
                                                                const D3D12_SHADER_RESOURCE_VIEW_DESC& desc)
 {
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createshaderresourceview
-    context.getDevice()->CreateShaderResourceView(resource, &desc, allocation.getCpuHandle(allocationIndex));
+    context.getDevice()->CreateShaderResourceView(resource, &desc, reservation.getCpuHandle(allocationIndex));
 }
 
 tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
@@ -272,16 +345,16 @@ FixedDescriptorHeap_CBV_SRV_UAV::createShaderResourceView(DeviceContext& context
                                                           ID3D12Resource* resource,
                                                           const D3D12_SHADER_RESOURCE_VIEW_DESC& desc)
 {
-    auto allocation = allocate(1);
-    if(!allocation) { return tl::make_unexpected(allocation.error()); }
+    auto reservation = reserve(1);
+    if(!reservation) { return tl::make_unexpected(reservation.error()); }
 
-    createShaderResourceView(context, allocation.value(), 0, resource, desc);
+    createShaderResourceView(context, reservation.value(), 0, resource, desc);
 
-    return FixedDescriptorHeapDescriptor{std::move(allocation.value())};
+    return FixedDescriptorHeapDescriptor{std::move(reservation.value())};
 }
 
 void FixedDescriptorHeap_CBV_SRV_UAV::createUnorderedAccessView(DeviceContext& context,
-                                                                const FixedDescriptorHeapAllocation& allocation,
+                                                                const FixedDescriptorHeapReservation& reservation,
                                                                 uint32_t allocationIndex,
                                                                 ID3D12Resource* resource,
                                                                 ID3D12Resource* counterResource,
@@ -289,7 +362,7 @@ void FixedDescriptorHeap_CBV_SRV_UAV::createUnorderedAccessView(DeviceContext& c
 {
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createunorderedaccessview
     context.getDevice()->CreateUnorderedAccessView(resource, counterResource, &desc,
-                                                   allocation.getCpuHandle(allocationIndex));
+                                                   reservation.getCpuHandle(allocationIndex));
 }
 
 tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
@@ -298,12 +371,12 @@ FixedDescriptorHeap_CBV_SRV_UAV::createUnorderedAccessView(DeviceContext& contex
                                                            ID3D12Resource* counterResource,
                                                            const D3D12_UNORDERED_ACCESS_VIEW_DESC& desc)
 {
-    auto allocation = allocate(1);
-    if(!allocation) { return tl::make_unexpected(allocation.error()); }
+    auto reservation = reserve(1);
+    if(!reservation) { return tl::make_unexpected(reservation.error()); }
 
-    createUnorderedAccessView(context, allocation.value(), 0, resource, counterResource, desc);
+    createUnorderedAccessView(context, reservation.value(), 0, resource, counterResource, desc);
 
-    return FixedDescriptorHeapDescriptor{std::move(allocation.value())};
+    return FixedDescriptorHeapDescriptor{std::move(reservation.value())};
 }
 
 FixedDescriptorHeap_Sampler::FixedDescriptorHeap_Sampler(DeviceContext& context, uint32_t descriptorCount)
@@ -311,23 +384,23 @@ FixedDescriptorHeap_Sampler::FixedDescriptorHeap_Sampler(DeviceContext& context,
 {}
 
 void FixedDescriptorHeap_Sampler::createSampler(DeviceContext& context,
-                                                const FixedDescriptorHeapAllocation& allocation,
+                                                const FixedDescriptorHeapReservation& reservation,
                                                 uint32_t allocationIndex,
                                                 const D3D12_SAMPLER_DESC& desc)
 {
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createsampler
-    context.getDevice()->CreateSampler(&desc, allocation.getCpuHandle(allocationIndex));
+    context.getDevice()->CreateSampler(&desc, reservation.getCpuHandle(allocationIndex));
 }
 
 tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
 FixedDescriptorHeap_Sampler::createSampler(DeviceContext& context, const D3D12_SAMPLER_DESC& desc)
 {
-    auto allocation = allocate(1);
-    if(!allocation) { return tl::make_unexpected(allocation.error()); }
+    auto reservation = reserve(1);
+    if(!reservation) { return tl::make_unexpected(reservation.error()); }
 
-    createSampler(context, allocation.value(), 0, desc);
+    createSampler(context, reservation.value(), 0, desc);
 
-    return FixedDescriptorHeapDescriptor{std::move(allocation.value())};
+    return FixedDescriptorHeapDescriptor{std::move(reservation.value())};
 }
 
 FixedDescriptorHeap_RTV::FixedDescriptorHeap_RTV(DeviceContext& context, uint32_t descriptorCount)
@@ -335,13 +408,13 @@ FixedDescriptorHeap_RTV::FixedDescriptorHeap_RTV(DeviceContext& context, uint32_
 {}
 
 void FixedDescriptorHeap_RTV::createRenderTargetView(DeviceContext& context,
-                                                     const FixedDescriptorHeapAllocation& allocation,
+                                                     const FixedDescriptorHeapReservation& reservation,
                                                      uint32_t allocationIndex,
                                                      ID3D12Resource* renderTargetResource,
                                                      const D3D12_RENDER_TARGET_VIEW_DESC& desc)
 {
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createrendertargetview
-    context.getDevice()->CreateRenderTargetView(renderTargetResource, &desc, allocation.getCpuHandle(allocationIndex));
+    context.getDevice()->CreateRenderTargetView(renderTargetResource, &desc, reservation.getCpuHandle(allocationIndex));
 }
 
 tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
@@ -349,12 +422,12 @@ FixedDescriptorHeap_RTV::createRenderTargetView(DeviceContext& context,
                                                 ID3D12Resource* renderTargetResource,
                                                 const D3D12_RENDER_TARGET_VIEW_DESC& desc)
 {
-    auto allocation = allocate(1);
-    if(!allocation) { return tl::make_unexpected(allocation.error()); }
+    auto reservation = reserve(1);
+    if(!reservation) { return tl::make_unexpected(reservation.error()); }
 
-    createRenderTargetView(context, allocation.value(), 0, renderTargetResource, desc);
+    createRenderTargetView(context, reservation.value(), 0, renderTargetResource, desc);
 
-    return FixedDescriptorHeapDescriptor{std::move(allocation.value())};
+    return FixedDescriptorHeapDescriptor{std::move(reservation.value())};
 }
 
 FixedDescriptorHeap_DSV::FixedDescriptorHeap_DSV(DeviceContext& context, uint32_t descriptorCount)
@@ -362,13 +435,13 @@ FixedDescriptorHeap_DSV::FixedDescriptorHeap_DSV(DeviceContext& context, uint32_
 {}
 
 void FixedDescriptorHeap_DSV::createDepthStencilView(DeviceContext& context,
-                                                     const FixedDescriptorHeapAllocation& allocation,
+                                                     const FixedDescriptorHeapReservation& reservation,
                                                      uint32_t allocationIndex,
                                                      ID3D12Resource* depthStencilResource,
                                                      const D3D12_DEPTH_STENCIL_VIEW_DESC& desc)
 {
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createdepthstencilview
-    context.getDevice()->CreateDepthStencilView(depthStencilResource, &desc, allocation.getCpuHandle(allocationIndex));
+    context.getDevice()->CreateDepthStencilView(depthStencilResource, &desc, reservation.getCpuHandle(allocationIndex));
 }
 
 tl::expected<FixedDescriptorHeapDescriptor, FreeBlockTracker::Error>
@@ -376,12 +449,11 @@ FixedDescriptorHeap_DSV::createDepthStencilView(DeviceContext& context,
                                                 ID3D12Resource* depthStencilResource,
                                                 const D3D12_DEPTH_STENCIL_VIEW_DESC& desc)
 {
-    auto allocation = allocate(1);
-    if(!allocation) { return tl::make_unexpected(allocation.error()); }
+    auto reservation = reserve(1);
+    if(!reservation) { return tl::make_unexpected(reservation.error()); }
 
-    createDepthStencilView(context, allocation.value(), 0, depthStencilResource, desc);
+    createDepthStencilView(context, reservation.value(), 0, depthStencilResource, desc);
 
-    return FixedDescriptorHeapDescriptor{std::move(allocation.value())};
+    return FixedDescriptorHeapDescriptor{std::move(reservation.value())};
 }
-
 } // namespace scrap::d3d12
