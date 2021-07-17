@@ -48,7 +48,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D12PipelineState> mPso;
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> mCommandList;
     Microsoft::WRL::ComPtr<ID3D12Fence> mFence;
-    std::array<uint64_t, 2> mFenceValues{};
+    std::array<uint64_t, d3d12::kFrameBufferCount> mFenceValues{};
     HANDLE mFenceEvent = nullptr;
 
     d3d12::Texture mTexture;

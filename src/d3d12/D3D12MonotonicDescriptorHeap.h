@@ -211,12 +211,12 @@ public:
                                 const MonotonicDescriptorHeapAllocation& allocation,
                                 uint32_t allocationIndex,
                                 ID3D12Resource* renderTargetResource,
-                                const D3D12_RENDER_TARGET_VIEW_DESC& desc);
+                                const D3D12_RENDER_TARGET_VIEW_DESC* desc);
 
     [[nodiscard]] tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error>
     createRenderTargetView(DeviceContext& context,
                            ID3D12Resource* renderTargetResource,
-                           const D3D12_RENDER_TARGET_VIEW_DESC& desc);
+                           const D3D12_RENDER_TARGET_VIEW_DESC* desc);
 };
 
 class MonotonicDescriptorHeap_DSV final : public MonotonicDescriptorHeapAllocator

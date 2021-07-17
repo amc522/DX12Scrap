@@ -179,12 +179,12 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
         const glm::i32vec2 frameSize = window.getDrawableSize();
 
         DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-        swapChainDesc.BufferCount = 2;
+        swapChainDesc.BufferCount = kFrameBufferCount;
         swapChainDesc.Width = frameSize.x;
         swapChainDesc.Height = frameSize.y;
         swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
         swapChainDesc.SampleDesc.Count = 1;
 
         ComPtr<IDXGISwapChain1> swapChain;
@@ -238,7 +238,7 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
     }
 
     { // Create frame resources.
-        auto rtvDescriptors = mRtvHeap->allocate(2);
+        auto rtvDescriptors = mRtvHeap->allocate(kFrameBufferCount);
 
         if(!rtvDescriptors)
         {
@@ -248,12 +248,6 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
 
         mSwapChainRtvs = std::move(rtvDescriptors.value());
 
-        D3D12_RENDER_TARGET_VIEW_DESC desc{};
-        desc.Texture2D.MipSlice = 0;
-        desc.Texture2D.PlaneSlice = 0;
-        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-
         for(uint32_t frameIndex = 0; frameIndex < d3d12::kFrameBufferCount; ++frameIndex)
         {
             if(FAILED(mSwapChain->GetBuffer(frameIndex, IID_PPV_ARGS(&mRenderTargets[frameIndex]))))
@@ -262,7 +256,7 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
                 return;
             }
 
-            mRtvHeap->createRenderTargetView(*this, mSwapChainRtvs, frameIndex, mRenderTargets[frameIndex].Get(), desc);
+            mRtvHeap->createRenderTargetView(*this, mSwapChainRtvs, frameIndex, mRenderTargets[frameIndex].Get(), nullptr);
         }
 
         spdlog::info("Created render target views");

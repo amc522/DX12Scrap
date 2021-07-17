@@ -198,6 +198,7 @@ FixedDescriptorHeapReservation::~FixedDescriptorHeapReservation()
 
 D3D12_CPU_DESCRIPTOR_HANDLE FixedDescriptorHeapReservation::getCpuHandle(uint32_t index) const
 {
+    assert(index < mReservedHeapBlocks.count);
     return CD3DX12_CPU_DESCRIPTOR_HANDLE(mHeap->getCpuDescriptorHeap()->GetCPUDescriptorHandleForHeapStart(),
                                          static_cast<INT>(mReservedHeapBlocks.start + index),
                                          mHeap->getDescriptorSize());
@@ -205,6 +206,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE FixedDescriptorHeapReservation::getCpuHandle(uint32_
 
 D3D12_GPU_DESCRIPTOR_HANDLE FixedDescriptorHeapReservation::getGpuHandle(uint32_t index) const
 {
+    assert(index < mReservedHeapBlocks.count);
     return CD3DX12_GPU_DESCRIPTOR_HANDLE(mHeap->getGpuDescriptorHeap()->GetGPUDescriptorHandleForHeapStart(),
                                          static_cast<INT>(mReservedHeapBlocks.start + index),
                                          mHeap->getDescriptorSize());

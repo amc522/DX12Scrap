@@ -76,12 +76,14 @@ MonotonicDescriptorHeapAllocation::operator=(MonotonicDescriptorHeapAllocation&&
 
 D3D12_CPU_DESCRIPTOR_HANDLE MonotonicDescriptorHeapAllocation::getCpuHandle(uint32_t index) const
 {
+    assert(index < mRange.count);
     return CD3DX12_CPU_DESCRIPTOR_HANDLE{mHeap->getDescriptorHeap()->GetCPUDescriptorHandleForHeapStart(), (INT)index,
                                          mHeap->getDescriptorSize()};
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE MonotonicDescriptorHeapAllocation::getGpuHandle(uint32_t index) const
 {
+    assert(index < mRange.count);
     return CD3DX12_GPU_DESCRIPTOR_HANDLE(mHeap->getDescriptorHeap()->GetGPUDescriptorHandleForHeapStart(), (INT)index,
                                          mHeap->getDescriptorSize());
 }
@@ -196,21 +198,21 @@ void MonotonicDescriptorHeap_RTV::createRenderTargetView(DeviceContext& context,
                                                          const MonotonicDescriptorHeapAllocation& allocation,
                                                          uint32_t allocationIndex,
                                                          ID3D12Resource* renderTarget,
-                                                         const D3D12_RENDER_TARGET_VIEW_DESC& desc)
+                                                         const D3D12_RENDER_TARGET_VIEW_DESC* desc)
 {
-    context.getDevice()->CreateRenderTargetView(renderTarget, &desc, allocation.getCpuHandle(allocationIndex));
+    context.getDevice()->CreateRenderTargetView(renderTarget, desc, allocation.getCpuHandle(allocationIndex));
 }
 
 tl::expected<MonotonicDescriptorHeapDescriptor, FreeBlockTracker::Error>
 MonotonicDescriptorHeap_RTV::createRenderTargetView(DeviceContext& context,
                                                     ID3D12Resource* renderTarget,
-                                                    const D3D12_RENDER_TARGET_VIEW_DESC& desc)
+                                                    const D3D12_RENDER_TARGET_VIEW_DESC* desc)
 {
     auto allocation = allocate(1);
     if(!allocation) { return tl::make_unexpected(allocation.error()); }
 
     MonotonicDescriptorHeapDescriptor descriptor{std::move(allocation.value()), 0};
-    context.getDevice()->CreateRenderTargetView(renderTarget, &desc, descriptor.getCpuHandle());
+    context.getDevice()->CreateRenderTargetView(renderTarget, desc, descriptor.getCpuHandle());
     return descriptor;
 }
 MonotonicDescriptorHeap_DSV::MonotonicDescriptorHeap_DSV(DeviceContext& context, uint32_t numDescriptors)
