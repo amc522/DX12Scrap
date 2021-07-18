@@ -15,7 +15,6 @@
 #include <wrl/client.h>
 
 enum D3D_FEATURE_LEVEL;
-struct ID3D12CommandAllocator;
 struct ID3D12CommandQueue;
 struct ID3D12DescriptorHeap;
 struct ID3D12Device;
@@ -25,6 +24,7 @@ struct ID3D12Device3;
 struct ID3D12Device4;
 struct ID3D12Device5;
 struct ID3D12Device6;
+struct ID3D12Fence;
 struct ID3D12Resource;
 struct IDXGIAdapter4;
 struct IDXGIFactory4;
@@ -76,7 +76,6 @@ public:
     ID3D12Device6* getDevice6() { return mDevice6.Get(); }
 
     uint32_t getFrameIndex() const { return mFrameIndex; }
-    ID3D12CommandAllocator* getCommandAllocator() { return mCommandAllocators[mFrameIndex].Get(); }
     ID3D12CommandQueue* getCommandQueue() { return mCommandQueue.Get(); }
 
     ID3D12Resource* getBackBuffer() { return mRenderTargets[mFrameIndex].Get(); }
@@ -87,10 +86,9 @@ public:
     glm::i32vec2 frameSize() const { return mFrameSize; }
 
     void beginFrame();
+    void endFrame();
 
-    void present();
-
-    void swap();
+    void waitForGpu();
 
 private:
     void getHardwareAdapter(GpuPreference gpuPreference, D3D_FEATURE_LEVEL featureLevel, IDXGIFactory4* dxgiFactory);
@@ -105,7 +103,9 @@ private:
     Microsoft::WRL::ComPtr<ID3D12Device5> mDevice5;
     Microsoft::WRL::ComPtr<ID3D12Device6> mDevice6;
     Microsoft::WRL::ComPtr<ID3D12CommandQueue> mCommandQueue;
-    std::array<Microsoft::WRL::ComPtr<ID3D12CommandAllocator>, d3d12::kFrameBufferCount> mCommandAllocators;
+    Microsoft::WRL::ComPtr<ID3D12Fence> mFence;
+    std::array<uint64_t, d3d12::kFrameBufferCount> mFenceValues{};
+    HANDLE mFenceEvent = nullptr;
     Microsoft::WRL::ComPtr<IDXGISwapChain3> mSwapChain;
     std::unique_ptr<d3d12::MonotonicDescriptorHeap_RTV> mRtvHeap;
     d3d12::MonotonicDescriptorHeapAllocation mSwapChainRtvs;

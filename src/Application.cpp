@@ -40,7 +40,8 @@ Application::Application()
 
 Application::~Application()
 {
-    if(mRenderScene != nullptr) { mRenderScene->shutdown(*mD3D12Context); }
+    mRenderScene.reset();
+    mD3D12Context.reset();
     if(SDL_WasInit(0) != 0) { SDL_Quit(); }
 }
 
@@ -145,6 +146,7 @@ void Application::update()
 
     mD3D12Context->beginFrame();
     mRenderScene->render(*mD3D12Context);
+    mD3D12Context->endFrame();
 }
 
 } // namespace scrap

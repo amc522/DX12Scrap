@@ -256,21 +256,27 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
                 return;
             }
 
-            mRtvHeap->createRenderTargetView(*this, mSwapChainRtvs, frameIndex, mRenderTargets[frameIndex].Get(), nullptr);
+            mRtvHeap->createRenderTargetView(*this, mSwapChainRtvs, frameIndex, mRenderTargets[frameIndex].Get(),
+                                             nullptr);
         }
 
         spdlog::info("Created render target views");
     }
 
-    for(size_t frameIndex = 0; frameIndex < d3d12::kFrameBufferCount; ++frameIndex)
-    {
-        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandallocator
-        if(FAILED(mDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                                  IID_PPV_ARGS(&mCommandAllocators[frameIndex]))))
+    { // Create synchronization objects and wait until assets have been uploaded to the GPU.
+        HRESULT hr = mDevice->CreateFence(mFenceValues[mFrameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence));
+        ++mFenceValues[mFrameIndex];
+
+        // Create an event handle to use for frame synchronization.
+        // https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createeventw
+        mFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+        if(mFenceEvent == nullptr)
         {
-            spdlog::critical("Failed to create d3d12 command allocator");
-            return;
+            hr = HRESULT_FROM_WIN32(GetLastError());
+            spdlog::critical("Failed to create fence event");
         }
+
+        spdlog::info("Created syncronization objects");
     }
 
     spdlog::info("Created d3d12 command allocators");
@@ -282,10 +288,14 @@ DeviceContext::~DeviceContext()
 {
     spdlog::info("Destroying D3D12");
 
+    waitForGpu();
+
+    if(mFenceEvent != nullptr) { CloseHandle(mFenceEvent); }
+
 #ifdef _DEBUG
     if(mDevice != nullptr)
     {
-        mCommandAllocators.fill(nullptr);
+        mFence.Reset();
         mCommandQueue.Reset();
         mRenderTargets.fill(nullptr);
         mRtvHeap = {};
@@ -369,14 +379,61 @@ void DeviceContext::beginFrame()
     mCbvSrvUavHeap->uploadPendingDescriptors(*this);
 }
 
-void DeviceContext::present()
+void DeviceContext::endFrame()
 {
-    if(FAILED(mSwapChain->Present(1, 0))) { spdlog::error("Present call failed"); }
+    if(FAILED(mSwapChain->Present(1, 0)))
+    {
+        spdlog::error("Present call failed");
+        return;
+    }
+
+    // Schedule a Signal command in the queue.
+    const UINT64 currentFenceValue = mFenceValues[mFrameIndex];
+    if(FAILED(mCommandQueue->Signal(mFence.Get(), currentFenceValue)))
+    {
+        spdlog::error("Failed to signal command queue;");
+        return;
+    }
+
+    // Update the frame index.
+    mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
+
+    // If the next frame is not ready to be rendered yet, wait until it is ready.
+    if(mFence->GetCompletedValue() < mFenceValues[mFrameIndex])
+    {
+        if(FAILED(mFence->SetEventOnCompletion(mFenceValues[mFrameIndex], mFenceEvent)))
+        {
+            spdlog::error("Fence SetEventOnCompletion call failed");
+            return;
+        }
+
+        WaitForSingleObjectEx(mFenceEvent, INFINITE, FALSE);
+    }
+
+    // Set the fence value for the next frame.
+    mFenceValues[mFrameIndex] = currentFenceValue + 1;
 }
 
-void DeviceContext::swap()
+void DeviceContext::waitForGpu()
 {
-    mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
+    if(mFence == nullptr) { return; }
+
+    const uint64_t fenceValue = mFenceValues[mFrameIndex];
+
+    // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12commandqueue-signal
+    if(FAILED(mCommandQueue->Signal(mFence.Get(), fenceValue)))
+    {
+        spdlog::error("Failed to update fence.");
+        return;
+    }
+
+    if(FAILED(mFence->SetEventOnCompletion(fenceValue, mFenceEvent)))
+    {
+        spdlog::error("Fence SetEventOnCompletion call failed");
+        return;
+    }
+
+    WaitForSingleObject(mFenceEvent, INFINITE);
 }
 
 void DeviceContext::getHardwareAdapter(GpuPreference gpuPreference,

@@ -14,11 +14,8 @@
 
 #include <wrl/client.h>
 
-struct ID3D12GraphicsCommandList;
 struct ID3D12Device;
-struct ID3D12Fence;
 struct ID3D12PipelineState;
-struct ID3D12Resource;
 struct ID3D12RootSignature;
 
 namespace scrap
@@ -32,24 +29,20 @@ class RenderScene
 {
 public:
     RenderScene(d3d12::DeviceContext& d3d12Context);
-    ~RenderScene();
+    ~RenderScene() = default;
 
     void render(d3d12::DeviceContext& d3d12Context);
-    void shutdown(d3d12::DeviceContext& d3d12Context);
 
     bool initialized() { return mInitialized; }
 
 private:
     bool loadShaders(ID3D12Device* device);
-    void waitOnGpu(d3d12::DeviceContext& d3d12Context);
-    void endFrame(d3d12::DeviceContext& d3d12Context);
 
     Microsoft::WRL::ComPtr<ID3D12RootSignature> mRootSignature;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> mPso;
+
+    std::array<Microsoft::WRL::ComPtr<ID3D12CommandAllocator>, d3d12::kFrameBufferCount> mCommandAllocators;
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> mCommandList;
-    Microsoft::WRL::ComPtr<ID3D12Fence> mFence;
-    std::array<uint64_t, d3d12::kFrameBufferCount> mFenceValues{};
-    HANDLE mFenceEvent = nullptr;
 
     d3d12::Texture mTexture;
     bool mInitialized = false;

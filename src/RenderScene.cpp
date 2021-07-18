@@ -114,11 +114,22 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
 
     if(!loadShaders(d3d12Context.getDevice())) { return; }
 
-    { // Create the command list.
+    { // Create the command allocators and command list.
+        for(size_t frameIndex = 0; frameIndex < d3d12::kFrameBufferCount; ++frameIndex)
+        {
+            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandallocator
+            if(FAILED(d3d12Context.getDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                                                       IID_PPV_ARGS(&mCommandAllocators[frameIndex]))))
+            {
+                spdlog::critical("Failed to create d3d12 command allocator");
+                return;
+            }
+        }
+
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandlist
         HRESULT hr = d3d12Context.getDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                                                 d3d12Context.getCommandAllocator(), mPso.Get(),
-                                                                 IID_PPV_ARGS(&mCommandList));
+                                                                 mCommandAllocators[d3d12Context.getFrameIndex()].Get(),
+                                                                 mPso.Get(), IID_PPV_ARGS(&mCommandList));
 
         if(FAILED(hr))
         {
@@ -149,7 +160,8 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         const UINT rowPitch = surface.extent().x * bytesPerPixel;
         const UINT cellPitch = std::max(rowPitch >> 3, 1u); // The width of a cell in the checkboard texture.
         const UINT cellHeight =
-            std::max(surface.extent().x >> 3, std::max(cellPitch / bytesPerPixel, 1u)); // The height of a cell in the checkerboard texture.
+            std::max(surface.extent().x >> 3,
+                     std::max(cellPitch / bytesPerPixel, 1u)); // The height of a cell in the checkerboard texture.
         const UINT textureSize = static_cast<UINT>(surface.sizeInBytes());
 
         UINT8* pData = surface.accessDataAs<UINT8>().data();
@@ -188,36 +200,12 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
     std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.Get()};
     d3d12Context.getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()), commandLists.data());
 
-    { // Create synchronization objects and wait until assets have been uploaded to the GPU.
-        uint32_t currentFrameIndex = d3d12Context.getFrameIndex();
-        HRESULT hr = d3d12Context.getDevice()->CreateFence(mFenceValues[currentFrameIndex], D3D12_FENCE_FLAG_NONE,
-                                                           IID_PPV_ARGS(&mFence));
-        ++mFenceValues[currentFrameIndex];
-
-        // Create an event handle to use for frame synchronization.
-        // https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createeventw
-        mFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-        if(mFenceEvent == nullptr)
-        {
-            hr = HRESULT_FROM_WIN32(GetLastError());
-            spdlog::critical("Failed to create fence event");
-        }
-
-        // Wait for the command list to execute; we are reusing the same command
-        // list in our main loop but for now, we just want to wait for setup to
-        // complete before continuing.
-        waitOnGpu(d3d12Context);
-
-        spdlog::info("Created syncronization objects");
-    }
+    // Wait for the command list to execute; we are reusing the same command
+    // list in our main loop but for now, we just want to wait for setup to
+    // complete before continuing.
+    d3d12Context.waitForGpu();
 
     mInitialized = true;
-}
-
-RenderScene::~RenderScene()
-{
-    spdlog::info("Destroying RenderScene");
-    if(mFenceEvent != nullptr) { CloseHandle(mFenceEvent); }
 }
 
 bool RenderScene::loadShaders(ID3D12Device* device)
@@ -304,10 +292,12 @@ bool RenderScene::loadShaders(ID3D12Device* device)
 
 void RenderScene::render(d3d12::DeviceContext& d3d12Context)
 {
+    ID3D12CommandAllocator* currentCommandAllocator = mCommandAllocators[d3d12Context.getFrameIndex()].Get();
+
     // Command list allocators can only be reset when the associated
     // command lists have finished execution on the GPU; apps should use
     // fences to determine GPU execution progress.
-    if(FAILED(d3d12Context.getCommandAllocator()->Reset()))
+    if(FAILED(currentCommandAllocator->Reset()))
     {
         spdlog::error("Failed to reset d3d12 command allocator");
         return;
@@ -316,7 +306,7 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
     // However, when ExecuteCommandList() is called on a particular command
     // list, that command list can then be reset at any time and must be before
     // re-recording.
-    if(FAILED(mCommandList->Reset(d3d12Context.getCommandAllocator(), mPso.Get())))
+    if(FAILED(mCommandList->Reset(currentCommandAllocator, mPso.Get())))
     {
         spdlog::error("Failed to reset d3d12 command list");
         return;
@@ -374,69 +364,6 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
     // Execute the command list.
     std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.Get()};
     d3d12Context.getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()), commandLists.data());
-
-    // Present the frame.
-    d3d12Context.present();
-
-    endFrame(d3d12Context);
-}
-
-void RenderScene::shutdown(d3d12::DeviceContext& d3d12Context)
-{
-    spdlog::info("Shutting down RenderScene");
-    waitOnGpu(d3d12Context);
-}
-
-void RenderScene::waitOnGpu(d3d12::DeviceContext& d3d12Context)
-{
-    if(mFence == nullptr) { return; }
-
-    const uint64_t fenceValue = mFenceValues[d3d12Context.getFrameIndex()];
-
-    // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12commandqueue-signal
-    if(FAILED(d3d12Context.getCommandQueue()->Signal(mFence.Get(), fenceValue)))
-    {
-        spdlog::error("Failed to update fence.");
-        return;
-    }
-
-    if(FAILED(mFence->SetEventOnCompletion(fenceValue, mFenceEvent)))
-    {
-        spdlog::error("Fence SetEventOnCompletion call failed");
-        return;
-    }
-
-    WaitForSingleObject(mFenceEvent, INFINITE);
-}
-
-void RenderScene::endFrame(d3d12::DeviceContext& d3d12Context)
-{
-    // Schedule a Signal command in the queue.
-    const UINT64 currentFenceValue = mFenceValues[d3d12Context.getFrameIndex()];
-    if(FAILED(d3d12Context.getCommandQueue()->Signal(mFence.Get(), currentFenceValue)))
-    {
-        spdlog::error("Failed to signal command queue;");
-        return;
-    }
-
-    // Update the frame index.
-    d3d12Context.swap();
-    const uint32_t currentFrameIndex = d3d12Context.getFrameIndex();
-
-    // If the next frame is not ready to be rendered yet, wait until it is ready.
-    if(mFence->GetCompletedValue() < mFenceValues[currentFrameIndex])
-    {
-        if(FAILED(mFence->SetEventOnCompletion(mFenceValues[currentFrameIndex], mFenceEvent)))
-        {
-            spdlog::error("Fence SetEventOnCompletion call failed");
-            return;
-        }
-
-        WaitForSingleObjectEx(mFenceEvent, INFINITE, FALSE);
-    }
-
-    // Set the fence value for the next frame.
-    mFenceValues[currentFrameIndex] = currentFenceValue + 1;
 }
 
 } // namespace scrap
