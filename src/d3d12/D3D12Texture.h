@@ -48,6 +48,12 @@ public:
     };
 
     Texture() = default;
+    Texture(const Texture&) = delete;
+    Texture(Texture&&) = default;
+    ~Texture();
+
+    Texture& operator=(const Texture &) = delete;
+    Texture& operator=(Texture &&) = delete;
 
     std::optional<Error> initUninitialized(DeviceContext& context, const Params& params);
     std::optional<Error> initFromMemory(DeviceContext& context,
@@ -60,7 +66,9 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE getSrvCpu() const { return mDescriptorHeapReservation.getCpuHandle(mSrvIndex); }
     D3D12_GPU_DESCRIPTOR_HANDLE getSrvGpu() const { return mDescriptorHeapReservation.getGpuHandle(mSrvIndex); }
 
-    bool isReady(const DeviceContext& deviceContext) const;
+    bool isReady() const;
+
+    void markAsUsed();
 
 private:
     std::optional<Error> init(DeviceContext& context, const Params& params, const cputex::TextureView* texture);
@@ -80,6 +88,7 @@ private:
     std::array<uint32_t, 15> mUavMipIndices{0};
 
     CopyFrameCode mUploadFrameCode;
+    RenderFrameCode mLastUsedFrameCode;
 };
 
 DEFINE_ENUM_BITWISE_OPERATORS(Texture::AccessFlags);

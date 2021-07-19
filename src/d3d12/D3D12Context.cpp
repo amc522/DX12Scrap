@@ -52,8 +52,13 @@ void LogAdapterDesc(const DXGI_ADAPTER_DESC1& desc, UINT adapterIndex)
 
 namespace d3d12
 {
+DeviceContext* DeviceContext::sInstance = nullptr;
+
 DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
 {
+    assert(sInstance == nullptr);
+    sInstance = this;
+
     spdlog::info("Initializing D3D12");
 
 #ifdef _DEBUG
@@ -292,7 +297,12 @@ DeviceContext::~DeviceContext()
 
     waitForGpu();
 
+    mPendingFreeList.clear();
+
     if(mFenceEvent != nullptr) { CloseHandle(mFenceEvent); }
+
+    assert(sInstance != nullptr);
+    sInstance = nullptr;
 
 #ifdef _DEBUG
     if(mDevice != nullptr)
@@ -419,6 +429,15 @@ void DeviceContext::endFrame()
 
     // Set the fence value for the next frame.
     mFenceValues[mFrameIndex] = currentFenceValue + 1;
+
+    { // Free all resources that are no longer being used by the gpu
+        std::lock_guard lockGuard(mPendingFreeListMutex);
+        mPendingFreeList.erase(std::remove_if(mPendingFreeList.begin(), mPendingFreeList.end(),
+                                              [&](const PendingFreeResource& resource) {
+                                                  return resource.lastUsedFrameCode <= mLastCompletedFrame;
+                                              }),
+                               mPendingFreeList.end());
+    }
 }
 
 void DeviceContext::waitForGpu()
@@ -441,6 +460,15 @@ void DeviceContext::waitForGpu()
     }
 
     WaitForSingleObject(mFenceEvent, INFINITE);
+}
+
+void DeviceContext::queueResourceForDestruction(Microsoft::WRL::ComPtr<ID3D12Resource>&& resource,
+                                                FixedDescriptorHeapReservation&& descriptors,
+                                                RenderFrameCode lastUsedFrameCode)
+{
+    if(lastUsedFrameCode <= mLastCompletedFrame) { return; }
+    std::lock_guard lockGuard(mPendingFreeListMutex);
+    mPendingFreeList.emplace_back(std::move(resource), std::move(descriptors), lastUsedFrameCode);
 }
 
 void DeviceContext::getHardwareAdapter(GpuPreference gpuPreference,

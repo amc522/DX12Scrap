@@ -63,7 +63,12 @@ namespace d3d12
 {
 class DeviceContext
 {
+private:
+    static DeviceContext* sInstance;
+
 public:
+    static DeviceContext& instance() { return *sInstance; }
+
     DeviceContext(const Window& window, GpuPreference gpuPreference);
     ~DeviceContext();
 
@@ -97,6 +102,10 @@ public:
 
     void waitForGpu();
 
+    void queueResourceForDestruction(Microsoft::WRL::ComPtr<ID3D12Resource>&& resource,
+                                     FixedDescriptorHeapReservation&& descriptors,
+                                     RenderFrameCode lastUsed);
+
 private:
     void getHardwareAdapter(GpuPreference gpuPreference, D3D_FEATURE_LEVEL featureLevel, IDXGIFactory4* dxgiFactory);
     HRESULT createDevice(D3D_FEATURE_LEVEL featureLevel);
@@ -125,6 +134,23 @@ private:
 
     uint32_t mFrameIndex = 0;
     RenderFrameCode mLastCompletedFrame;
+
+    struct PendingFreeResource
+    {
+        PendingFreeResource(Microsoft::WRL::ComPtr<ID3D12Resource>&& resource_,
+                            FixedDescriptorHeapReservation&& descriptors_,
+                            RenderFrameCode lastUsedFrameCode_)
+            : resource(std::move(resource_))
+            , descriptors(std::move(descriptors_))
+            , lastUsedFrameCode(lastUsedFrameCode_)
+        {}
+
+        Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+        FixedDescriptorHeapReservation descriptors;
+        RenderFrameCode lastUsedFrameCode;
+    };
+    std::mutex mPendingFreeListMutex;
+    std::vector<PendingFreeResource> mPendingFreeList;
 
     bool mInitialized = false;
 };

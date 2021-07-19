@@ -41,6 +41,14 @@ D3D12_SRV_DIMENSION TranslateTextureDimensionToSrv(cputex::TextureDimension text
     }
 }
 
+Texture::~Texture()
+{
+    if(mResource && mLastUsedFrameCode > DeviceContext::instance().getLastCompletedFrameCode())
+    {
+        DeviceContext::instance().queueResourceForDestruction(std::move(mResource), std::move(mDescriptorHeapReservation), mLastUsedFrameCode);
+    }
+}
+
 std::optional<Texture::Error> Texture::initUninitialized(DeviceContext& context, const Params& params)
 {
     return init(context, params, nullptr);
@@ -62,9 +70,14 @@ std::optional<Texture::Error> Texture::initFromMemory(DeviceContext& context,
     return init(context, params, &texture);
 }
 
-bool Texture::isReady(const DeviceContext& deviceContext) const
+bool Texture::isReady() const
 {
-    return mResource != nullptr && mUploadFrameCode <= deviceContext.getCopyContext().getLastCompletedFrameCode();
+    return mResource != nullptr && mUploadFrameCode <= DeviceContext::instance().getCopyContext().getLastCompletedFrameCode();
+}
+
+void Texture::markAsUsed()
+{
+    mLastUsedFrameCode = DeviceContext::instance().getLastCompletedFrameCode();
 }
 
 std::optional<Texture::Error>

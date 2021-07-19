@@ -148,8 +148,7 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
     textureParams.arraySize = 1;
     textureParams.format = gpufmt::Format::R8G8B8A8_UNORM;
     cputex::UniqueTexture cpuTexture{textureParams};
-    d3d12::Texture texture;
-
+    
     //-------------------------------------
     // Generate a checkboard texture
     //-------------------------------------
@@ -190,7 +189,8 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         }
     }
 
-    texture.initFromMemory(d3d12Context, cpuTexture, d3d12::Texture::AccessFlags::GpuRead, "Firsrt Texture");
+    auto texture = std::make_unique<d3d12::Texture>();
+    texture->initFromMemory(d3d12Context, cpuTexture, d3d12::Texture::AccessFlags::GpuRead, "Firsrt Texture");
     mTexture = std::move(texture);
 
     if(FAILED(mCommandList->Close())) { spdlog::error("Failed to close graphics command list"); }
@@ -346,8 +346,9 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
     const float clearColor[] = {0.0f, 0.2f, 0.4f, 1.0f};
     mCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-    if(mTexture.isReady(d3d12Context))
+    if(mTexture->isReady())
     {
+        mTexture->markAsUsed();
         mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         mCommandList->DrawInstanced(3, 1, 0, 0);
     }

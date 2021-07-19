@@ -44,7 +44,7 @@ private:
     std::array<Microsoft::WRL::ComPtr<ID3D12CommandAllocator>, d3d12::kFrameBufferCount> mCommandAllocators;
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> mCommandList;
 
-    d3d12::Texture mTexture;
+    std::unique_ptr<d3d12::Texture> mTexture;
     bool mInitialized = false;
 };
 } // namespace scrap
