@@ -10,6 +10,8 @@
 #include <gpufmt/dxgi.h>
 #include <spdlog/spdlog.h>
 
+using namespace Microsoft::WRL;
+
 namespace scrap::d3d12
 {
 D3D12_RESOURCE_DIMENSION TranslateTextureDimension(cputex::TextureDimension textureDimension)
@@ -39,14 +41,12 @@ D3D12_SRV_DIMENSION TranslateTextureDimensionToSrv(cputex::TextureDimension text
     }
 }
 
-std::optional<Texture::Error>
-Texture::initUninitialized(DeviceContext& context, ID3D12GraphicsCommandList* commandList, const Params& params)
+std::optional<Texture::Error> Texture::initUninitialized(DeviceContext& context, const Params& params)
 {
-    return init(context, commandList, params, nullptr);
+    return init(context, params, nullptr);
 }
 
 std::optional<Texture::Error> Texture::initFromMemory(DeviceContext& context,
-                                                      ID3D12GraphicsCommandList* commandList,
                                                       const cputex::TextureView& texture,
                                                       AccessFlags accessFlags,
                                                       std::string_view name)
@@ -59,14 +59,19 @@ std::optional<Texture::Error> Texture::initFromMemory(DeviceContext& context,
     params.mipCount = texture.mips();
     params.accessFlags = accessFlags;
     params.name = name;
-    return init(context, commandList, params, &texture);
+    return init(context, params, &texture);
 }
 
-std::optional<Texture::Error> Texture::init(DeviceContext& context,
-                                            ID3D12GraphicsCommandList* commandList,
-                                            const Params& params,
-                                            const cputex::TextureView* texture)
+bool Texture::isReady(const DeviceContext& deviceContext) const
 {
+    return mResource != nullptr && mUploadFrameCode <= deviceContext.getCopyContext().getLastCompletedFrameCode();
+}
+
+std::optional<Texture::Error>
+Texture::init(DeviceContext& context, const Params& params, const cputex::TextureView* texture)
+{
+    ID3D12GraphicsCommandList* commandList = context.getCopyContext().getCommandList();
+
     // 1. Create GPU texture
     //    a. Get allocation info. This will get the byte aligment for the texture. You can set the alignment in
     //       D3D12_RESOURCE_DESC to 0 and it will figure out the alignment. Expicitly grabbing it here to use later.
@@ -173,9 +178,10 @@ std::optional<Texture::Error> Texture::init(DeviceContext& context,
     uploadHeapProps.CreationNodeMask = 0;
     uploadHeapProps.VisibleNodeMask = 0;
 
+    ComPtr<ID3D12Resource> uploadResource;
     hr = context.getDevice()->CreateCommittedResource(&uploadHeapProps, D3D12_HEAP_FLAG_NONE, &textureUploadDesc,
                                                       D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-                                                      IID_PPV_ARGS(&mUploadResource));
+                                                      IID_PPV_ARGS(&uploadResource));
     if(FAILED(hr))
     {
         spdlog::critical("Failed to create texture upload resource.");
@@ -183,7 +189,7 @@ std::optional<Texture::Error> Texture::init(DeviceContext& context,
     }
 
     wideName.append(L" (Upload)");
-    mUploadResource->SetName(wideName.c_str());
+    uploadResource->SetName(wideName.c_str());
 
     //============================================
     // 3. Copy cpu texture data to upload buffer
@@ -221,7 +227,7 @@ std::optional<Texture::Error> Texture::init(DeviceContext& context,
 
                     if(subresourceCount == subresources.size())
                     {
-                        UpdateSubresources<subresources.size()>(commandList, mResource.Get(), mUploadResource.Get(), 0,
+                        UpdateSubresources<subresources.size()>(commandList, mResource.Get(), uploadResource.Get(), 0,
                                                                 firstSubresource, subresourceCount,
                                                                 subresources.data());
                         firstSubresource = subresourceCount;
@@ -233,26 +239,12 @@ std::optional<Texture::Error> Texture::init(DeviceContext& context,
 
         if(subresourceCount != 0)
         {
-            UpdateSubresources<subresources.size()>(commandList, mResource.Get(), mUploadResource.Get(), 0,
+            UpdateSubresources<subresources.size()>(commandList, mResource.Get(), uploadResource.Get(), 0,
                                                     firstSubresource, subresourceCount, subresources.data());
         }
-
-        //=============================================================================
-        // 5. Transition the resource from the copy state to the shader resource state
-        //=============================================================================
-        {
-            D3D12_RESOURCE_BARRIER transitionBarrier = {};
-            transitionBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            transitionBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-            transitionBarrier.Transition.pResource = mResource.Get();
-            transitionBarrier.Transition.Subresource = 0;
-            transitionBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-            transitionBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-
-            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12graphicscommandlist-resourcebarrier
-            commandList->ResourceBarrier(1, &transitionBarrier);
-        }
     }
+
+    context.getCopyContext().trackCopyResource(mResource, std::move(uploadResource));
 
     auto descriptorHeapReservation = context.getCbvSrvUavHeap().reserve(1);
     if(!descriptorHeapReservation) { return Texture::Error::InsufficientDescriptorHeapSpace; }
@@ -317,6 +309,8 @@ std::optional<Texture::Error> Texture::init(DeviceContext& context,
 
     context.getCbvSrvUavHeap().createShaderResourceView(context, mDescriptorHeapReservation, mSrvIndex, mResource.Get(),
                                                         srvDesc);
+
+    mUploadFrameCode = context.getCopyContext().getCurrentFrameCode();
 
     return std::nullopt;
 }

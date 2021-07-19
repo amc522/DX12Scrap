@@ -168,11 +168,11 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandqueue
         if(FAILED(mDevice->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&mCommandQueue))))
         {
-            spdlog::critical("Failed to create d3d12 command queue");
+            spdlog::critical("Failed to create d3d12 direct command queue");
             return;
         }
 
-        spdlog::info("Created d3d12 command queue");
+        spdlog::info("Created d3d12 direct command queue");
     }
 
     { // create swap chain
@@ -207,7 +207,7 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
 
         if(FAILED(swapChain.As(&mSwapChain))) { spdlog::critical("Failed to convert swap chain"); }
 
-        mFrameSize = frameSize;
+        mFrameBufferSize = frameSize;
         mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
 
         spdlog::info("Created d3d12 swap chain");
@@ -264,7 +264,7 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
     }
 
     { // Create synchronization objects and wait until assets have been uploaded to the GPU.
-        HRESULT hr = mDevice->CreateFence(mFenceValues[mFrameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence));
+        HRESULT hr = mDevice->CreateFence(*mFenceValues[mFrameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence));
         ++mFenceValues[mFrameIndex];
 
         // Create an event handle to use for frame synchronization.
@@ -279,7 +279,9 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
         spdlog::info("Created syncronization objects");
     }
 
-    spdlog::info("Created d3d12 command allocators");
+    mCopyContext = std::make_unique<CopyContext>();
+    mCopyContext->init(*this);
+    mCopyContext->beginCopyFrame();
 
     mInitialized = true;
 }
@@ -295,6 +297,7 @@ DeviceContext::~DeviceContext()
 #ifdef _DEBUG
     if(mDevice != nullptr)
     {
+        mCopyContext.reset();
         mFence.Reset();
         mCommandQueue.Reset();
         mRenderTargets.fill(nullptr);
@@ -377,6 +380,8 @@ D3D12_CPU_DESCRIPTOR_HANDLE DeviceContext::getBackBufferRtv() const
 void DeviceContext::beginFrame()
 {
     mCbvSrvUavHeap->uploadPendingDescriptors(*this);
+    mCopyContext->endCopyFrame();
+    mCopyContext->beginCopyFrame();
 }
 
 void DeviceContext::endFrame()
@@ -388,7 +393,7 @@ void DeviceContext::endFrame()
     }
 
     // Schedule a Signal command in the queue.
-    const UINT64 currentFenceValue = mFenceValues[mFrameIndex];
+    const UINT64 currentFenceValue = *mFenceValues[mFrameIndex];
     if(FAILED(mCommandQueue->Signal(mFence.Get(), currentFenceValue)))
     {
         spdlog::error("Failed to signal command queue;");
@@ -399,9 +404,9 @@ void DeviceContext::endFrame()
     mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
 
     // If the next frame is not ready to be rendered yet, wait until it is ready.
-    if(mFence->GetCompletedValue() < mFenceValues[mFrameIndex])
+    if(mFence->GetCompletedValue() < *mFenceValues[mFrameIndex])
     {
-        if(FAILED(mFence->SetEventOnCompletion(mFenceValues[mFrameIndex], mFenceEvent)))
+        if(FAILED(mFence->SetEventOnCompletion(*mFenceValues[mFrameIndex], mFenceEvent)))
         {
             spdlog::error("Fence SetEventOnCompletion call failed");
             return;
@@ -409,6 +414,8 @@ void DeviceContext::endFrame()
 
         WaitForSingleObjectEx(mFenceEvent, INFINITE, FALSE);
     }
+
+    mLastCompletedFrame = mFenceValues[mFrameIndex];
 
     // Set the fence value for the next frame.
     mFenceValues[mFrameIndex] = currentFenceValue + 1;
@@ -418,7 +425,7 @@ void DeviceContext::waitForGpu()
 {
     if(mFence == nullptr) { return; }
 
-    const uint64_t fenceValue = mFenceValues[mFrameIndex];
+    const uint64_t fenceValue = *mFenceValues[mFrameIndex];
 
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12commandqueue-signal
     if(FAILED(mCommandQueue->Signal(mFence.Get(), fenceValue)))

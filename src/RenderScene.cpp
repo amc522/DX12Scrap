@@ -190,8 +190,7 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         }
     }
 
-    texture.initFromMemory(d3d12Context, mCommandList.Get(), cpuTexture, d3d12::Texture::AccessFlags::GpuRead,
-                           "Firsrt Texture");
+    texture.initFromMemory(d3d12Context, cpuTexture, d3d12::Texture::AccessFlags::GpuRead, "Firsrt Texture");
     mTexture = std::move(texture);
 
     if(FAILED(mCommandList->Close())) { spdlog::error("Failed to close graphics command list"); }
@@ -346,8 +345,12 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
     // Record commands.
     const float clearColor[] = {0.0f, 0.2f, 0.4f, 1.0f};
     mCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-    mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    mCommandList->DrawInstanced(3, 1, 0, 0);
+
+    if(mTexture.isReady(d3d12Context))
+    {
+        mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        mCommandList->DrawInstanced(3, 1, 0, 0);
+    }
 
     // Indicate that the back buffer will now be used to present.
     renderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(

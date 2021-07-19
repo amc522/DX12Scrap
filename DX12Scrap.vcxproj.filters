@@ -37,6 +37,9 @@
     <ClCompile Include="src\d3d12\D3D12Texture.cpp">
       <Filter>Source Files\d3d12</Filter>
     </ClCompile>
+    <ClCompile Include="src\d3d12\D3D12CopyContext.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application.h">
@@ -74,6 +77,12 @@
     </ClInclude>
     <ClInclude Include="src\Utility.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\d3d12\D3D12CopyContext.h">
+      <Filter>Source Files\d3d12</Filter>
+    </ClInclude>
+    <ClInclude Include="src\d3d12\D3D12FrameCodes.h">
+      <Filter>Source Files\d3d12</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

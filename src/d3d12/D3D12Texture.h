@@ -2,6 +2,7 @@
 
 #include "Utility.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
+#include "d3d12/D3D12FrameCodes.h"
 
 #include <array>
 
@@ -48,10 +49,8 @@ public:
 
     Texture() = default;
 
-    std::optional<Error>
-    initUninitialized(DeviceContext& context, ID3D12GraphicsCommandList* commandList, const Params& params);
+    std::optional<Error> initUninitialized(DeviceContext& context, const Params& params);
     std::optional<Error> initFromMemory(DeviceContext& context,
-                                        ID3D12GraphicsCommandList* commandList,
                                         const cputex::TextureView& texture,
                                         AccessFlags accessFlags,
                                         std::string_view name);
@@ -61,11 +60,10 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE getSrvCpu() const { return mDescriptorHeapReservation.getCpuHandle(mSrvIndex); }
     D3D12_GPU_DESCRIPTOR_HANDLE getSrvGpu() const { return mDescriptorHeapReservation.getGpuHandle(mSrvIndex); }
 
+    bool isReady(const DeviceContext& deviceContext) const;
+
 private:
-    std::optional<Error> init(DeviceContext& context,
-                              ID3D12GraphicsCommandList* commandList,
-                              const Params& params,
-                              const cputex::TextureView* texture);
+    std::optional<Error> init(DeviceContext& context, const Params& params, const cputex::TextureView* texture);
 
     // Q: Why use two different GPU resource for the texture?
     // A: GPUs have different kinds of memory that are made faster for certain tasks but are slower for others. The
@@ -75,12 +73,13 @@ private:
     // For more information read https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_heap_type.
     // Specifically look at the descriptions for 'D3D12_HEAP_TYPE_UPLOAD' and 'D3D12_HEAP_TYPE_DEFAULT'.
     Microsoft::WRL::ComPtr<ID3D12Resource> mResource;
-    Microsoft::WRL::ComPtr<ID3D12Resource> mUploadResource;
     FixedDescriptorHeapReservation mDescriptorHeapReservation;
     uint32_t mSrvIndex = 0;
     uint32_t mUavIndex = 0;
     std::array<uint32_t, 15> mSrvMipIndices{0};
     std::array<uint32_t, 15> mUavMipIndices{0};
+
+    CopyFrameCode mUploadFrameCode;
 };
 
 DEFINE_ENUM_BITWISE_OPERATORS(Texture::AccessFlags);
