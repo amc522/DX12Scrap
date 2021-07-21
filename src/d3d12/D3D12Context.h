@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "RenderDefs.h"
 #include "d3d12/D3D12Config.h"
 #include "d3d12/D3D12CopyContext.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
@@ -36,28 +37,6 @@ struct D3D12_CPU_DESCRIPTOR_HANDLE;
 namespace scrap
 {
 class Window;
-
-enum class GpuPreference
-{
-    None,
-    HighPerformance,
-    MinimumPower,
-    MaximumMemory,
-    MinimumMemory
-};
-
-constexpr std::string_view ToString(GpuPreference gpuPreference)
-{
-    switch(gpuPreference)
-    {
-    case scrap::GpuPreference::None: return "None";
-    case scrap::GpuPreference::HighPerformance: return "HighPerformance";
-    case scrap::GpuPreference::MinimumPower: return "MinimumPower";
-    case scrap::GpuPreference::MaximumMemory: return "MaximumMemory";
-    case scrap::GpuPreference::MinimumMemory: return "MinimumMemory";
-    default: return "Unknown GpuPreference";
-    }
-}
 
 namespace d3d12
 {
@@ -156,13 +135,3 @@ private:
 };
 } // namespace d3d12
 } // namespace scrap
-
-template<>
-struct fmt::formatter<scrap::GpuPreference> : public fmt::formatter<std::string_view>
-{
-    template<typename FormatContext>
-    auto format(scrap::GpuPreference gpuPreference, FormatContext& ctx)
-    {
-        return format_to(ctx.out(), scrap::ToString(gpuPreference));
-    }
-};

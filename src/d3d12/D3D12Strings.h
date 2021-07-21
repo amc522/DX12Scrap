@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "StringUtils.h"
+
 #include <string_view>
 
 #include <d3d12.h>
@@ -18,6 +20,7 @@ struct HRESULT_t
     HRESULT hr = S_OK;
 };
 
+template<>
 constexpr std::string_view ToStringView(D3D_FEATURE_LEVEL featureLevel)
 {
     switch(featureLevel)
@@ -36,6 +39,7 @@ constexpr std::string_view ToStringView(D3D_FEATURE_LEVEL featureLevel)
     }
 }
 
+template<>
 constexpr std::string_view ToStringView(D3D_SHADER_MODEL shaderModel)
 {
     switch(shaderModel)
@@ -52,6 +56,7 @@ constexpr std::string_view ToStringView(D3D_SHADER_MODEL shaderModel)
     }
 }
 
+template<>
 constexpr std::string_view ToStringView(D3D12_DESCRIPTOR_HEAP_TYPE descriptorHeapType)
 {
     switch(descriptorHeapType)
@@ -64,6 +69,7 @@ constexpr std::string_view ToStringView(D3D12_DESCRIPTOR_HEAP_TYPE descriptorHea
     }
 }
 
+template<>
 constexpr std::string_view ToStringView(D3D12_RESOURCE_BINDING_TIER resourceBindingTier)
 {
     switch(resourceBindingTier)
@@ -75,8 +81,6 @@ constexpr std::string_view ToStringView(D3D12_RESOURCE_BINDING_TIER resourceBind
     }
 }
 } // namespace scrap
-
-#include "StringUtils.h"
 
 template<>
 struct fmt::formatter<scrap::HRESULT_t> : public fmt::formatter<std::string_view>

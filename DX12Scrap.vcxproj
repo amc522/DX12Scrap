@@ -42,6 +42,7 @@
     <ClInclude Include="src\d3d12\D3D12Texture.h" />
     <ClInclude Include="src\d3d12\D3D12FrameCodes.h" />
     <ClInclude Include="src\FreeBlockTracker.h" />
+    <ClInclude Include="src\RenderDefs.h" />
     <ClInclude Include="src\RenderScene.h" />
     <ClInclude Include="src\StringUtils.h" />
     <ClInclude Include="src\Utility.h" />

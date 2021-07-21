@@ -2,13 +2,20 @@
 
 #include <string_view>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 namespace scrap
 {
 template<class T>
-struct ToStringViewFormatter : public fmt::formatter<std::string_view>
+constexpr std::string_view ToStringView(T)
 {
+    return {};
+}
+
+template<class T>
+class ToStringViewFormatter : public fmt::formatter<std::string_view>
+{
+public:
     template<typename FormatContext>
     auto format(const T& value, FormatContext& ctx)
     {
