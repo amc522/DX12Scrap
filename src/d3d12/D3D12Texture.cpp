@@ -43,10 +43,7 @@ D3D12_SRV_DIMENSION TranslateTextureDimensionToSrv(cputex::TextureDimension text
 
 Texture::~Texture()
 {
-    if(mResource && mLastUsedFrameCode > DeviceContext::instance().getLastCompletedFrameCode())
-    {
-        DeviceContext::instance().queueResourceForDestruction(std::move(mResource), std::move(mDescriptorHeapReservation), mLastUsedFrameCode);
-    }
+    DeviceContext::instance().queueResourceForDestruction(std::move(mResource), std::move(mDescriptorHeapReservation), mLastUsedFrameCode);
 }
 
 std::optional<Texture::Error> Texture::initUninitialized(DeviceContext& context, const Params& params)
@@ -77,7 +74,7 @@ bool Texture::isReady() const
 
 void Texture::markAsUsed()
 {
-    mLastUsedFrameCode = DeviceContext::instance().getLastCompletedFrameCode();
+    mLastUsedFrameCode = DeviceContext::instance().getCurrentFrameCode();
 }
 
 std::optional<Texture::Error>

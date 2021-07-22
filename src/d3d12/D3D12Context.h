@@ -12,6 +12,7 @@
 #include "d3d12/D3D12MonotonicDescriptorHeap.h"
 
 #include <array>
+#include <future>
 
 #include <fmt/format.h>
 #include <glm/vec2.hpp>
@@ -27,7 +28,9 @@ struct ID3D12Device3;
 struct ID3D12Device4;
 struct ID3D12Device5;
 struct ID3D12Device6;
+struct ID3D12DeviceChild;
 struct ID3D12Fence;
+struct ID3D12PipelineState;
 struct ID3D12Resource;
 struct IDXGIAdapter4;
 struct IDXGIFactory4;
@@ -40,6 +43,9 @@ class Window;
 
 namespace d3d12
 {
+class GraphicsPipelineState;
+struct GraphicsPipelineStateParams;
+
 class DeviceContext
 {
 private:
@@ -85,6 +91,11 @@ public:
                                      FixedDescriptorHeapReservation&& descriptors,
                                      RenderFrameCode lastUsed);
 
+    void queuePipelineStateForDesctruction(Microsoft::WRL::ComPtr<ID3D12PipelineState>&& pipelineState,
+                                           RenderFrameCode lastUsed);
+
+    std::shared_ptr<GraphicsPipelineState> createGraphicsPipelineState(GraphicsPipelineStateParams&& params);
+
 private:
     void getHardwareAdapter(GpuPreference gpuPreference, D3D_FEATURE_LEVEL featureLevel, IDXGIFactory4* dxgiFactory);
     HRESULT createDevice(D3D_FEATURE_LEVEL featureLevel);
@@ -114,22 +125,24 @@ private:
     uint32_t mFrameIndex = 0;
     RenderFrameCode mLastCompletedFrame;
 
-    struct PendingFreeResource
+    struct PendingFreeObject
     {
-        PendingFreeResource(Microsoft::WRL::ComPtr<ID3D12Resource>&& resource_,
-                            FixedDescriptorHeapReservation&& descriptors_,
-                            RenderFrameCode lastUsedFrameCode_)
+        PendingFreeObject(Microsoft::WRL::ComPtr<ID3D12DeviceChild>&& resource_,
+                          FixedDescriptorHeapReservation&& descriptors_,
+                          RenderFrameCode lastUsedFrameCode_)
             : resource(std::move(resource_))
             , descriptors(std::move(descriptors_))
             , lastUsedFrameCode(lastUsedFrameCode_)
         {}
 
-        Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+        Microsoft::WRL::ComPtr<ID3D12DeviceChild> resource;
         FixedDescriptorHeapReservation descriptors;
         RenderFrameCode lastUsedFrameCode;
     };
     std::mutex mPendingFreeListMutex;
-    std::vector<PendingFreeResource> mPendingFreeList;
+    std::vector<PendingFreeObject> mPendingFreeList;
+
+    std::vector<std::future<void>> mFutures;
 
     bool mInitialized = false;
 };

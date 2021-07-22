@@ -1,7 +1,7 @@
-#include "D3D12FixedDescriptorHeap.h"
+#include "d3d12/D3D12FixedDescriptorHeap.h"
 
-#include "D3D12Strings.h"
 #include "d3d12/D3D12Context.h"
+#include "d3d12/D3D12Strings.h"
 
 #include <d3d12.h>
 #include <d3dx12.h>
@@ -79,12 +79,12 @@ FixedDescriptorHeapAllocator::allocateMonotonicSubHeap(uint32_t descriptorCount)
 tl::expected<FixedDescriptorHeapReservation, FreeBlockTracker::Error>
 FixedDescriptorHeapAllocator::reserve(uint32_t descriptorCount)
 {
-    std::lock_guard lockGuard{ mMutex };
+    std::lock_guard lockGuard{mMutex};
 
     auto reservation = mFreeBlockTracker.unsafeReserve(descriptorCount);
     if(!reservation) { return tl::make_unexpected(reservation.error()); }
 
-    FreeBlockTracker::Range range{ reservation.value(), descriptorCount };
+    FreeBlockTracker::Range range{reservation.value(), descriptorCount};
     mCpuRangesToCopy.push_back(range);
 
     return FixedDescriptorHeapReservation(*this, range);

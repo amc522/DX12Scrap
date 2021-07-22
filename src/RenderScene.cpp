@@ -1,6 +1,8 @@
 #include "RenderScene.h"
 
 #include "d3d12/D3D12Context.h"
+#include "d3d12/D3D12GraphicsPipelineState.h"
+#include "d3d12/D3D12GraphicsShader.h"
 #include "d3d12/D3D12Texture.h"
 
 #include <cputex/utility.h>
@@ -112,8 +114,6 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         spdlog::info("Created d3d12 root signature");
     }
 
-    if(!loadShaders(d3d12Context.getDevice())) { return; }
-
     { // Create the command allocators and command list.
         for(size_t frameIndex = 0; frameIndex < d3d12::kFrameBufferCount; ++frameIndex)
         {
@@ -129,7 +129,7 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandlist
         HRESULT hr = d3d12Context.getDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
                                                                  mCommandAllocators[d3d12Context.getFrameIndex()].Get(),
-                                                                 mPso.Get(), IID_PPV_ARGS(&mCommandList));
+                                                                 nullptr, IID_PPV_ARGS(&mCommandList));
 
         if(FAILED(hr))
         {
@@ -148,7 +148,7 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
     textureParams.arraySize = 1;
     textureParams.format = gpufmt::Format::R8G8B8A8_UNORM;
     cputex::UniqueTexture cpuTexture{textureParams};
-    
+
     //-------------------------------------
     // Generate a checkboard texture
     //-------------------------------------
@@ -204,87 +204,35 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
     // complete before continuing.
     d3d12Context.waitForGpu();
 
+    if(!loadShaders()) { return; }
+
     mInitialized = true;
 }
 
-bool RenderScene::loadShaders(ID3D12Device* device)
+bool RenderScene::loadShaders()
 {
-    ComPtr<ID3DBlob> vertexShader;
-    ComPtr<ID3DBlob> pixelShader;
-
-#if defined(_DEBUG)
-    // Enable better shader debugging with the graphics debugging tools.
-    UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#else
-    UINT compileFlags = 0;
+    d3d12::GraphicsShaderParams shaderParams;
+    shaderParams.filepaths[(size_t)GraphicsShaderStage::Vertex] = L"assets\\hello_triangle.hlsl";
+    shaderParams.filepaths[(size_t)GraphicsShaderStage::Pixel] = L"assets\\hello_triangle.hlsl";
+    shaderParams.entryPoints[(size_t)GraphicsShaderStage::Vertex] = "VSMain";
+    shaderParams.entryPoints[(size_t)GraphicsShaderStage::Pixel] = "PSMain";
+    shaderParams.stages = GraphicsShaderStageMask::VsPs;
+#ifdef _DEBUG
+    shaderParams.debug = true;
 #endif
 
-    ComPtr<ID3DBlob> error;
-    // Shader paths are hardcoded and only work with the directory structure of the project
-    constexpr std::wstring_view vertexShaderPath = L"assets\\hello_triangle.hlsl";
-    constexpr std::wstring_view pixelShaderPath = L"assets\\hello_triangle.hlsl";
-
-    // https://docs.microsoft.com/en-us/windows/win32/api/d3dcompiler/nf-d3dcompiler-d3dcompilefromfile
-    HRESULT hr = D3DCompileFromFile(vertexShaderPath.data(), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0,
-                                    &vertexShader, &error);
-    if(FAILED(hr))
-    {
-        if(error != nullptr)
-        {
-            spdlog::critical("Failed to compile vertex shader.\n{}",
-                             std::string_view((const char*)error->GetBufferPointer(), error->GetBufferSize()));
-        }
-        else
-        {
-            spdlog::critical(L"Failed to compile vertex shader {}", vertexShaderPath);
-        }
-
-        return false;
-    }
-
-    spdlog::info(L"Compiled vertex shader {}", vertexShaderPath);
-
-    hr = D3DCompileFromFile(pixelShaderPath.data(), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader,
-                            &error);
-
-    if(FAILED(hr))
-    {
-        if(error != nullptr)
-        {
-            spdlog::critical("Failed to compile pixel shader.\n{}",
-                             std::string_view((const char*)error->GetBufferPointer(), error->GetBufferSize()));
-        }
-        else
-        {
-            spdlog::critical(L"Failed to compile pixel shader {}", pixelShaderPath);
-        }
-
-        return false;
-    }
-
-    spdlog::info(L"Compiled pixel shader {}", pixelShaderPath);
-
     // Describe and create the graphics pipeline state object (PSO).
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-    psoDesc.pRootSignature = mRootSignature.Get();
-    psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
-    psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
-    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-    psoDesc.DepthStencilState.DepthEnable = FALSE;
-    psoDesc.DepthStencilState.StencilEnable = FALSE;
-    psoDesc.SampleMask = UINT_MAX;
-    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    psoDesc.NumRenderTargets = 1;
-    psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-    psoDesc.SampleDesc.Count = 1;
+    d3d12::GraphicsPipelineStateParams psoParams = {};
+    psoParams.rootSignature = mRootSignature.Get();
+    psoParams.shader = std::make_shared<d3d12::GraphicsShader>(std::move(shaderParams));
+    psoParams.rasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoParams.blendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    psoParams.depthStencilState.DepthEnable = FALSE;
+    psoParams.depthStencilState.StencilEnable = FALSE;
+    psoParams.primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoParams.renderTargetFormats = {DXGI_FORMAT_R8G8B8A8_UNORM};
 
-    // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-creategraphicspipelinestate
-    if(FAILED(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPso))))
-    {
-        spdlog::critical("Failed to create d3d12 pipeline state object");
-        return false;
-    }
+    mPso = d3d12::DeviceContext::instance().createGraphicsPipelineState(std::move(psoParams));
 
     return true;
 }
@@ -305,7 +253,7 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
     // However, when ExecuteCommandList() is called on a particular command
     // list, that command list can then be reset at any time and must be before
     // re-recording.
-    if(FAILED(mCommandList->Reset(currentCommandAllocator, mPso.Get())))
+    if(FAILED(mCommandList->Reset(currentCommandAllocator, nullptr)))
     {
         spdlog::error("Failed to reset d3d12 command list");
         return;
@@ -346,9 +294,11 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
     const float clearColor[] = {0.0f, 0.2f, 0.4f, 1.0f};
     mCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-    if(mTexture->isReady())
+    if(mPso->isReady() && mTexture->isReady())
     {
+        mPso->markAsUsed();
         mTexture->markAsUsed();
+        mCommandList->SetPipelineState(mPso->getPipelineState());
         mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         mCommandList->DrawInstanced(3, 1, 0, 0);
     }

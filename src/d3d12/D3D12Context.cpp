@@ -12,6 +12,10 @@
 #ifdef _DEBUG
 #    include <dxgidebug.h>
 #endif
+#include "d3d12/D3D12GraphicsPipelineState.h"
+
+#include <chrono>
+
 #include <spdlog/spdlog.h>
 
 // These exports are needed for the DX12 Agility SDK. The agility sdk is a portable dx12 binary to be shipped with the
@@ -297,6 +301,12 @@ DeviceContext::~DeviceContext()
 
     waitForGpu();
 
+    for(auto& future : mFutures)
+    {
+        if(!future.valid()) { continue; }
+        future.wait();
+    }
+    mFutures.clear();
     mPendingFreeList.clear();
 
     if(mFenceEvent != nullptr) { CloseHandle(mFenceEvent); }
@@ -390,6 +400,14 @@ D3D12_CPU_DESCRIPTOR_HANDLE DeviceContext::getBackBufferRtv() const
 void DeviceContext::beginFrame()
 {
     mCbvSrvUavHeap->uploadPendingDescriptors(*this);
+
+    mFutures.erase(std::remove_if(mFutures.begin(), mFutures.end(),
+                                  [](const std::future<void>& future) {
+                                      return future.valid() &&
+                                             future.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+                                  }),
+                   mFutures.end());
+
     mCopyContext->endCopyFrame();
     mCopyContext->beginCopyFrame();
 }
@@ -433,7 +451,7 @@ void DeviceContext::endFrame()
     { // Free all resources that are no longer being used by the gpu
         std::lock_guard lockGuard(mPendingFreeListMutex);
         mPendingFreeList.erase(std::remove_if(mPendingFreeList.begin(), mPendingFreeList.end(),
-                                              [&](const PendingFreeResource& resource) {
+                                              [&](const PendingFreeObject& resource) {
                                                   return resource.lastUsedFrameCode <= mLastCompletedFrame;
                                               }),
                                mPendingFreeList.end());
@@ -466,9 +484,29 @@ void DeviceContext::queueResourceForDestruction(Microsoft::WRL::ComPtr<ID3D12Res
                                                 FixedDescriptorHeapReservation&& descriptors,
                                                 RenderFrameCode lastUsedFrameCode)
 {
-    if(lastUsedFrameCode <= mLastCompletedFrame) { return; }
+    if(resource == nullptr || lastUsedFrameCode <= mLastCompletedFrame) { return; }
+
     std::lock_guard lockGuard(mPendingFreeListMutex);
     mPendingFreeList.emplace_back(std::move(resource), std::move(descriptors), lastUsedFrameCode);
+}
+
+void DeviceContext::queuePipelineStateForDesctruction(Microsoft::WRL::ComPtr<ID3D12PipelineState>&& pipelineState,
+                                                      RenderFrameCode lastUsed)
+{
+    if(pipelineState == nullptr || lastUsed <= mLastCompletedFrame) { return; }
+
+    std::lock_guard lockGuard(mPendingFreeListMutex);
+    mPendingFreeList.emplace_back(std::move(pipelineState), FixedDescriptorHeapReservation{}, lastUsed);
+}
+
+std::shared_ptr<GraphicsPipelineState> DeviceContext::createGraphicsPipelineState(GraphicsPipelineStateParams&& params)
+{
+    auto pipelineState = std::make_shared<d3d12::GraphicsPipelineState>(std::move(params));
+    // This is a really cheesy way to do multithreaded creation of pipeline states. In the future, I would like to make
+    // some kind of task manager for handling async resource creation
+    mFutures.emplace_back(std::async(std::launch::async, [pipelineState]() { pipelineState->create(); }));
+
+    return pipelineState;
 }
 
 void DeviceContext::getHardwareAdapter(GpuPreference gpuPreference,

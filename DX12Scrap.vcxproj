@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="packages\Microsoft.Direct3D.D3D12.1.4.10\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('packages\Microsoft.Direct3D.D3D12.1.4.10\build\native\Microsoft.Direct3D.D3D12.props')" />
   <ItemGroup Label="ProjectConfigurations">
@@ -25,7 +25,9 @@
     <ClCompile Include="src\d3d12\D3D12CopyContext.cpp" />
     <ClCompile Include="src\d3d12\D3D12FixedDescriptorHeap.cpp" />
     <ClCompile Include="src\d3d12\D3D12MonotonicDescriptorHeap.cpp" />
+    <ClCompile Include="src\d3d12\D3D12GraphicsPipelineState.cpp" />
     <ClCompile Include="src\d3d12\D3D12Texture.cpp" />
+    <ClCompile Include="src\d3d12\D3D12GraphicsShader.cpp" />
     <ClCompile Include="src\FreeBlockTracker.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\RenderScene.cpp" />
@@ -38,9 +40,11 @@
     <ClInclude Include="src\d3d12\D3D12Context.h" />
     <ClInclude Include="src\d3d12\D3D12FixedDescriptorHeap.h" />
     <ClInclude Include="src\d3d12\D3D12MonotonicDescriptorHeap.h" />
+    <ClInclude Include="src\d3d12\D3D12GraphicsPipelineState.h" />
     <ClInclude Include="src\d3d12\D3D12Strings.h" />
     <ClInclude Include="src\d3d12\D3D12Texture.h" />
     <ClInclude Include="src\d3d12\D3D12FrameCodes.h" />
+    <ClInclude Include="src\d3d12\D3D12GraphicsShader.h" />
     <ClInclude Include="src\FreeBlockTracker.h" />
     <ClInclude Include="src\RenderDefs.h" />
     <ClInclude Include="src\RenderScene.h" />
@@ -152,7 +156,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;d3dcompiler.lib;gpufmt.lib;cputex.lib;dxguid.lib;SDL2maind.lib;%(AdditionalDependencies);</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;gpufmt.lib;cputex.lib;dxguid.lib;SDL2maind.lib;%(AdditionalDependencies);</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
       <AdditionalLibraryDirectories>$(SolutionDir)intermediate\$(Platform)\$(Configuration)\gpufmt\;$(SolutionDir)intermediate\$(Platform)\$(Configuration)\cputex\;</AdditionalLibraryDirectories>
@@ -178,7 +182,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;d3dcompiler.lib;gpufmt.lib;cputex.lib;SDL2main.lib;%(AdditionalDependencies);</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;gpufmt.lib;cputex.lib;SDL2main.lib;%(AdditionalDependencies);</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)intermediate\$(Platform)\$(Configuration)\gpufmt\;$(SolutionDir)intermediate\$(Platform)\$(Configuration)\cputex\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Manifest>
@@ -198,7 +202,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;d3dcompiler.lib;gpufmt.lib;cputex.lib;dxguid.lib;SDL2maind.lib;%(AdditionalDependencies);</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;gpufmt.lib;cputex.lib;dxguid.lib;SDL2maind.lib;%(AdditionalDependencies);</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
       <AdditionalLibraryDirectories>$(SolutionDir)intermediate\$(Platform)\$(Configuration)\gpufmt\;$(SolutionDir)intermediate\$(Platform)\$(Configuration)\cputex\;</AdditionalLibraryDirectories>
@@ -224,7 +228,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;d3dcompiler.lib;gpufmt.lib;cputex.lib;SDL2main.lib;%(AdditionalDependencies);</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;gpufmt.lib;cputex.lib;SDL2main.lib;%(AdditionalDependencies);</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)intermediate\$(Platform)\$(Configuration)\gpufmt\;$(SolutionDir)intermediate\$(Platform)\$(Configuration)\cputex\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Manifest>

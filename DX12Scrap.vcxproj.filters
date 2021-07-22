@@ -37,8 +37,14 @@
     <ClCompile Include="src\d3d12\D3D12Texture.cpp">
       <Filter>Source Files\d3d12</Filter>
     </ClCompile>
+    <ClCompile Include="src\d3d12\D3D12GraphicsShader.cpp">
+      <Filter>Source Files\d3d12</Filter>
+    </ClCompile>
+    <ClCompile Include="src\d3d12\D3D12GraphicsPipelineState.cpp">
+      <Filter>Source Files\d3d12</Filter>
+    </ClCompile>
     <ClCompile Include="src\d3d12\D3D12CopyContext.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\d3d12</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -84,8 +90,14 @@
     <ClInclude Include="src\d3d12\D3D12FrameCodes.h">
       <Filter>Source Files\d3d12</Filter>
     </ClInclude>
+    <ClInclude Include="src\d3d12\D3D12GraphicsShader.h">
+      <Filter>Source Files\d3d12</Filter>
+    </ClInclude>
     <ClInclude Include="src\RenderDefs.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\d3d12\D3D12GraphicsPipelineState.h">
+      <Filter>Source Files\d3d12</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

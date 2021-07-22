@@ -14,8 +14,6 @@
 
 #include <wrl/client.h>
 
-struct ID3D12Device;
-struct ID3D12PipelineState;
 struct ID3D12RootSignature;
 
 namespace scrap
@@ -23,6 +21,7 @@ namespace scrap
 namespace d3d12
 {
 class DeviceContext;
+class GraphicsPipelineState;
 }
 
 class RenderScene
@@ -36,10 +35,10 @@ public:
     bool initialized() { return mInitialized; }
 
 private:
-    bool loadShaders(ID3D12Device* device);
+    bool loadShaders();
 
     Microsoft::WRL::ComPtr<ID3D12RootSignature> mRootSignature;
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> mPso;
+    std::shared_ptr<d3d12::GraphicsPipelineState> mPso;
 
     std::array<Microsoft::WRL::ComPtr<ID3D12CommandAllocator>, d3d12::kFrameBufferCount> mCommandAllocators;
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> mCommandList;
