@@ -2,8 +2,10 @@
 
 #include "Utility.h"
 
+#include <string>
 #include <string_view>
 
+#include <fmt/format.h>
 #include <tl/expected.hpp>
 #include <wrl/client.h>
 
@@ -37,12 +39,92 @@ public:
     std::wstring getLatestWinPixGpuCapturerPath();
     bool loadWinPixDll();
 
+    template<class... Args>
+    void beginGpuEvent(ID3D12GraphicsCommandList* commandList, std::string_view format, Args&&... args)
+    {
+#ifdef _DEBUG
+        fmt::format_to(std::back_inserter(tStringBuffer), format, std::forward(args)...);
+        beginGpuEvent(commandList, tStringBuffer);
+        tStringBuffer.clear();
+#endif
+    }
+
+    template<class... Args>
+    void beginGpuEvent(ID3D12GraphicsCommandList* commandList, std::wstring_view format, Args&&... args)
+    {
+#ifdef _DEBUG
+        fmt::format_to(std::back_inserter(tWStringBuffer), format, std::forward(args)...);
+        beginGpuEvent(commandList, tWStringBuffer);
+        tWStringBuffer.clear();
+#endif
+    }
+
+    template<class... Args>
+    void beginGpuEvent(ID3D12CommandQueue* commandQueue, std::string_view format, Args&&... args)
+    {
+#ifdef _DEBUG
+        fmt::format_to(std::back_inserter(tStringBuffer), format, std::forward<Args>(args)...);
+        beginGpuEvent(commandQueue, tStringBuffer);
+        tStringBuffer.clear();
+#endif
+    }
+
+    template<class... Args>
+    void beginGpuEvent(ID3D12CommandQueue* commandQueue, std::wstring_view format, Args&&... args)
+    {
+#ifdef _DEBUG
+        fmt::format_to(std::back_inserter(tWStringBuffer), format, std::forward(args)...);
+        beginGpuEvent(commandQueue, tWStringBuffer);
+        tWStringBuffer.clear();
+#endif
+    }
+
     void beginGpuEvent(ID3D12GraphicsCommandList* commandList, std::string_view label);
     void beginGpuEvent(ID3D12GraphicsCommandList* commandList, std::wstring_view label);
     void beginGpuEvent(ID3D12CommandQueue* commandQueue, std::string_view label);
     void beginGpuEvent(ID3D12CommandQueue* commandQueue, std::wstring_view label);
     void endGpuEvent(ID3D12GraphicsCommandList* commandList);
     void endGpuEvent(ID3D12CommandQueue* commandQueue);
+
+    template<class... Args>
+    void setGpuMarker(ID3D12GraphicsCommandList* commandList, std::string_view format, Args&&... args)
+    {
+#ifdef _DEBUG
+        fmt::format_to(std::back_inserter(tStringBuffer), format, std::forward(args)...);
+        setGpuMarker(commandList, tStringBuffer);
+        tStringBuffer.clear();
+#endif
+    }
+
+    template<class... Args>
+    void setGpuMarker(ID3D12GraphicsCommandList* commandList, std::wstring_view format, Args&&... args)
+    {
+#ifdef _DEBUG
+        fmt::format_to(std::back_inserter(tWStringBuffer), format, std::forward(args)...);
+        setGpuMarker(commandList, tWStringBuffer);
+        tWStringBuffer.clear();
+#endif
+    }
+
+    template<class... Args>
+    void setGpuMarker(ID3D12CommandQueue* commandQueue, std::string_view format, Args&&... args)
+    {
+#ifdef _DEBUG
+        fmt::format_to(std::back_inserter(tStringBuffer), format, std::forward(args)...);
+        setGpuMarker(commandQueue, tStringBuffer);
+        tStringBuffer.clear();
+#endif
+    }
+
+    template<class... Args>
+    void setGpuMarker(ID3D12CommandQueue* commandQueue, std::wstring_view format, Args&&... args)
+    {
+#ifdef _DEBUG
+        fmt::format_to(std::back_inserter(tWStringBuffer), format, std::forward(args)...);
+        setGpuMarker(commandQueue, tWStringBuffer);
+        tWStringBuffer.clear();
+#endif
+    }
 
     void setGpuMarker(ID3D12GraphicsCommandList* commandList, std::string_view label);
     void setGpuMarker(ID3D12GraphicsCommandList* commandList, std::wstring_view label);
@@ -59,6 +141,8 @@ private:
 #ifdef _DEBUG
     Microsoft::WRL::ComPtr<ID3D12Device> mDevice;
     Microsoft::WRL::ComPtr<IDXGraphicsAnalysis> mGraphicsAnalysis;
+    thread_local static std::string tStringBuffer;
+    thread_local static std::wstring tWStringBuffer;
 #endif
     bool mIsPixAttached = false;
 };

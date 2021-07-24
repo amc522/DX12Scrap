@@ -276,6 +276,8 @@ D3D12_CPU_DESCRIPTOR_HANDLE DeviceContext::getBackBufferRtv() const
 
 void DeviceContext::beginFrame()
 {
+    mDebug.beginGpuEvent(mCommandQueue.Get(), "Render Frame {}", (uint64_t)mFenceValues[mFrameIndex]);
+
     mCbvSrvUavHeap->uploadPendingDescriptors(*this);
 
     mFutures.erase(std::remove_if(mFutures.begin(), mFutures.end(),
@@ -333,6 +335,8 @@ void DeviceContext::endFrame()
                                               }),
                                mPendingFreeList.end());
     }
+
+    mDebug.endGpuEvent(mCommandQueue.Get());
 }
 
 void DeviceContext::waitForGpu()

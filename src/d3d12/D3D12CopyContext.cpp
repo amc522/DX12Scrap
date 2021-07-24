@@ -1,6 +1,7 @@
 #include "d3d12/D3D12CopyContext.h"
 
 #include "d3d12/D3D12Context.h"
+#include "d3d12/D3D12Debug.h"
 
 #include <d3d12.h>
 #include <spdlog/spdlog.h>
@@ -88,6 +89,8 @@ void CopyContext::trackCopyResource(Microsoft::WRL::ComPtr<ID3D12Resource> sourc
 
 void CopyContext::beginCopyFrame()
 {
+    Debug::instance().beginGpuEvent(mCopyQueue.Get(), "Copy Frame {}", (uint64_t)mFenceValues[mFrameIndex]);
+
     ID3D12CommandAllocator* currentCommandAllocator = mCommandAllocators[mFrameIndex].Get();
     currentCommandAllocator->Reset();
     mCommandList->Reset(currentCommandAllocator, nullptr);
@@ -120,6 +123,8 @@ void CopyContext::endCopyFrame()
                                                return pendingResource.copyFrameCode <= mLastCompletedFrameCode;
                                            }),
                             mPendingResources.end());
+
+    Debug::instance().endGpuEvent(mCopyQueue.Get());
 }
 
 void CopyContext::waitOnGpu()

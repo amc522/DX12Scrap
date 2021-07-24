@@ -1,6 +1,7 @@
 #include "RenderScene.h"
 
 #include "d3d12/D3D12Context.h"
+#include "d3d12/D3D12Debug.h"
 #include "d3d12/D3D12GraphicsPipelineState.h"
 #include "d3d12/D3D12GraphicsShader.h"
 #include "d3d12/D3D12Texture.h"
@@ -259,55 +260,59 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
         return;
     }
 
-    D3D12_VIEWPORT viewport{};
-    viewport.TopLeftX = 0.0f;
-    viewport.TopLeftY = 0.0f;
-    viewport.Width = static_cast<float>(d3d12Context.frameSize().x);
-    viewport.Height = static_cast<float>(d3d12Context.frameSize().y);
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
-
-    D3D12_RECT scissorRect{static_cast<LONG>(viewport.TopLeftX), static_cast<LONG>(viewport.TopLeftY),
-                           static_cast<LONG>(viewport.Width), static_cast<LONG>(viewport.Height)};
-
-    // Set necessary state.
-    mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
-
-    std::array<ID3D12DescriptorHeap*, 1> descriptorHeaps = {d3d12Context.getCbvSrvUavHeap().getGpuDescriptorHeap()};
-    mCommandList->SetDescriptorHeaps((UINT)descriptorHeaps.size(), descriptorHeaps.data());
-    mCommandList->SetGraphicsRootDescriptorTable(
-        0, d3d12Context.getCbvSrvUavHeap().getGpuDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
-
-    mCommandList->RSSetViewports(1, &viewport);
-    mCommandList->RSSetScissorRects(1, &scissorRect);
-
-    // Indicate that the back buffer will be used as a render target.
-    D3D12_RESOURCE_BARRIER renderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        d3d12Context.getBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-    mCommandList->ResourceBarrier(1, &renderTargetBarrier);
-
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = d3d12Context.getBackBufferRtv();
-    mCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-
-    // Record commands.
-    const float clearColor[] = {0.0f, 0.2f, 0.4f, 1.0f};
-    mCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-
-    if(mPso->isReady() && mTexture->isReady())
     {
-        mPso->markAsUsed();
-        mTexture->markAsUsed();
-        mCommandList->SetPipelineState(mPso->getPipelineState());
-        mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        mCommandList->DrawInstanced(3, 1, 0, 0);
+        d3d12::ScopedGpuEvent gpuEvent(mCommandList.Get(), "RenderScene");
+
+        D3D12_VIEWPORT viewport{};
+        viewport.TopLeftX = 0.0f;
+        viewport.TopLeftY = 0.0f;
+        viewport.Width = static_cast<float>(d3d12Context.frameSize().x);
+        viewport.Height = static_cast<float>(d3d12Context.frameSize().y);
+        viewport.MinDepth = 0.0f;
+        viewport.MaxDepth = 1.0f;
+
+        D3D12_RECT scissorRect{static_cast<LONG>(viewport.TopLeftX), static_cast<LONG>(viewport.TopLeftY),
+                               static_cast<LONG>(viewport.Width), static_cast<LONG>(viewport.Height)};
+
+        // Set necessary state.
+        mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
+
+        std::array<ID3D12DescriptorHeap*, 1> descriptorHeaps = {d3d12Context.getCbvSrvUavHeap().getGpuDescriptorHeap()};
+        mCommandList->SetDescriptorHeaps((UINT)descriptorHeaps.size(), descriptorHeaps.data());
+        mCommandList->SetGraphicsRootDescriptorTable(
+            0, d3d12Context.getCbvSrvUavHeap().getGpuDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
+
+        mCommandList->RSSetViewports(1, &viewport);
+        mCommandList->RSSetScissorRects(1, &scissorRect);
+
+        // Indicate that the back buffer will be used as a render target.
+        D3D12_RESOURCE_BARRIER renderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+            d3d12Context.getBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+        mCommandList->ResourceBarrier(1, &renderTargetBarrier);
+
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = d3d12Context.getBackBufferRtv();
+        mCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+        // Record commands.
+        const float clearColor[] = {0.0f, 0.2f, 0.4f, 1.0f};
+        mCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+
+        if(mPso->isReady() && mTexture->isReady())
+        {
+            mPso->markAsUsed();
+            mTexture->markAsUsed();
+            mCommandList->SetPipelineState(mPso->getPipelineState());
+            mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            mCommandList->DrawInstanced(3, 1, 0, 0);
+        }
+
+        // Indicate that the back buffer will now be used to present.
+        renderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+            d3d12Context.getBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+
+        mCommandList->ResourceBarrier(1, &renderTargetBarrier);
     }
-
-    // Indicate that the back buffer will now be used to present.
-    renderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        d3d12Context.getBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-
-    mCommandList->ResourceBarrier(1, &renderTargetBarrier);
 
     if(FAILED(mCommandList->Close()))
     {

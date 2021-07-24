@@ -33,6 +33,9 @@ Debug::Debug()
 }
 
 #ifdef _DEBUG
+thread_local std::string Debug::tStringBuffer;
+thread_local std::wstring Debug::tWStringBuffer;
+
 Debug::~Debug()
 {
     assert(sInstance != nullptr);
