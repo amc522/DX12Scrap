@@ -7,6 +7,7 @@
 #include "RenderDefs.h"
 #include "d3d12/D3D12Config.h"
 #include "d3d12/D3D12CopyContext.h"
+#include "d3d12/D3D12Debug.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
 #include "d3d12/D3D12FrameCodes.h"
 #include "d3d12/D3D12MonotonicDescriptorHeap.h"
@@ -99,6 +100,10 @@ public:
 private:
     void getHardwareAdapter(GpuPreference gpuPreference, D3D_FEATURE_LEVEL featureLevel, IDXGIFactory4* dxgiFactory);
     HRESULT createDevice(D3D_FEATURE_LEVEL featureLevel);
+
+    // Debug needs to be the first member so it's the last one destroyed. Debug checks to see what
+    // d3d12 and dxgi objects are still live on destruction.
+    Debug mDebug;
 
     Microsoft::WRL::ComPtr<IDXGIAdapter4> mAdapter;
     Microsoft::WRL::ComPtr<ID3D12Device> mDevice;

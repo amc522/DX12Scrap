@@ -1,7 +1,11 @@
 #include "D3D12Context.h"
 
+#include "D3D12Debug.h"
 #include "D3D12Strings.h"
 #include "Window.h"
+#include "d3d12/D3D12GraphicsPipelineState.h"
+
+#include <chrono>
 
 #include <d3d12.h>
 #include <d3dx12.h>
@@ -9,13 +13,6 @@
 #include <dxgi1_3.h>
 #include <dxgi1_4.h>
 #include <dxgi1_6.h>
-#ifdef _DEBUG
-#    include <dxgidebug.h>
-#endif
-#include "d3d12/D3D12GraphicsPipelineState.h"
-
-#include <chrono>
-
 #include <spdlog/spdlog.h>
 
 // These exports are needed for the DX12 Agility SDK. The agility sdk is a portable dx12 binary to be shipped with the
@@ -65,22 +62,7 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
 
     spdlog::info("Initializing D3D12");
 
-#ifdef _DEBUG
-    // Always enable the debug layer before doing anything DX12 related
-    // so all possible errors generated while creating DX12 objects
-    // are caught by the debug layer.
-    Microsoft::WRL::ComPtr<ID3D12Debug> debugInterface;
-
-    if(SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface))))
-    {
-        debugInterface->EnableDebugLayer();
-        spdlog::info("Enabled the d3d12 debug layer");
-    }
-    else
-    {
-        spdlog::error("Failed to enable the d3d12 debug layer.");
-    }
-#endif
+    mDebug.init(DebugOptions::None);
 
     ComPtr<IDXGIFactory4> dxgiFactory4;
     UINT createFactoryFlags = 0;
@@ -94,18 +76,6 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
         return;
     }
 
-#ifdef _DEBUG
-    // https://docs.microsoft.com/en-us/windows/win32/api/dxgidebug/nn-dxgidebug-idxgiinfoqueue
-    ComPtr<IDXGIInfoQueue> dxgiInfoQueue;
-
-    // https://docs.microsoft.com/en-us/windows/win32/api/dxgi1_3/nf-dxgi1_3-dxgigetdebuginterface1
-    if(SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiInfoQueue))))
-    {
-        dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, TRUE);
-        dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, TRUE);
-    }
-#endif
-
     // Feature level documentation
     // https://docs.microsoft.com/en-us/windows/win32/direct3d12/hardware-feature-levels
     constexpr D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
@@ -113,6 +83,8 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
     getHardwareAdapter(gpuPreference, featureLevel, dxgiFactory4.Get());
 
     if(FAILED(createDevice(featureLevel))) { return; }
+
+    mDebug.setDevice(mDevice);
 
     { // check for hlsl dynamic resources support
         // https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html
@@ -137,37 +109,6 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
             // return;
         }
     }
-
-#ifdef _DEBUG
-    // https://docs.microsoft.com/en-us/windows/win32/api/d3d12sdklayers/nn-d3d12sdklayers-id3d12infoqueue
-    ComPtr<ID3D12InfoQueue> pInfoQueue;
-    if(SUCCEEDED(mDevice.As(&pInfoQueue)))
-    {
-        pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
-        pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
-        // pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, TRUE);
-
-        // Suppress whole categories of messages
-        // D3D12_MESSAGE_CATEGORY categories[] = {};
-
-        // Suppress messages based on their severity level
-        // D3D12_MESSAGE_SEVERITY severities[] = {};
-
-        // Suppress individual messages by their ID
-        // D3D12_MESSAGE_ID denyIds[] = {};
-
-        // D3D12_INFO_QUEUE_FILTER newFilter = {};
-        // newFilter.DenyList.NumCategories = _countof(categories);
-        // newFilter.DenyList.pCategoryList = categories;
-        // newFilter.DenyList.NumSeverities = _countof(severities);
-        // newFilter.DenyList.pSeverityList = severities;
-        // newFilter.DenyList.NumIDs = _countof(denyIds);
-        // newFilter.DenyList.pIDList = denyIds;
-
-        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12sdklayers/nf-d3d12sdklayers-id3d12infoqueue-pushstoragefilter
-        // pInfoQueue->PushStorageFilter(&newFilter);
-    }
-#endif
 
     { // create command queue
         D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
@@ -313,70 +254,6 @@ DeviceContext::~DeviceContext()
 
     assert(sInstance != nullptr);
     sInstance = nullptr;
-
-#ifdef _DEBUG
-    if(mDevice != nullptr)
-    {
-        mCopyContext.reset();
-        mFence.Reset();
-        mCommandQueue.Reset();
-        mRenderTargets.fill(nullptr);
-        mRtvHeap = {};
-        mCbvSrvUavHeap.reset();
-        mSwapChain.Reset();
-
-        { // Check for d3d12 object leaks
-            ComPtr<ID3D12DebugDevice> debugDevice;
-            if(SUCCEEDED(mDevice->QueryInterface(IID_PPV_ARGS(&debugDevice))))
-            {
-                mDevice.Reset();
-                mDevice1.Reset();
-                mDevice2.Reset();
-                mDevice3.Reset();
-                mDevice4.Reset();
-                mDevice5.Reset();
-                mDevice6.Reset();
-
-                spdlog::info("ID3D12DebugDevice::ReportLiveDeviceObjects");
-
-                // https://docs.microsoft.com/en-us/windows/win32/api/d3d12sdklayers/nf-d3d12sdklayers-id3d12debugdevice-reportlivedeviceobjects
-                if(FAILED(debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL)))
-                {
-                    spdlog::error("ReportLiveDeviceObjects failed");
-                }
-
-                // If the output looks like the following, there are no leaks. (1 ref on the device)
-                //
-                // clang-format off
-                // D3D12 WARNING: Live ID3D12Device at 0x0000022ACF4D01A8, Refcount: 1 [ STATE_CREATION WARNING #274: LIVE_DEVICE]
-                // clang-format on
-            }
-        }
-
-        mDevice.Reset();
-        mDevice1.Reset();
-        mDevice2.Reset();
-        mDevice3.Reset();
-        mDevice4.Reset();
-        mDevice5.Reset();
-        mDevice6.Reset();
-
-        mAdapter.Reset();
-
-        { // Check for dxgi and d3d12 object leaks
-            ComPtr<IDXGIDebug1> dxgiDebug;
-            // https://docs.microsoft.com/en-us/windows/win32/api/dxgi1_3/nf-dxgi1_3-dxgigetdebuginterface1
-            if(SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiDebug))))
-            {
-                spdlog::info("IDXGIDebug1::ReportLiveObjects");
-
-                // https://docs.microsoft.com/en-us/windows/win32/api/dxgidebug/nf-dxgidebug-idxgidebug-reportliveobjects
-                HRESULT hr = dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL));
-                if(FAILED(hr)) { spdlog::error("ReportLiveObjects failed"); }
-            }
-        }
-    }
-#endif
 }
 
 constexpr DXGI_GPU_PREFERENCE GetDxgiGpuPreference(GpuPreference gpuPreference)

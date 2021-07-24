@@ -46,6 +46,9 @@
     <ClCompile Include="src\d3d12\D3D12CopyContext.cpp">
       <Filter>Source Files\d3d12</Filter>
     </ClCompile>
+    <ClCompile Include="src\d3d12\D3D12Debug.cpp">
+      <Filter>Source Files\d3d12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application.h">
@@ -97,6 +100,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="src\d3d12\D3D12GraphicsPipelineState.h">
+      <Filter>Source Files\d3d12</Filter>
+    </ClInclude>
+    <ClInclude Include="src\d3d12\D3D12Debug.h">
       <Filter>Source Files\d3d12</Filter>
     </ClInclude>
   </ItemGroup>
