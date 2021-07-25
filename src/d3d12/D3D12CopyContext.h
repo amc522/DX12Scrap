@@ -49,11 +49,12 @@ private:
     {
         PendingResource(Microsoft::WRL::ComPtr<ID3D12Resource>&& source,
                         Microsoft::WRL::ComPtr<ID3D12Resource>&& dest,
-                        CopyFrameCode frameCode)
-            : sourceResource(std::move(source))
-            , destResource(std::move(dest))
-            , copyFrameCode(frameCode)
-        {}
+                        CopyFrameCode frameCode);
+        PendingResource(const PendingResource&) = delete;
+        PendingResource(PendingResource&&);
+        ~PendingResource();
+
+        PendingResource& operator=(PendingResource &&);
 
         Microsoft::WRL::ComPtr<ID3D12Resource> sourceResource;
         Microsoft::WRL::ComPtr<ID3D12Resource> destResource;

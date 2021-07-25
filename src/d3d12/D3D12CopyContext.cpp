@@ -148,4 +148,17 @@ void CopyContext::waitOnGpu()
 
     WaitForSingleObject(mFenceEvent, INFINITE);
 }
+
+CopyContext::PendingResource::PendingResource(Microsoft::WRL::ComPtr<ID3D12Resource>&& source,
+                                              Microsoft::WRL::ComPtr<ID3D12Resource>&& dest,
+                                              CopyFrameCode frameCode)
+    : sourceResource(std::move(source))
+    , destResource(std::move(dest))
+    , copyFrameCode(frameCode)
+{}
+
+CopyContext::PendingResource::PendingResource(PendingResource&&) = default;
+
+CopyContext::PendingResource::~PendingResource() = default;
+CopyContext::PendingResource& CopyContext::PendingResource::operator=(PendingResource&&) = default;
 } // namespace scrap::d3d12

@@ -56,7 +56,12 @@ public:
     static DeviceContext& instance() { return *sInstance; }
 
     DeviceContext(const Window& window, GpuPreference gpuPreference);
+    DeviceContext(const DeviceContext&) = delete;
+    DeviceContext(DeviceContext&&) = delete;
     ~DeviceContext();
+
+    DeviceContext& operator=(const DeviceContext&) = delete;
+    DeviceContext& operator=(DeviceContext&&) = delete;
 
     bool initialized() const { return mInitialized; }
 
@@ -134,11 +139,14 @@ private:
     {
         PendingFreeObject(Microsoft::WRL::ComPtr<ID3D12DeviceChild>&& resource_,
                           FixedDescriptorHeapReservation&& descriptors_,
-                          RenderFrameCode lastUsedFrameCode_)
-            : resource(std::move(resource_))
-            , descriptors(std::move(descriptors_))
-            , lastUsedFrameCode(lastUsedFrameCode_)
-        {}
+                          RenderFrameCode lastUsedFrameCode_);
+
+        PendingFreeObject(const PendingFreeObject&) = delete;
+        PendingFreeObject(PendingFreeObject&&);
+        ~PendingFreeObject();
+
+        PendingFreeObject& operator=(const PendingFreeObject&) = delete;
+        PendingFreeObject& operator=(PendingFreeObject&&);
 
         Microsoft::WRL::ComPtr<ID3D12DeviceChild> resource;
         FixedDescriptorHeapReservation descriptors;

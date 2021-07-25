@@ -8,9 +8,10 @@
 #include <array>
 
 #include <cputex/unique_texture.h>
-#include <d3d12.h>
 #include <tl/expected.hpp>
 #include <wrl/client.h>
+
+struct ID3D12Resource;
 
 namespace scrap::d3d12
 {
@@ -42,7 +43,7 @@ public:
 
     Texture() = default;
     Texture(const Texture&) = delete;
-    Texture(Texture&&) = default;
+    Texture(Texture&&) = delete;
     ~Texture();
 
     Texture& operator=(const Texture&) = delete;
@@ -56,8 +57,8 @@ public:
 
     ID3D12Resource* getResource() const { return mResource.Get(); }
 
-    D3D12_CPU_DESCRIPTOR_HANDLE getSrvCpu() const { return mDescriptorHeapReservation.getCpuHandle(mSrvIndex); }
-    D3D12_GPU_DESCRIPTOR_HANDLE getSrvGpu() const { return mDescriptorHeapReservation.getGpuHandle(mSrvIndex); }
+    D3D12_CPU_DESCRIPTOR_HANDLE getSrvCpu() const;
+    D3D12_GPU_DESCRIPTOR_HANDLE getSrvGpu() const;
 
     bool isReady() const;
 

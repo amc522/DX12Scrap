@@ -67,6 +67,16 @@ std::optional<Texture::Error> Texture::initFromMemory(DeviceContext& context,
     return init(context, params, &texture);
 }
 
+D3D12_CPU_DESCRIPTOR_HANDLE Texture::getSrvCpu() const
+{
+    return mDescriptorHeapReservation.getCpuHandle(mSrvIndex);
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE Texture::getSrvGpu() const
+{
+    return mDescriptorHeapReservation.getGpuHandle(mSrvIndex);
+}
+
 bool Texture::isReady() const
 {
     return mResource != nullptr && mUploadFrameCode <= DeviceContext::instance().getCopyContext().getLastCompletedFrameCode();

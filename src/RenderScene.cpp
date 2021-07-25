@@ -210,6 +210,10 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
     mInitialized = true;
 }
 
+RenderScene::RenderScene(RenderScene&&) = default;
+
+RenderScene::~RenderScene() = default;
+
 bool RenderScene::loadShaders()
 {
     d3d12::GraphicsShaderParams shaderParams;
@@ -237,6 +241,8 @@ bool RenderScene::loadShaders()
 
     return true;
 }
+
+RenderScene& RenderScene::operator=(RenderScene&&) = default;
 
 void RenderScene::render(d3d12::DeviceContext& d3d12Context)
 {

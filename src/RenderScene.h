@@ -7,13 +7,14 @@
 
 #include "d3d12/D3D12Config.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
-#include "d3d12/D3D12Texture.h"
 
 #include <array>
 #include <cstdint>
 
 #include <wrl/client.h>
 
+struct ID3D12CommandAllocator;
+struct ID3D12GraphicsCommandList;
 struct ID3D12RootSignature;
 
 namespace scrap
@@ -22,13 +23,19 @@ namespace d3d12
 {
 class DeviceContext;
 class GraphicsPipelineState;
+class Texture;
 }
 
 class RenderScene
 {
 public:
     RenderScene(d3d12::DeviceContext& d3d12Context);
-    ~RenderScene() = default;
+    RenderScene(const RenderScene&) = delete;
+    RenderScene(RenderScene&&);
+    ~RenderScene();
+
+    RenderScene& operator=(const RenderScene&) = delete;
+    RenderScene& operator=(RenderScene&&);
 
     void render(d3d12::DeviceContext& d3d12Context);
 

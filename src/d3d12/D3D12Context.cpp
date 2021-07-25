@@ -524,5 +524,18 @@ HRESULT DeviceContext::createDevice(D3D_FEATURE_LEVEL featureLevel)
 
     return S_OK;
 }
+DeviceContext::PendingFreeObject::PendingFreeObject(Microsoft::WRL::ComPtr<ID3D12DeviceChild>&& resource_,
+                                                    FixedDescriptorHeapReservation&& descriptors_,
+                                                    RenderFrameCode lastUsedFrameCode_)
+    : resource(std::move(resource_))
+    , descriptors(std::move(descriptors_))
+    , lastUsedFrameCode(lastUsedFrameCode_)
+{}
+
+DeviceContext::PendingFreeObject::PendingFreeObject(PendingFreeObject&&) = default;
+
+DeviceContext::PendingFreeObject::~PendingFreeObject() = default;
+
+DeviceContext::PendingFreeObject& DeviceContext::PendingFreeObject::operator=(PendingFreeObject&&) = default;
 } // namespace d3d12
 } // namespace scrap
