@@ -73,6 +73,16 @@ inline GraphicsShaderStageMask GraphicsShaderStageToMask(GraphicsShaderStage sta
     default: return GraphicsShaderStageMask::None;
     }
 }
+
+enum class ResourceAccessFlags
+{
+    CpuRead = 1 << 0,
+    CpuWrite = 1 << 1,
+    GpuRead = 1 << 2,
+    GpuWrite = 1 << 3,
+};
+DEFINE_ENUM_BITWISE_OPERATORS(ResourceAccessFlags);
+
 } // namespace scrap
 
 template<>

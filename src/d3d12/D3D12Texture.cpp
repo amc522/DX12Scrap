@@ -53,7 +53,7 @@ std::optional<Texture::Error> Texture::initUninitialized(DeviceContext& context,
 
 std::optional<Texture::Error> Texture::initFromMemory(DeviceContext& context,
                                                       const cputex::TextureView& texture,
-                                                      AccessFlags accessFlags,
+                                                      ResourceAccessFlags accessFlags,
                                                       std::string_view name)
 {
     Params params;
@@ -119,11 +119,11 @@ Texture::init(DeviceContext& context, const Params& params, const cputex::Textur
     textureDesc.SampleDesc.Quality = 0;
     textureDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
-    if((params.accessFlags & AccessFlags::GpuRead) != AccessFlags::GpuRead)
+    if((params.accessFlags & ResourceAccessFlags::GpuRead) != ResourceAccessFlags::GpuRead)
     {
         textureDesc.Flags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
     }
-    if((params.accessFlags & AccessFlags::GpuWrite) == AccessFlags::GpuWrite)
+    if((params.accessFlags & ResourceAccessFlags::GpuWrite) == ResourceAccessFlags::GpuWrite)
     {
         textureDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
     }

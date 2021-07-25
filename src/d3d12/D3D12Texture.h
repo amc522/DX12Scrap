@@ -1,5 +1,6 @@
 #pragma once
 
+#include "RenderDefs.h"
 #include "Utility.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
 #include "d3d12/D3D12FrameCodes.h"
@@ -28,14 +29,6 @@ public:
         InsufficientDescriptorHeapSpace,
     };
 
-    enum class AccessFlags
-    {
-        CpuRead = 1 << 0,
-        CpuWrite = 1 << 1,
-        GpuRead = 1 << 2,
-        GpuWrite = 1 << 3,
-    };
-
     struct Params
     {
         cputex::TextureDimension dimension;
@@ -43,7 +36,7 @@ public:
         cputex::Extent extents;
         uint32_t arraySize;
         uint8_t mipCount;
-        AccessFlags accessFlags;
+        ResourceAccessFlags accessFlags;
         std::string_view name;
     };
 
@@ -52,13 +45,13 @@ public:
     Texture(Texture&&) = default;
     ~Texture();
 
-    Texture& operator=(const Texture &) = delete;
-    Texture& operator=(Texture &&) = delete;
+    Texture& operator=(const Texture&) = delete;
+    Texture& operator=(Texture&&) = delete;
 
     std::optional<Error> initUninitialized(DeviceContext& context, const Params& params);
     std::optional<Error> initFromMemory(DeviceContext& context,
                                         const cputex::TextureView& texture,
-                                        AccessFlags accessFlags,
+                                        ResourceAccessFlags accessFlags,
                                         std::string_view name);
 
     ID3D12Resource* getResource() const { return mResource.Get(); }
@@ -90,7 +83,5 @@ private:
     CopyFrameCode mUploadFrameCode;
     RenderFrameCode mLastUsedFrameCode;
 };
-
-DEFINE_ENUM_BITWISE_OPERATORS(Texture::AccessFlags);
 
 } // namespace scrap::d3d12

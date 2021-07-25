@@ -191,7 +191,7 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
     }
 
     auto texture = std::make_unique<d3d12::Texture>();
-    texture->initFromMemory(d3d12Context, cpuTexture, d3d12::Texture::AccessFlags::GpuRead, "Firsrt Texture");
+    texture->initFromMemory(d3d12Context, cpuTexture, ResourceAccessFlags::GpuRead, "Firsrt Texture");
     mTexture = std::move(texture);
 
     if(FAILED(mCommandList->Close())) { spdlog::error("Failed to close graphics command list"); }
