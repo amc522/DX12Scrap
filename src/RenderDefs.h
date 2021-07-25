@@ -80,6 +80,7 @@ enum class ResourceAccessFlags
     CpuWrite = 1 << 1,
     GpuRead = 1 << 2,
     GpuWrite = 1 << 3,
+    GpuRW = GpuRead | GpuWrite,
 };
 DEFINE_ENUM_BITWISE_OPERATORS(ResourceAccessFlags);
 

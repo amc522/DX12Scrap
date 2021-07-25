@@ -54,4 +54,13 @@ std::enable_if_t<std::is_enum_v<EnumT>, EnumT> IncrementEnum(EnumT e)
 {
     return static_cast<EnumT>(ToUnderlying(e) + std::underlying_type_t<EnumT>(1));
 }
+
+template<class... Ts>
+struct Overloaded : Ts...
+{
+    using Ts::operator()...;
+};
+template<class... Ts>
+Overloaded(Ts...) -> Overloaded<Ts...>;
+
 } // namespace scrap
