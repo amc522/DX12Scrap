@@ -3,6 +3,7 @@
 #include <d3d12.h>
 #include <d3dcompiler.h>
 #include <d3dx12.h>
+#include <spdlog/spdlog.h>
 
 using namespace Microsoft::WRL;
 
@@ -89,6 +90,9 @@ void GraphicsShader::create()
             {
                 shaderInfo.compilerMessage =
                     std::string((const char*)error->GetBufferPointer(), error->GetBufferSize());
+
+                spdlog::error("Failed to compile shader '{}':\n{}", mParams.filepaths[(size_t)stage].generic_u8string(),
+                              shaderInfo.compilerMessage);
             }
         }
     }

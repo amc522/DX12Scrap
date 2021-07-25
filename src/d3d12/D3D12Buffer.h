@@ -68,9 +68,9 @@ public:
     Buffer& operator=(const Buffer&) = delete;
     Buffer& operator=(Buffer&&) = delete;
 
-    std::optional<Error> init(const SimpleParams& params, nonstd::span<std::byte> buffer = {});
-    std::optional<Error> init(const FormattedParams& params, nonstd::span<std::byte> buffer = {});
-    std::optional<Error> init(const StructuredParams& params, nonstd::span<std::byte> buffer = {});
+    std::optional<Error> init(const SimpleParams& params, nonstd::span<const std::byte> buffer = {});
+    std::optional<Error> init(const FormattedParams& params, nonstd::span<const std::byte> buffer = {});
+    std::optional<Error> init(const StructuredParams& params, nonstd::span<const std::byte> buffer = {});
 
     ID3D12Resource* getResource() const { return mResource.Get(); }
 
@@ -116,7 +116,7 @@ private:
         Type type;
     };
 
-    std::optional<Error> initInternal(Params params, nonstd::span<std::byte> buffer);
+    std::optional<Error> initInternal(Params params, nonstd::span<const std::byte> buffer);
 
     Params mParams;
     Microsoft::WRL::ComPtr<ID3D12Resource> mResource;

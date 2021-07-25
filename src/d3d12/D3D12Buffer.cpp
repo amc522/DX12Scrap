@@ -9,27 +9,27 @@
 #include <gpufmt/traits.h>
 #include <spdlog/spdlog.h>
 
-#include <ostream>
 using namespace Microsoft::WRL;
 
 namespace scrap::d3d12
 {
 Buffer::~Buffer()
 {
-    DeviceContext::instance().queueResourceForDestruction(std::move(mResource), std::move(mDescriptorHeapReservation), mLastUsedFrameCode);
+    DeviceContext::instance().queueResourceForDestruction(std::move(mResource), std::move(mDescriptorHeapReservation),
+                                                          mLastUsedFrameCode);
 }
 
-std::optional<Buffer::Error> Buffer::init(const SimpleParams& params, nonstd::span<std::byte> buffer)
+std::optional<Buffer::Error> Buffer::init(const SimpleParams& params, nonstd::span<const std::byte> buffer)
 {
     return initInternal(params, buffer);
 }
 
-std::optional<Buffer::Error> Buffer::init(const FormattedParams& params, nonstd::span<std::byte> buffer)
+std::optional<Buffer::Error> Buffer::init(const FormattedParams& params, nonstd::span<const std::byte> buffer)
 {
     return initInternal(params, buffer);
 }
 
-std::optional<Buffer::Error> Buffer::init(const StructuredParams& params, nonstd::span<std::byte> buffer)
+std::optional<Buffer::Error> Buffer::init(const StructuredParams& params, nonstd::span<const std::byte> buffer)
 {
     return initInternal(params, buffer);
 }
@@ -64,13 +64,14 @@ D3D12_INDEX_BUFFER_VIEW Buffer::getIndexView(DXGI_FORMAT format) const
     D3D12_INDEX_BUFFER_VIEW ibv;
     ibv.BufferLocation = mResource->GetGPUVirtualAddress();
     ibv.Format = format;
-    ibv.SizeInBytes = mParams.elementByteSize;
+    ibv.SizeInBytes = mParams.byteSize;
     return ibv;
 }
 
 bool Buffer::isReady() const
 {
-    return mResource != nullptr && mUploadFrameCode <= DeviceContext::instance().getCopyContext().getLastCompletedFrameCode();
+    return mResource != nullptr &&
+           mUploadFrameCode <= DeviceContext::instance().getCopyContext().getLastCompletedFrameCode();
 }
 
 void Buffer::markAsUsed()
@@ -78,7 +79,7 @@ void Buffer::markAsUsed()
     mLastUsedFrameCode = DeviceContext::instance().getCurrentFrameCode();
 }
 
-std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<std::byte> buffer)
+std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<const std::byte> buffer)
 {
     DeviceContext& deviceContext = DeviceContext::instance();
 

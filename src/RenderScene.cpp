@@ -1,5 +1,6 @@
 #include "RenderScene.h"
 
+#include "d3d12/D3D12Buffer.h"
 #include "d3d12/D3D12Context.h"
 #include "d3d12/D3D12Debug.h"
 #include "d3d12/D3D12GraphicsPipelineState.h"
@@ -38,7 +39,7 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         std::array<D3D12_DESCRIPTOR_RANGE1, 1> ranges = {};
         D3D12_DESCRIPTOR_RANGE1& range = ranges[0];
         range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        range.NumDescriptors = 1;
+        range.NumDescriptors = 5;
         range.BaseShaderRegister = 0;
         range.OffsetInDescriptorsFromTableStart = 0;
         range.RegisterSpace = 0;
@@ -52,7 +53,7 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         D3D12_ROOT_PARAMETER1& rootParameter = rootParameters[0];
         rootParameter.DescriptorTable.NumDescriptorRanges = 1;
         rootParameter.DescriptorTable.pDescriptorRanges = ranges.data();
-        rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_static_sampler_desc
         // Static samplers are the same as normal samplers, except that they are not going to change after creating the
@@ -141,6 +142,8 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         spdlog::info("Created d3d12 command list");
     }
 
+    createIndexBuffer();
+    createVertexBuffer();
     createTexture();
 
     if(FAILED(mCommandList->Close())) { spdlog::error("Failed to close graphics command list"); }
@@ -180,6 +183,7 @@ bool RenderScene::loadShaders()
     psoParams.rootSignature = mRootSignature.Get();
     psoParams.shader = std::make_shared<d3d12::GraphicsShader>(std::move(shaderParams));
     psoParams.rasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoParams.rasterizerState.FrontCounterClockwise = true;
     psoParams.blendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     psoParams.depthStencilState.DepthEnable = FALSE;
     psoParams.depthStencilState.StencilEnable = FALSE;
@@ -189,6 +193,70 @@ bool RenderScene::loadShaders()
     mPso = d3d12::DeviceContext::instance().createGraphicsPipelineState(std::move(psoParams));
 
     return true;
+}
+
+void RenderScene::createIndexBuffer()
+{
+    d3d12::Buffer::FormattedParams params;
+    params.format = gpufmt::Format::R16_UINT;
+    params.numElements = 3;
+    params.accessFlags = ResourceAccessFlags::GpuRead;
+    params.name = "Index Buffer";
+
+    std::array<uint16_t, 3> indices{0, 1, 2};
+
+    auto indexBuffer = std::make_unique<d3d12::Buffer>();
+    indexBuffer->init(params, nonstd::as_bytes(nonstd::span(indices)));
+
+    mIndexBuffer = std::move(indexBuffer);
+}
+
+void RenderScene::createVertexBuffer()
+{
+    { // Positions
+        d3d12::Buffer::FormattedParams params;
+        params.format = gpufmt::Format::R32G32_SFLOAT;
+        params.numElements = 3;
+        params.accessFlags = ResourceAccessFlags::GpuRead;
+        params.name = "Triangle Positions Buffer";
+
+        std::array<glm::vec2, 3> vertices{{{-0.5f, -0.5f}, {0.5f, -0.5f}, {0.0f, 0.5f}}};
+
+        auto vertexBuffer = std::make_unique<d3d12::Buffer>();
+        vertexBuffer->init(params, nonstd::as_bytes(nonstd::span(vertices)));
+
+        mMeshBuffers.positions = std::move(vertexBuffer);
+    }
+
+    { // UVs
+        d3d12::Buffer::FormattedParams params;
+        params.format = gpufmt::Format::R32G32_SFLOAT;
+        params.numElements = 3;
+        params.accessFlags = ResourceAccessFlags::GpuRead;
+        params.name = "Triangle TexCoords Buffer";
+
+        std::array<glm::vec2, 3> vertices{{{0.0f, 1.0f}, {1.0f, 1.0f}, {0.5f, 0.0f}}};
+
+        auto vertexBuffer = std::make_unique<d3d12::Buffer>();
+        vertexBuffer->init(params, nonstd::as_bytes(nonstd::span(vertices)));
+
+        mMeshBuffers.texCoords = std::move(vertexBuffer);
+    }
+
+    { // Colors
+        d3d12::Buffer::FormattedParams params;
+        params.format = gpufmt::Format::R32G32B32A32_SFLOAT;
+        params.numElements = 3;
+        params.accessFlags = ResourceAccessFlags::GpuRead;
+        params.name = "Triangle TexCoords Buffer";
+
+        std::array<glm::vec4, 3> vertices{{{1.0f, 0.0, 0.0, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
+
+        auto vertexBuffer = std::make_unique<d3d12::Buffer>();
+        vertexBuffer->init(params, nonstd::as_bytes(nonstd::span(vertices)));
+
+        mMeshBuffers.colors = std::move(vertexBuffer);
+    }
 }
 
 void RenderScene::createTexture()
@@ -309,13 +377,21 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
         const float clearColor[] = {0.0f, 0.2f, 0.4f, 1.0f};
         mCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-        if(mPso->isReady() && mTexture->isReady())
+        if(mPso->isReady() && mIndexBuffer->isReady() && mMeshBuffers.positions->isReady() &&
+           mMeshBuffers.texCoords->isReady() && mMeshBuffers.colors->isReady() && mTexture->isReady())
         {
+            D3D12_INDEX_BUFFER_VIEW ibv = mIndexBuffer->getIndexView();
+
             mPso->markAsUsed();
+            mIndexBuffer->markAsUsed();
+            mMeshBuffers.positions->markAsUsed();
+            mMeshBuffers.texCoords->markAsUsed();
+            mMeshBuffers.colors->markAsUsed();
             mTexture->markAsUsed();
             mCommandList->SetPipelineState(mPso->getPipelineState());
             mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            mCommandList->DrawInstanced(3, 1, 0, 0);
+            mCommandList->IASetIndexBuffer(&ibv);
+            mCommandList->DrawIndexedInstanced(3, 1, 0, 0, 0);
         }
 
         // Indicate that the back buffer will now be used to present.

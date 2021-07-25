@@ -10,36 +10,19 @@ struct VertexOutput
     float4 color : COLOR;
 };
 
-Texture2D<float> gTexture : register(t0);
+Buffer<float2> gVertexPositions : register(t1);
+Buffer<float2> gVertexTexCoords : register(t2);
+Buffer<float4> gVertexColors : register(t3);
+Texture2D<float> gTexture : register(t4);
 SamplerState gSampler : register(s0);
 
 VertexOutput VSMain(VertexInput input)
 {
     VertexOutput output;
 
-    switch(input.vertexId)
-    {
-    case 0:
-        output.clipPos = float4(-0.5, -0.5, 0.0, 1.0);
-        output.uv = float2(0.0, 1.0);
-        output.color = float4(1.0, 0.0, 0.0, 1.0);
-        break;
-    case 1:
-        output.clipPos = float4(0.0, 0.5, 0.0, 1.0);
-        output.uv = float2(0.5, 0.0);
-        output.color = float4(0.0, 1.0, 0.0, 1.0);
-        break;
-    case 2:
-        output.clipPos = float4(0.5, -0.5, 0.0, 1.0);
-        output.uv = float2(1.0, 1.0);
-        output.color = float4(0.0, 0.0, 1.0, 1.0);
-        break;
-    default:
-        output.clipPos = 0.0.xxxx;
-        output.uv = 0.0.xx;
-        output.color = float4(0.0.xxx, 1.0);
-        break;
-    }
+    output.clipPos = float4(gVertexPositions[input.vertexId], 0.0, 1.0);
+    output.uv = gVertexTexCoords[input.vertexId];
+    output.color = gVertexColors[input.vertexId];
 
     return output;
 }

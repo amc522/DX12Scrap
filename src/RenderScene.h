@@ -21,10 +21,11 @@ namespace scrap
 {
 namespace d3d12
 {
+class Buffer;
 class DeviceContext;
 class GraphicsPipelineState;
 class Texture;
-}
+} // namespace d3d12
 
 class RenderScene
 {
@@ -43,6 +44,8 @@ public:
 
 private:
     bool loadShaders();
+    void createIndexBuffer();
+    void createVertexBuffer();
     void createTexture();
 
     Microsoft::WRL::ComPtr<ID3D12RootSignature> mRootSignature;
@@ -51,6 +54,15 @@ private:
     std::array<Microsoft::WRL::ComPtr<ID3D12CommandAllocator>, d3d12::kFrameBufferCount> mCommandAllocators;
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> mCommandList;
 
+    struct MeshBuffers
+    {
+        std::unique_ptr<d3d12::Buffer> positions;
+        std::unique_ptr<d3d12::Buffer> texCoords;
+        std::unique_ptr<d3d12::Buffer> colors;
+    };
+
+    std::unique_ptr<d3d12::Buffer> mIndexBuffer;
+    MeshBuffers mMeshBuffers;
     std::unique_ptr<d3d12::Texture> mTexture;
     bool mInitialized = false;
 };

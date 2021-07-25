@@ -2020,8 +2020,3 @@ static constexpr std::string_view to_string(DXGI_FORMAT format) noexcept {
         return "DXGI_FORMAT_UNKNOWN";
     }
 }
-
-inline std::ostream &operator<<(std::ostream &out, DXGI_FORMAT format) {
-    out << to_string(format);
-    return out;
-}
