@@ -15,8 +15,6 @@ struct ID3D12Resource;
 
 namespace scrap::d3d12
 {
-class DeviceContext;
-
 class Texture
 {
 public:
@@ -49,11 +47,9 @@ public:
     Texture& operator=(const Texture&) = delete;
     Texture& operator=(Texture&&) = delete;
 
-    std::optional<Error> initUninitialized(DeviceContext& context, const Params& params);
-    std::optional<Error> initFromMemory(DeviceContext& context,
-                                        const cputex::TextureView& texture,
-                                        ResourceAccessFlags accessFlags,
-                                        std::string_view name);
+    std::optional<Error> initUninitialized(const Params& params);
+    std::optional<Error>
+    initFromMemory(const cputex::TextureView& texture, ResourceAccessFlags accessFlags, std::string_view name);
 
     ID3D12Resource* getResource() const { return mResource.Get(); }
 
@@ -65,7 +61,7 @@ public:
     void markAsUsed();
 
 private:
-    std::optional<Error> init(DeviceContext& context, const Params& params, const cputex::TextureView* texture);
+    std::optional<Error> init(const Params& params, const cputex::TextureView* texture);
 
     // Q: Why use two different GPU resource for the texture?
     // A: GPUs have different kinds of memory that are made faster for certain tasks but are slower for others. The

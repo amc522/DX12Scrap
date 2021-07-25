@@ -141,6 +141,58 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         spdlog::info("Created d3d12 command list");
     }
 
+    createTexture();
+
+    if(FAILED(mCommandList->Close())) { spdlog::error("Failed to close graphics command list"); }
+
+    // Execute the command list.
+    std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.Get()};
+    d3d12Context.getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()), commandLists.data());
+
+    // Wait for the command list to execute; we are reusing the same command
+    // list in our main loop but for now, we just want to wait for setup to
+    // complete before continuing.
+    d3d12Context.waitForGpu();
+
+    if(!loadShaders()) { return; }
+
+    mInitialized = true;
+}
+
+RenderScene::RenderScene(RenderScene&&) = default;
+
+RenderScene::~RenderScene() = default;
+
+bool RenderScene::loadShaders()
+{
+    d3d12::GraphicsShaderParams shaderParams;
+    shaderParams.filepaths[(size_t)GraphicsShaderStage::Vertex] = L"assets\\hello_triangle.hlsl";
+    shaderParams.filepaths[(size_t)GraphicsShaderStage::Pixel] = L"assets\\hello_triangle.hlsl";
+    shaderParams.entryPoints[(size_t)GraphicsShaderStage::Vertex] = "VSMain";
+    shaderParams.entryPoints[(size_t)GraphicsShaderStage::Pixel] = "PSMain";
+    shaderParams.stages = GraphicsShaderStageMask::VsPs;
+#ifdef _DEBUG
+    shaderParams.debug = true;
+#endif
+
+    // Describe and create the graphics pipeline state object (PSO).
+    d3d12::GraphicsPipelineStateParams psoParams = {};
+    psoParams.rootSignature = mRootSignature.Get();
+    psoParams.shader = std::make_shared<d3d12::GraphicsShader>(std::move(shaderParams));
+    psoParams.rasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoParams.blendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    psoParams.depthStencilState.DepthEnable = FALSE;
+    psoParams.depthStencilState.StencilEnable = FALSE;
+    psoParams.primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoParams.renderTargetFormats = {DXGI_FORMAT_R8G8B8A8_UNORM};
+
+    mPso = d3d12::DeviceContext::instance().createGraphicsPipelineState(std::move(psoParams));
+
+    return true;
+}
+
+void RenderScene::createTexture()
+{
     cputex::TextureParams textureParams;
     textureParams.dimension = cputex::TextureDimension::Texture2D;
     textureParams.extent = {1024, 1024, 1};
@@ -191,55 +243,8 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
     }
 
     auto texture = std::make_unique<d3d12::Texture>();
-    texture->initFromMemory(d3d12Context, cpuTexture, ResourceAccessFlags::GpuRead, "Firsrt Texture");
+    texture->initFromMemory(cpuTexture, ResourceAccessFlags::GpuRead, "Firsrt Texture");
     mTexture = std::move(texture);
-
-    if(FAILED(mCommandList->Close())) { spdlog::error("Failed to close graphics command list"); }
-
-    // Execute the command list.
-    std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.Get()};
-    d3d12Context.getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()), commandLists.data());
-
-    // Wait for the command list to execute; we are reusing the same command
-    // list in our main loop but for now, we just want to wait for setup to
-    // complete before continuing.
-    d3d12Context.waitForGpu();
-
-    if(!loadShaders()) { return; }
-
-    mInitialized = true;
-}
-
-RenderScene::RenderScene(RenderScene&&) = default;
-
-RenderScene::~RenderScene() = default;
-
-bool RenderScene::loadShaders()
-{
-    d3d12::GraphicsShaderParams shaderParams;
-    shaderParams.filepaths[(size_t)GraphicsShaderStage::Vertex] = L"assets\\hello_triangle.hlsl";
-    shaderParams.filepaths[(size_t)GraphicsShaderStage::Pixel] = L"assets\\hello_triangle.hlsl";
-    shaderParams.entryPoints[(size_t)GraphicsShaderStage::Vertex] = "VSMain";
-    shaderParams.entryPoints[(size_t)GraphicsShaderStage::Pixel] = "PSMain";
-    shaderParams.stages = GraphicsShaderStageMask::VsPs;
-#ifdef _DEBUG
-    shaderParams.debug = true;
-#endif
-
-    // Describe and create the graphics pipeline state object (PSO).
-    d3d12::GraphicsPipelineStateParams psoParams = {};
-    psoParams.rootSignature = mRootSignature.Get();
-    psoParams.shader = std::make_shared<d3d12::GraphicsShader>(std::move(shaderParams));
-    psoParams.rasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    psoParams.blendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-    psoParams.depthStencilState.DepthEnable = FALSE;
-    psoParams.depthStencilState.StencilEnable = FALSE;
-    psoParams.primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    psoParams.renderTargetFormats = {DXGI_FORMAT_R8G8B8A8_UNORM};
-
-    mPso = d3d12::DeviceContext::instance().createGraphicsPipelineState(std::move(psoParams));
-
-    return true;
 }
 
 RenderScene& RenderScene::operator=(RenderScene&&) = default;

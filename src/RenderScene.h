@@ -43,6 +43,7 @@ public:
 
 private:
     bool loadShaders();
+    void createTexture();
 
     Microsoft::WRL::ComPtr<ID3D12RootSignature> mRootSignature;
     std::shared_ptr<d3d12::GraphicsPipelineState> mPso;

@@ -43,18 +43,17 @@ D3D12_SRV_DIMENSION TranslateTextureDimensionToSrv(cputex::TextureDimension text
 
 Texture::~Texture()
 {
-    DeviceContext::instance().queueResourceForDestruction(std::move(mResource), std::move(mDescriptorHeapReservation), mLastUsedFrameCode);
+    DeviceContext::instance().queueResourceForDestruction(std::move(mResource), std::move(mDescriptorHeapReservation),
+                                                          mLastUsedFrameCode);
 }
 
-std::optional<Texture::Error> Texture::initUninitialized(DeviceContext& context, const Params& params)
+std::optional<Texture::Error> Texture::initUninitialized(const Params& params)
 {
-    return init(context, params, nullptr);
+    return init(params, nullptr);
 }
 
-std::optional<Texture::Error> Texture::initFromMemory(DeviceContext& context,
-                                                      const cputex::TextureView& texture,
-                                                      ResourceAccessFlags accessFlags,
-                                                      std::string_view name)
+std::optional<Texture::Error>
+Texture::initFromMemory(const cputex::TextureView& texture, ResourceAccessFlags accessFlags, std::string_view name)
 {
     Params params;
     params.dimension = texture.dimension();
@@ -64,7 +63,7 @@ std::optional<Texture::Error> Texture::initFromMemory(DeviceContext& context,
     params.mipCount = texture.mips();
     params.accessFlags = accessFlags;
     params.name = name;
-    return init(context, params, &texture);
+    return init(params, &texture);
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE Texture::getSrvCpu() const
@@ -79,7 +78,8 @@ D3D12_GPU_DESCRIPTOR_HANDLE Texture::getSrvGpu() const
 
 bool Texture::isReady() const
 {
-    return mResource != nullptr && mUploadFrameCode <= DeviceContext::instance().getCopyContext().getLastCompletedFrameCode();
+    return mResource != nullptr &&
+           mUploadFrameCode <= DeviceContext::instance().getCopyContext().getLastCompletedFrameCode();
 }
 
 void Texture::markAsUsed()
@@ -87,10 +87,10 @@ void Texture::markAsUsed()
     mLastUsedFrameCode = DeviceContext::instance().getCurrentFrameCode();
 }
 
-std::optional<Texture::Error>
-Texture::init(DeviceContext& context, const Params& params, const cputex::TextureView* texture)
+std::optional<Texture::Error> Texture::init(const Params& params, const cputex::TextureView* texture)
 {
-    ID3D12GraphicsCommandList* commandList = context.getCopyContext().getCommandList();
+    DeviceContext& deviceContext = DeviceContext::instance();
+    ID3D12GraphicsCommandList* commandList = deviceContext.getCopyContext().getCommandList();
 
     // 1. Create GPU texture
     //    a. Get allocation info. This will get the byte aligment for the texture. You can set the alignment in
@@ -142,7 +142,7 @@ Texture::init(DeviceContext& context, const Params& params, const cputex::Textur
     // https://asawicki.info/news_1726_secrets_of_direct3d_12_resource_alignment
 
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getresourceallocationinfo
-    allocInfo = context.getDevice()->GetResourceAllocationInfo(0, 1, &textureDesc);
+    allocInfo = deviceContext.getDevice()->GetResourceAllocationInfo(0, 1, &textureDesc);
     textureDesc.Alignment = allocInfo.Alignment;
 
     // The destination heap of the texture. This is the heap where the texture will be for its lifetime on the
@@ -159,9 +159,9 @@ Texture::init(DeviceContext& context, const Params& params, const cputex::Textur
         (texture != nullptr) ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommittedresource
-    HRESULT hr =
-        context.getDevice()->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &textureDesc,
-                                                     D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&mResource));
+    HRESULT hr = deviceContext.getDevice()->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE,
+                                                                    &textureDesc, D3D12_RESOURCE_STATE_COPY_DEST,
+                                                                    nullptr, IID_PPV_ARGS(&mResource));
 
     if(FAILED(hr)) { return Error::FailedToCreateResource; }
 
@@ -199,9 +199,9 @@ Texture::init(DeviceContext& context, const Params& params, const cputex::Textur
     uploadHeapProps.VisibleNodeMask = 0;
 
     ComPtr<ID3D12Resource> uploadResource;
-    hr = context.getDevice()->CreateCommittedResource(&uploadHeapProps, D3D12_HEAP_FLAG_NONE, &textureUploadDesc,
-                                                      D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-                                                      IID_PPV_ARGS(&uploadResource));
+    hr = deviceContext.getDevice()->CreateCommittedResource(&uploadHeapProps, D3D12_HEAP_FLAG_NONE, &textureUploadDesc,
+                                                            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+                                                            IID_PPV_ARGS(&uploadResource));
     if(FAILED(hr))
     {
         spdlog::critical("Failed to create texture upload resource.");
@@ -264,9 +264,9 @@ Texture::init(DeviceContext& context, const Params& params, const cputex::Textur
         }
     }
 
-    context.getCopyContext().trackCopyResource(mResource, std::move(uploadResource));
+    deviceContext.getCopyContext().trackCopyResource(mResource, std::move(uploadResource));
 
-    auto descriptorHeapReservation = context.getCbvSrvUavHeap().reserve(1);
+    auto descriptorHeapReservation = deviceContext.getCbvSrvUavHeap().reserve(1);
     if(!descriptorHeapReservation) { return Texture::Error::InsufficientDescriptorHeapSpace; }
 
     mDescriptorHeapReservation = std::move(descriptorHeapReservation.value());
@@ -327,10 +327,10 @@ Texture::init(DeviceContext& context, const Params& params, const cputex::Textur
     default: break;
     }
 
-    context.getCbvSrvUavHeap().createShaderResourceView(context, mDescriptorHeapReservation, mSrvIndex, mResource.Get(),
-                                                        srvDesc);
+    deviceContext.getCbvSrvUavHeap().createShaderResourceView(deviceContext, mDescriptorHeapReservation, mSrvIndex,
+                                                              mResource.Get(), srvDesc);
 
-    mUploadFrameCode = context.getCopyContext().getCurrentFrameCode();
+    mUploadFrameCode = deviceContext.getCopyContext().getCurrentFrameCode();
 
     return std::nullopt;
 }
