@@ -341,7 +341,7 @@ Debug::~Debug()
     sInstance = nullptr;
 }
 
-void Debug::init() {}
+void Debug::init(DebugOptions) {}
 
 void Debug::setDevice(Microsoft::WRL::ComPtr<ID3D12Device>) {}
 
