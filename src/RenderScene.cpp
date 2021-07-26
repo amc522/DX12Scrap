@@ -33,28 +33,6 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
             featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
         }
 
-        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_descriptor_range1
-        // This describes the descriptors that will be available to the shader. A descriptor in this case being an SRV,
-        // UAV, or CBV. For this simple setup, we have a descriptor range saying it has 1 descriptor (SRV), our texture.
-        std::array<D3D12_DESCRIPTOR_RANGE1, 1> ranges = {};
-        D3D12_DESCRIPTOR_RANGE1& range = ranges[0];
-        range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        range.NumDescriptors = 5;
-        range.BaseShaderRegister = 0;
-        range.OffsetInDescriptorsFromTableStart = 0;
-        range.RegisterSpace = 0;
-        range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
-
-        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_root_parameter1
-        // The root parameter describes a parameter or argument being passed into the shader as described or declared by
-        // the root signautre. Here we are saying we have a descriptor table (a list of descritor ranges), with one
-        // range in it.
-        std::array<D3D12_ROOT_PARAMETER1, 1> rootParameters = {};
-        D3D12_ROOT_PARAMETER1& rootParameter = rootParameters[0];
-        rootParameter.DescriptorTable.NumDescriptorRanges = 1;
-        rootParameter.DescriptorTable.pDescriptorRanges = ranges.data();
-        rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_static_sampler_desc
         // Static samplers are the same as normal samplers, except that they are not going to change after creating the
         // root signature. Static samplers can be used to describe all the basic samplers that are used by most shaders
@@ -80,11 +58,11 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_versioned_root_signature_desc
         D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
         rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-        rootSignatureDesc.Desc_1_1.NumParameters = (UINT)rootParameters.size();
-        rootSignatureDesc.Desc_1_1.pParameters = rootParameters.data();
+        rootSignatureDesc.Desc_1_1.NumParameters = 0;
+        rootSignatureDesc.Desc_1_1.pParameters = nullptr;
         rootSignatureDesc.Desc_1_1.NumStaticSamplers = (UINT)staticSamplers.size();
         rootSignatureDesc.Desc_1_1.pStaticSamplers = staticSamplers.data();
-        rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+        rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
 
         ComPtr<ID3DBlob> signature;
         ComPtr<ID3DBlob> error;
@@ -354,12 +332,13 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
                                static_cast<LONG>(viewport.Width), static_cast<LONG>(viewport.Height)};
 
         // Set necessary state.
-        mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
+        // Descriptor heaps need to be set before setting the root signature when using dynamic resources.
+        // https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html#setdescriptorheaps-and-setrootsignature
         std::array<ID3D12DescriptorHeap*, 1> descriptorHeaps = {d3d12Context.getCbvSrvUavHeap().getGpuDescriptorHeap()};
         mCommandList->SetDescriptorHeaps((UINT)descriptorHeaps.size(), descriptorHeaps.data());
-        mCommandList->SetGraphicsRootDescriptorTable(
-            0, d3d12Context.getCbvSrvUavHeap().getGpuDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
+
+        mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
         mCommandList->RSSetViewports(1, &viewport);
         mCommandList->RSSetScissorRects(1, &scissorRect);

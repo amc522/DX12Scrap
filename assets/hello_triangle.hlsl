@@ -10,14 +10,14 @@ struct VertexOutput
     float4 color : COLOR;
 };
 
-Buffer<float2> gVertexPositions : register(t1);
-Buffer<float2> gVertexTexCoords : register(t2);
-Buffer<float4> gVertexColors : register(t3);
-Texture2D<float> gTexture : register(t4);
 SamplerState gSampler : register(s0);
 
 VertexOutput VSMain(VertexInput input)
 {
+    Buffer<float2> gVertexPositions = ResourceDescriptorHeap[1];
+    Buffer<float2> gVertexTexCoords = ResourceDescriptorHeap[2];
+    Buffer<float4> gVertexColors = ResourceDescriptorHeap[3];
+    
     VertexOutput output;
 
     output.clipPos = float4(gVertexPositions[input.vertexId], 0.0, 1.0);
@@ -29,5 +29,7 @@ VertexOutput VSMain(VertexInput input)
 
 float4 PSMain(VertexOutput input) : SV_Target
 {
+    Texture2D<float> gTexture = ResourceDescriptorHeap[4];
+
     return lerp(input.color, gTexture.Sample(gSampler, input.uv), 0.5);
 }

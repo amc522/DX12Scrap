@@ -169,7 +169,7 @@
       <EnableDpiAwareness>true</EnableDpiAwareness>
     </Manifest>
     <PostBuildEvent>
-      <Command>xcopy $(ProjectDir)external\dxc\bin\$(Platform)\*.dll $(OutputPath) /y</Command>
+      <Command>xcopy $(ProjectDir)external\dxc\bin\$(Platform)\*.dll $(OutputPath) /D /y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -196,7 +196,7 @@
       <EnableDpiAwareness>true</EnableDpiAwareness>
     </Manifest>
     <PostBuildEvent>
-      <Command>xcopy $(ProjectDir)external\dxc\bin\$(Platform)\*.dll $(OutputPath) /y</Command>
+      <Command>xcopy $(ProjectDir)external\dxc\bin\$(Platform)\*.dll $(OutputPath) /D /y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -221,7 +221,7 @@
       <EnableDpiAwareness>true</EnableDpiAwareness>
     </Manifest>
     <PostBuildEvent>
-      <Command>xcopy $(ProjectDir)external\dxc\bin\$(Platform)\*.dll $(OutputPath) /y</Command>
+      <Command>xcopy $(ProjectDir)external\dxc\bin\$(Platform)\*.dll $(OutputPath) /D /y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -248,7 +248,7 @@
       <EnableDpiAwareness>true</EnableDpiAwareness>
     </Manifest>
     <PostBuildEvent>
-      <Command>xcopy $(ProjectDir)external\dxc\bin\$(Platform)\*.dll $(OutputPath) /y</Command>
+      <Command>xcopy $(ProjectDir)external\dxc\bin\$(Platform)\*.dll $(OutputPath) /D /y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
