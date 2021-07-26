@@ -33,6 +33,17 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
             featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
         }
 
+        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_root_parameter1
+        // The root parameter describes a parameter or argument being passed into the shader as described or declared by
+        // the root signautre. Here we are saying we have a constant buffer with 3 constants.
+        std::array<D3D12_ROOT_PARAMETER1, 1> rootParameters = {};
+        D3D12_ROOT_PARAMETER1& rootParameter = rootParameters[0];
+        rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        rootParameter.Constants.Num32BitValues = 3;
+        rootParameter.Constants.RegisterSpace = 1;
+        rootParameter.Constants.ShaderRegister = 0;
+        rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_static_sampler_desc
         // Static samplers are the same as normal samplers, except that they are not going to change after creating the
         // root signature. Static samplers can be used to describe all the basic samplers that are used by most shaders
@@ -58,8 +69,8 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_versioned_root_signature_desc
         D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
         rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-        rootSignatureDesc.Desc_1_1.NumParameters = 0;
-        rootSignatureDesc.Desc_1_1.pParameters = nullptr;
+        rootSignatureDesc.Desc_1_1.NumParameters = (UINT)rootParameters.size();
+        rootSignatureDesc.Desc_1_1.pParameters = rootParameters.data();
         rootSignatureDesc.Desc_1_1.NumStaticSamplers = (UINT)staticSamplers.size();
         rootSignatureDesc.Desc_1_1.pStaticSamplers = staticSamplers.data();
         rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
@@ -359,6 +370,13 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
         if(mPso->isReady() && mIndexBuffer->isReady() && mMeshBuffers.positions->isReady() &&
            mMeshBuffers.texCoords->isReady() && mMeshBuffers.colors->isReady() && mTexture->isReady())
         {
+            std::array<uint32_t, 3> vertexBufferIndices{mMeshBuffers.positions->getSrvDescriptorHeapIndex(),
+                                                        mMeshBuffers.texCoords->getSrvDescriptorHeapIndex(),
+                                                        mMeshBuffers.colors->getSrvDescriptorHeapIndex()};
+
+            mCommandList->SetGraphicsRoot32BitConstants(0, (UINT)vertexBufferIndices.size(), vertexBufferIndices.data(),
+                                                        0);
+
             D3D12_INDEX_BUFFER_VIEW ibv = mIndexBuffer->getIndexView();
 
             mPso->markAsUsed();

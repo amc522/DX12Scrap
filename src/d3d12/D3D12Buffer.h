@@ -79,6 +79,9 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE getUavCpu() const;
     D3D12_GPU_DESCRIPTOR_HANDLE getUavGpu() const;
 
+    uint32_t getSrvDescriptorHeapIndex() const { return mDescriptorHeapReservation.getStartHeapIndex() + mSrvIndex; }
+    uint32_t getUavDescriptorHeapIndex() const { return mDescriptorHeapReservation.getStartHeapIndex() + mUavIndex; }
+
     D3D12_INDEX_BUFFER_VIEW getIndexView() const;
     D3D12_INDEX_BUFFER_VIEW getIndexView(DXGI_FORMAT format) const;
 

@@ -135,6 +135,8 @@ public:
     [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE getCpuHandle(uint32_t index) const;
     [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE getGpuHandle(uint32_t index) const;
 
+    [[nodiscard]] uint32_t getStartHeapIndex() const { return (uint32_t)mReservedHeapBlocks.start; }
+
 protected:
     FixedDescriptorHeapAllocator* mHeap = nullptr;
     FreeBlockTracker::Range mReservedHeapBlocks;

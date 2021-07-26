@@ -10,19 +10,26 @@ struct VertexOutput
     float4 color : COLOR;
 };
 
+cbuffer VertexIndices : register(b0, space1)
+{
+    uint gVertexPositionIndex;
+    uint gVertexTexCoordIndex;
+    uint gVertexColorIndex;
+}
+
 SamplerState gSampler : register(s0);
 
 VertexOutput VSMain(VertexInput input)
 {
-    Buffer<float2> gVertexPositions = ResourceDescriptorHeap[1];
-    Buffer<float2> gVertexTexCoords = ResourceDescriptorHeap[2];
-    Buffer<float4> gVertexColors = ResourceDescriptorHeap[3];
-    
+    Buffer<float2> positions = ResourceDescriptorHeap[gVertexPositionIndex];
+    Buffer<float2> texCoords = ResourceDescriptorHeap[gVertexTexCoordIndex];
+    Buffer<float4> colors = ResourceDescriptorHeap[gVertexColorIndex];
+
     VertexOutput output;
 
-    output.clipPos = float4(gVertexPositions[input.vertexId], 0.0, 1.0);
-    output.uv = gVertexTexCoords[input.vertexId];
-    output.color = gVertexColors[input.vertexId];
+    output.clipPos = float4(positions[input.vertexId], 0.0, 1.0);
+    output.uv = texCoords[input.vertexId];
+    output.color = colors[input.vertexId];
 
     return output;
 }
