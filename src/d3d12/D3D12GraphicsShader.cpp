@@ -1,8 +1,9 @@
 #include "d3d12/D3D12GraphicsShader.h"
 
 #include <d3d12.h>
-#include <d3dcompiler.h>
+#include <d3d12shader.h>
 #include <d3dx12.h>
+#include <dxcapi.h>
 #include <spdlog/spdlog.h>
 
 using namespace Microsoft::WRL;
@@ -61,9 +62,17 @@ void GraphicsShader::create()
         return;
     }
 
-    UINT compileFlags = 0;
+    // dxc shader compiling tutorial:
+    // https://github.com/microsoft/DirectXShaderCompiler/wiki/Using-dxc.exe-and-dxcompiler.dll
+    ComPtr<IDxcUtils> utils;
+    ComPtr<IDxcCompiler3> compiler;
+    DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils));
+    DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler));
 
-    if(mParams.debug) { compileFlags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION; }
+    ComPtr<IDxcIncludeHandler> includeHandler;
+    utils->CreateDefaultIncludeHandler(&includeHandler);
+
+    UINT compileFlags = 0;
 
     bool compiled = true;
     for(GraphicsShaderStage stage = GraphicsShaderStage::First; stage <= GraphicsShaderStage::Last;
@@ -73,27 +82,75 @@ void GraphicsShader::create()
 
         ShaderInfo& shaderInfo = mShaders[(size_t)stage];
 
-        ComPtr<ID3DBlob> error;
+        std::array<const wchar_t*, (size_t)GraphicsShaderStage::Count> shaderTargets = {L"vs_6_6", L"hs_6_6", L"ds_6_6",
+                                                                                        L"gs_6_6", L"ps_6_6"};
 
-        std::array<const char*, (size_t)GraphicsShaderStage::Count> shaderTargets = {"vs_5_0", "hs_5_0", "ds_5_0",
-                                                                                     "gs_5_0", "ps_5_0"};
+        const std::string& entryPoint = mParams.entryPoints[(size_t)stage];
 
-        shaderInfo.hr = D3DCompileFromFile(mParams.filepaths[(size_t)stage].c_str(), nullptr, nullptr,
-                                           mParams.entryPoints[(size_t)stage].c_str(), shaderTargets[(size_t)stage],
-                                           compileFlags, 0, &shaderInfo.shaderBlob, &error);
+        int wideStrSize = MultiByteToWideChar(CP_UTF8, 0, entryPoint.c_str(), (int)entryPoint.size(), nullptr, 0);
+        std::wstring wideEntryPoint((size_t)wideStrSize, 0);
+        MultiByteToWideChar(CP_UTF8, 0, entryPoint.c_str(), (int)entryPoint.size(), wideEntryPoint.data(),
+                            (int)wideEntryPoint.size());
 
-        if(FAILED(shaderInfo.hr))
+        LPCWSTR compilerArgs[] = {mParams.filepaths[(size_t)stage].c_str(),
+                                  L"-E",
+                                  wideEntryPoint.c_str(),
+                                  L"-T",
+                                  shaderTargets[(size_t)stage],
+                                  (mParams.debug) ? L"-Zi" : L"",
+                                  (mParams.debug) ? L"-Od" : L"O3"};
+
+        // Load the source file
+        const std::filesystem::path& filepath = mParams.filepaths[(size_t)stage];
+        ComPtr<IDxcBlobEncoding> sourceBlob;
+        if(FAILED(utils->LoadFile(filepath.c_str(), nullptr, &sourceBlob)))
         {
+            spdlog::error("Failed to load '{}' for shader compilation", filepath.generic_u8string());
             compiled = false;
+            continue;
+        }
 
-            if(error != nullptr)
-            {
-                shaderInfo.compilerMessage =
-                    std::string((const char*)error->GetBufferPointer(), error->GetBufferSize());
+        DxcBuffer source;
+        source.Ptr = sourceBlob->GetBufferPointer();
+        source.Size = sourceBlob->GetBufferSize();
+        source.Encoding = DXC_CP_ACP;
 
-                spdlog::error("Failed to compile shader '{}':\n{}", mParams.filepaths[(size_t)stage].generic_u8string(),
-                              shaderInfo.compilerMessage);
-            }
+        // Compile
+        ComPtr<IDxcResult> results;
+        HRESULT hr = compiler->Compile(&source, compilerArgs, _countof(compilerArgs), includeHandler.Get(),
+                                       IID_PPV_ARGS(&results));
+
+        // Check for errors
+        ComPtr<IDxcBlobUtf8> errors;
+        results->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errors), nullptr);
+
+        if(FAILED(hr) || (errors != nullptr && errors->GetStringLength() != 0))
+        {
+            shaderInfo.compilerMessage =
+                std::string((const char*)errors->GetStringPointer(), errors->GetStringLength());
+
+            spdlog::error("Failed to compile shader '{}':\n{}", filepath.generic_u8string(),
+                          shaderInfo.compilerMessage);
+
+            compiled = false;
+            continue;
+        }
+
+        ComPtr<IDxcBlob> shader = nullptr;
+        ComPtr<IDxcBlobUtf16> shaderName = nullptr;
+        hr = results->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&shader), shaderName.GetAddressOf());
+
+        if(FAILED(hr) || shader == nullptr)
+        {
+            spdlog::error("Failed to get shader binary");
+            continue;
+        }
+
+        // Convert from an IDxcBlob to ID3DBlob
+        if(FAILED(shader.As(&shaderInfo.shaderBlob)))
+        {
+            spdlog::error("Failed to convert IDxcBlob to ID3DBlob");
+            continue;
         }
     }
 
