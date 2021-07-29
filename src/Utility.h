@@ -44,13 +44,13 @@
 namespace scrap
 {
 template<class EnumT>
-std::enable_if_t<std::is_enum_v<EnumT>, std::underlying_type_t<EnumT>> ToUnderlying(EnumT e)
+constexpr std::enable_if_t<std::is_enum_v<EnumT>, std::underlying_type_t<EnumT>> ToUnderlying(EnumT e)
 {
     return static_cast<std::underlying_type_t<EnumT>>(e);
 }
 
 template<class EnumT>
-std::enable_if_t<std::is_enum_v<EnumT>, EnumT> IncrementEnum(EnumT e)
+constexpr std::enable_if_t<std::is_enum_v<EnumT>, EnumT> IncrementEnum(EnumT e)
 {
     return static_cast<EnumT>(ToUnderlying(e) + std::underlying_type_t<EnumT>(1));
 }
@@ -62,5 +62,11 @@ struct Overloaded : Ts...
 };
 template<class... Ts>
 Overloaded(Ts...) -> Overloaded<Ts...>;
+
+template<typename T, size_t N>
+constexpr size_t GetArraySize(const T(&)[N])
+{
+    return N;
+}
 
 } // namespace scrap

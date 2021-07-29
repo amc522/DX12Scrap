@@ -36,13 +36,20 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_root_parameter1
         // The root parameter describes a parameter or argument being passed into the shader as described or declared by
         // the root signautre. Here we are saying we have a constant buffer with 3 constants.
-        std::array<D3D12_ROOT_PARAMETER1, 1> rootParameters = {};
-        D3D12_ROOT_PARAMETER1& rootParameter = rootParameters[0];
-        rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-        rootParameter.Constants.Num32BitValues = 3;
-        rootParameter.Constants.RegisterSpace = 1;
-        rootParameter.Constants.ShaderRegister = 0;
-        rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+        std::array<D3D12_ROOT_PARAMETER1, 2> rootParameters = {};
+        D3D12_ROOT_PARAMETER1& resourceRootConstants = rootParameters[0];
+        resourceRootConstants.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        resourceRootConstants.Constants.Num32BitValues = 8;
+        resourceRootConstants.Constants.RegisterSpace = 2;
+        resourceRootConstants.Constants.ShaderRegister = 0;
+        resourceRootConstants.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+        D3D12_ROOT_PARAMETER1& vertexRootConstants = rootParameters[1];
+        vertexRootConstants.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        vertexRootConstants.Constants.Num32BitValues = 4;
+        vertexRootConstants.Constants.RegisterSpace = 1;
+        vertexRootConstants.Constants.ShaderRegister = 0;
+        vertexRootConstants.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_static_sampler_desc
         // Static samplers are the same as normal samplers, except that they are not going to change after creating the
@@ -370,21 +377,25 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
         if(mPso->isReady() && mIndexBuffer->isReady() && mMeshBuffers.positions->isReady() &&
            mMeshBuffers.texCoords->isReady() && mMeshBuffers.colors->isReady() && mTexture->isReady())
         {
-            std::array<uint32_t, 3> vertexBufferIndices{mMeshBuffers.positions->getSrvDescriptorHeapIndex(),
-                                                        mMeshBuffers.texCoords->getSrvDescriptorHeapIndex(),
-                                                        mMeshBuffers.colors->getSrvDescriptorHeapIndex()};
+            uint32_t vertexBufferIndices[] = {mMeshBuffers.positions->getSrvDescriptorHeapIndex(),
+                                              mMeshBuffers.texCoords->getSrvDescriptorHeapIndex(),
+                                              mMeshBuffers.colors->getSrvDescriptorHeapIndex()};
 
-            mCommandList->SetGraphicsRoot32BitConstants(0, (UINT)vertexBufferIndices.size(), vertexBufferIndices.data(),
+            mCommandList->SetGraphicsRoot32BitConstants(1, (UINT)GetArraySize(vertexBufferIndices), vertexBufferIndices,
                                                         0);
 
-            D3D12_INDEX_BUFFER_VIEW ibv = mIndexBuffer->getIndexView();
-
+            uint32_t resourceIndices[] = {mTexture->getSrvDescriptorHeapIndex()};
+            mCommandList->SetGraphicsRoot32BitConstants(0, (UINT)GetArraySize(resourceIndices), resourceIndices, 0);
+            
             mPso->markAsUsed();
             mIndexBuffer->markAsUsed();
             mMeshBuffers.positions->markAsUsed();
             mMeshBuffers.texCoords->markAsUsed();
             mMeshBuffers.colors->markAsUsed();
             mTexture->markAsUsed();
+            
+            const D3D12_INDEX_BUFFER_VIEW ibv = mIndexBuffer->getIndexView();
+
             mCommandList->SetPipelineState(mPso->getPipelineState());
             mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             mCommandList->IASetIndexBuffer(&ibv);

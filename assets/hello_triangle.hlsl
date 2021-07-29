@@ -1,3 +1,9 @@
+#define DECLARE_RESOURCE(ResourceObjectType, ResourceValueType, Name) \
+uint g##Name##DescriptorIndex; \
+ResourceObjectType<ResourceValueType> Get##Name() { return ResourceDescriptorHeap[g##Name##DescriptorIndex]; }
+
+#define DECLARE_VERTEX_BUFFER(ValueType, Name) DECLARE_RESOURCE(Buffer, ValueType, Vertex##Name)
+
 struct VertexInput
 {
     uint vertexId : SV_VertexID;
@@ -12,18 +18,23 @@ struct VertexOutput
 
 cbuffer VertexIndices : register(b0, space1)
 {
-    uint gVertexPositionIndex;
-    uint gVertexTexCoordIndex;
-    uint gVertexColorIndex;
+    DECLARE_VERTEX_BUFFER(float2, Positions)
+    DECLARE_VERTEX_BUFFER(float2, TexCoords)
+    DECLARE_VERTEX_BUFFER(float4, Colors)
+}
+
+cbuffer ResourceIndices : register(b0, space2)
+{
+    DECLARE_RESOURCE(Texture2D, float4, Texture);
 }
 
 SamplerState gSampler : register(s0);
 
 VertexOutput VSMain(VertexInput input)
 {
-    Buffer<float2> positions = ResourceDescriptorHeap[gVertexPositionIndex];
-    Buffer<float2> texCoords = ResourceDescriptorHeap[gVertexTexCoordIndex];
-    Buffer<float4> colors = ResourceDescriptorHeap[gVertexColorIndex];
+    Buffer<float2> positions = GetVertexPositions();
+    Buffer<float2> texCoords = GetVertexTexCoords();
+    Buffer<float4> colors = GetVertexColors();
 
     VertexOutput output;
 
@@ -36,7 +47,7 @@ VertexOutput VSMain(VertexInput input)
 
 float4 PSMain(VertexOutput input) : SV_Target
 {
-    Texture2D<float> gTexture = ResourceDescriptorHeap[4];
+    Texture2D<float4> gTexture = GetTexture();
 
     return lerp(input.color, gTexture.Sample(gSampler, input.uv), 0.5);
 }

@@ -56,6 +56,8 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE getSrvCpu() const;
     D3D12_GPU_DESCRIPTOR_HANDLE getSrvGpu() const;
 
+    uint32_t getSrvDescriptorHeapIndex() const { return mDescriptorHeapReservation.getStartHeapIndex() + mSrvIndex; }
+
     bool isReady() const;
 
     void markAsUsed();
