@@ -6,6 +6,18 @@
 
 namespace scrap
 {
+template<class CharT>
+bool StartsWith(std::basic_string_view<CharT> str, std::basic_string_view<CharT> potentialPrefix)
+{
+    return std::equal(potentialPrefix.begin(), potentialPrefix.end(), str.begin());
+}
+
+template<class CharT>
+bool EndsWith(std::basic_string_view<CharT> str, std::basic_string_view<CharT> potentialSuffix)
+{
+    return std::equal(potentialSuffix.rbegin(), potentialSuffix.rend(), str.rbegin());
+}
+
 template<class T>
 constexpr std::string_view ToStringView(T)
 {

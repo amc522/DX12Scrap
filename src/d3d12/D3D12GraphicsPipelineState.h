@@ -43,6 +43,8 @@ public:
 
     ID3D12PipelineState* getPipelineState() const { return mPipelineState.Get(); }
 
+    const GraphicsShader* getShader() const { return mParams.shader.get(); }
+
     void markAsUsed();
 
 private:

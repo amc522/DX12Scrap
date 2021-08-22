@@ -77,7 +77,30 @@ constexpr std::string_view ToStringView(D3D12_RESOURCE_BINDING_TIER resourceBind
     case D3D12_RESOURCE_BINDING_TIER_1: return "D3D12_RESOURCE_BINDING_TIER_1";
     case D3D12_RESOURCE_BINDING_TIER_2: return "D3D12_RESOURCE_BINDING_TIER_2";
     case D3D12_RESOURCE_BINDING_TIER_3: return "D3D12_RESOURCE_BINDING_TIER_3";
-    default: return "Unknow D3D12_RESOURCE_BIND_TIER";
+    default: return "Unknown D3D12_RESOURCE_BIND_TIER";
+    }
+}
+
+template<>
+constexpr std::string_view ToStringView(D3D_SHADER_INPUT_TYPE sit)
+{
+    switch(sit)
+    {
+    case D3D_SIT_CBUFFER: return "D3D_SIT_CBUFFER";
+    case D3D_SIT_TBUFFER: return "D3D_SIT_TBUFFER";
+    case D3D_SIT_TEXTURE: return "D3D_SIT_TEXTURE";
+    case D3D_SIT_SAMPLER: return "D3D_SIT_SAMPLER";
+    case D3D_SIT_UAV_RWTYPED: return "D3D_SIT_UAV_RWTYPED";
+    case D3D_SIT_STRUCTURED: return "D3D_SIT_STRUCTURED";
+    case D3D_SIT_UAV_RWSTRUCTURED: return "D3D_SIT_UAV_RWSTRUCTURED";
+    case D3D_SIT_BYTEADDRESS: return "D3D_SIT_BYTEADDRESS";
+    case D3D_SIT_UAV_RWBYTEADDRESS: return "D3D_SIT_UAV_RWBYTEADDRESS";
+    case D3D_SIT_UAV_APPEND_STRUCTURED: return "D3D_SIT_UAV_APPEND_STRUCTURED";
+    case D3D_SIT_UAV_CONSUME_STRUCTURED: return "D3D_SIT_UAV_CONSUME_STRUCTURED";
+    case D3D_SIT_UAV_RWSTRUCTURED_WITH_COUNTER: return "D3D_SIT_UAV_RWSTRUCTURED_WITH_COUNTER";
+    case D3D_SIT_RTACCELERATIONSTRUCTURE: return "D3D_SIT_RTACCELERATIONSTRUCTURE";
+    case D3D_SIT_UAV_FEEDBACKTEXTURE: return "D3D_SIT_UAV_FEEDBACKTEXTURE";
+    default: return "Unknown D3D12_SHADER_INPUT_TYPE";
     }
 }
 } // namespace scrap
@@ -163,4 +186,8 @@ struct fmt::formatter<D3D12_DESCRIPTOR_HEAP_TYPE> : public scrap::ToStringViewFo
 
 template<>
 struct fmt::formatter<D3D12_RESOURCE_BINDING_TIER> : public scrap::ToStringViewFormatter<D3D12_RESOURCE_BINDING_TIER>
+{};
+
+template<>
+struct fmt::formatter<D3D_SHADER_INPUT_TYPE> : public scrap::ToStringViewFormatter<D3D_SHADER_INPUT_TYPE>
 {};

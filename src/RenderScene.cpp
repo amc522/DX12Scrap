@@ -37,18 +37,19 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         // The root parameter describes a parameter or argument being passed into the shader as described or declared by
         // the root signautre. Here we are saying we have a constant buffer with 3 constants.
         std::array<D3D12_ROOT_PARAMETER1, 2> rootParameters = {};
-        D3D12_ROOT_PARAMETER1& resourceRootConstants = rootParameters[0];
+
+        D3D12_ROOT_PARAMETER1& resourceRootConstants = rootParameters[d3d12::kRootParamIndex_ResourceIndices];
         resourceRootConstants.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-        resourceRootConstants.Constants.Num32BitValues = 8;
-        resourceRootConstants.Constants.RegisterSpace = 2;
-        resourceRootConstants.Constants.ShaderRegister = 0;
+        resourceRootConstants.Constants.Num32BitValues = d3d12::kMaxBindlessResources;
+        resourceRootConstants.Constants.ShaderRegister = d3d12::reservedShaderRegister::kResourceCB.shaderRegister;
+        resourceRootConstants.Constants.RegisterSpace = d3d12::reservedShaderRegister::kResourceCB.registerSpace;
         resourceRootConstants.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-        D3D12_ROOT_PARAMETER1& vertexRootConstants = rootParameters[1];
+        D3D12_ROOT_PARAMETER1& vertexRootConstants = rootParameters[d3d12::kRootParamIndex_VertexIndices];
         vertexRootConstants.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-        vertexRootConstants.Constants.Num32BitValues = 4;
-        vertexRootConstants.Constants.RegisterSpace = 1;
-        vertexRootConstants.Constants.ShaderRegister = 0;
+        vertexRootConstants.Constants.Num32BitValues = d3d12::kMaxBindlessVertexBuffers;
+        vertexRootConstants.Constants.ShaderRegister = d3d12::reservedShaderRegister::kVertexCB.shaderRegister;
+        vertexRootConstants.Constants.RegisterSpace = d3d12::reservedShaderRegister::kVertexCB.registerSpace;
         vertexRootConstants.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_static_sampler_desc
@@ -377,23 +378,53 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
         if(mPso->isReady() && mIndexBuffer->isReady() && mMeshBuffers.positions->isReady() &&
            mMeshBuffers.texCoords->isReady() && mMeshBuffers.colors->isReady() && mTexture->isReady())
         {
-            uint32_t vertexBufferIndices[] = {mMeshBuffers.positions->getSrvDescriptorHeapIndex(),
-                                              mMeshBuffers.texCoords->getSrvDescriptorHeapIndex(),
-                                              mMeshBuffers.colors->getSrvDescriptorHeapIndex()};
+            const d3d12::GraphicsShader& shader = *mPso->getShader();
 
-            mCommandList->SetGraphicsRoot32BitConstants(1, (UINT)GetArraySize(vertexBufferIndices), vertexBufferIndices,
-                                                        0);
+            { // bind vertex buffers
+                const uint32_t vertexPositionIndex = shader.getVertexElementIndex(ShaderVertexSemantic::Position, 0)
+                                                         .value_or(d3d12::kMaxBindlessVertexBuffers);
+                const uint32_t vertexTexCoordIndex = shader.getVertexElementIndex(ShaderVertexSemantic::TexCoord, 0)
+                                                         .value_or(d3d12::kMaxBindlessVertexBuffers);
+                const uint32_t vertexColorIndex = shader.getVertexElementIndex(ShaderVertexSemantic::Color, 0)
+                                                      .value_or(d3d12::kMaxBindlessVertexBuffers);
 
-            uint32_t resourceIndices[] = {mTexture->getSrvDescriptorHeapIndex()};
-            mCommandList->SetGraphicsRoot32BitConstants(0, (UINT)GetArraySize(resourceIndices), resourceIndices, 0);
-            
+                // creating an array with one more than necessary to give a slot to assign buffers not used by the
+                // shader.
+                std::array<uint32_t, d3d12::kMaxBindlessVertexBuffers + 1> vertexBufferDescriptorIndices;
+                vertexBufferDescriptorIndices[vertexPositionIndex] =
+                    mMeshBuffers.positions->getSrvDescriptorHeapIndex();
+                vertexBufferDescriptorIndices[vertexTexCoordIndex] =
+                    mMeshBuffers.texCoords->getSrvDescriptorHeapIndex();
+                vertexBufferDescriptorIndices[vertexColorIndex] = mMeshBuffers.colors->getSrvDescriptorHeapIndex();
+
+                mCommandList->SetGraphicsRoot32BitConstants(
+                    (UINT)d3d12::kRootParamIndex_VertexIndices,
+                    std::min(d3d12::kMaxBindlessVertexBuffers,
+                             (uint32_t)shader.getShaderInputs().vertexElements.size()),
+                    vertexBufferDescriptorIndices.data(), 0);
+            }
+
+            { // bind resources
+                const uint64_t textureNameHash = std::hash<std::string_view>()("Texture");
+                const uint32_t textureIndex =
+                    shader.getResourceIndex(textureNameHash).value_or(d3d12::kMaxBindlessResources);
+
+                std::array<uint32_t, d3d12::kMaxBindlessResources + 1> resourceIndices;
+                resourceIndices[textureIndex] = mTexture->getSrvDescriptorHeapIndex();
+
+                mCommandList->SetGraphicsRoot32BitConstants(
+                    d3d12::kRootParamIndex_ResourceIndices,
+                    std::min(d3d12::kMaxBindlessResources, (uint32_t)shader.getShaderInputs().resources.size()),
+                    resourceIndices.data(), 0);
+            }
+
             mPso->markAsUsed();
             mIndexBuffer->markAsUsed();
             mMeshBuffers.positions->markAsUsed();
             mMeshBuffers.texCoords->markAsUsed();
             mMeshBuffers.colors->markAsUsed();
             mTexture->markAsUsed();
-            
+
             const D3D12_INDEX_BUFFER_VIEW ibv = mIndexBuffer->getIndexView();
 
             mCommandList->SetPipelineState(mPso->getPipelineState());

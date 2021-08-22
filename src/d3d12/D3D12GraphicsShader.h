@@ -6,12 +6,17 @@
 #include <array>
 #include <filesystem>
 #include <mutex>
+#include <optional>
 
+#include <nonstd/span.hpp>
 #include <wrl/client.h>
 
 struct D3D12_SHADER_BYTECODE;
+struct _D3D12_SHADER_INPUT_BIND_DESC;
+using D3D12_SHADER_INPUT_BIND_DESC = _D3D12_SHADER_INPUT_BIND_DESC;
 struct ID3D10Blob;
 using ID3DBlob = ID3D10Blob;
+struct ID3D12ShaderReflection;
 
 namespace scrap::d3d12
 {
@@ -57,6 +62,12 @@ public:
     ID3DBlob* getShader(GraphicsShaderStage stage) const { return mShaders[(size_t)stage].shaderBlob.Get(); }
     D3D12_SHADER_BYTECODE getShaderByteCode(GraphicsShaderStage stage) const;
 
+    ShaderInputs& accessShaderInputs() { return mShaderInputs; }
+    const ShaderInputs& getShaderInputs() const { return mShaderInputs; }
+
+    std::optional<uint32_t> getVertexElementIndex(ShaderVertexSemantic semantic, uint32_t semanticIndex) const;
+    std::optional<uint32_t> getResourceIndex(uint64_t nameHash) const;
+
 private:
     struct ShaderInfo
     {
@@ -65,9 +76,19 @@ private:
         std::string compilerMessage;
     };
 
+    void collectVertexInputs(GraphicsShaderStage stage,
+                             ID3D12ShaderReflection* reflection,
+                             const D3D12_SHADER_INPUT_BIND_DESC& shaderInputBindDesc);
+    void collectResourceInputs(GraphicsShaderStage stage,
+                               ID3D12ShaderReflection* reflection,
+                               const D3D12_SHADER_INPUT_BIND_DESC& shaderInputBindDesc);
+
     GraphicsShaderParams mParams;
     std::array<ShaderInfo, (size_t)GraphicsShaderStage::Count> mShaders;
     GraphicsShaderState mState = GraphicsShaderState::Invalid;
     std::mutex mCreationMutex;
+
+    bool mVertexConstantBufferFound = false;
+    ShaderInputs mShaderInputs;
 };
 } // namespace scrap::d3d12

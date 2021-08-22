@@ -23,7 +23,7 @@ cbuffer VertexIndices : register(b0, space1)
     DECLARE_VERTEX_BUFFER(float4, Colors)
 }
 
-cbuffer ResourceIndices : register(b0, space2)
+cbuffer ResourceIndices : register(b1, space1)
 {
     DECLARE_RESOURCE(Texture2D, float4, Texture);
 }

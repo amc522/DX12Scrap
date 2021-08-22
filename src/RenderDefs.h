@@ -3,7 +3,9 @@
 #include "StringUtils.h"
 #include "Utility.h"
 
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace scrap
 {
@@ -42,6 +44,26 @@ enum class GraphicsShaderStage
     Last = Pixel,
     None,
 };
+
+template<>
+constexpr std::string_view ToStringView(GraphicsShaderStage shaderStage)
+{
+    switch(shaderStage)
+    {
+    case scrap::GraphicsShaderStage::Vertex:
+        return "Vertex";
+    case scrap::GraphicsShaderStage::Hull:
+        return "Hull";
+    case scrap::GraphicsShaderStage::Domain:
+        return "Domain";
+    case scrap::GraphicsShaderStage::Geometry:
+        return "Geometry";
+    case scrap::GraphicsShaderStage::Pixel:
+        return "Pixel";
+    default:
+        return "Unknow GraphicsShaderstage";
+    }
+}
 
 enum class GraphicsShaderStageMask
 {
@@ -84,8 +106,40 @@ enum class ResourceAccessFlags
 };
 DEFINE_ENUM_BITWISE_OPERATORS(ResourceAccessFlags);
 
+enum class ShaderVertexSemantic
+{
+    Position,
+    TexCoord,
+    Color,
+    Count,
+    Unknown
+};
+
+struct ShaderVertexElement
+{
+    ShaderVertexSemantic semantic = ShaderVertexSemantic::Unknown;
+    uint32_t semanticIndex = 0;
+    uint32_t index = 0;
+};
+
+struct ShaderResource
+{
+    std::string name;
+    uint64_t nameHash = 0;
+    uint32_t index = 0;
+};
+
+struct ShaderInputs
+{
+    std::vector<ShaderVertexElement> vertexElements;
+    std::vector<ShaderResource> resources;
+};
 } // namespace scrap
 
 template<>
 struct fmt::formatter<scrap::GpuPreference> : public scrap::ToStringViewFormatter<scrap::GpuPreference>
+{};
+
+template<>
+struct fmt::formatter<scrap::GraphicsShaderStage> : public scrap::ToStringViewFormatter<scrap::GraphicsShaderStage>
 {};
