@@ -23,7 +23,12 @@ cbuffer VertexIndices : register(b0, space1)
     DECLARE_VERTEX_BUFFER(float4, Colors)
 }
 
-cbuffer ResourceIndices : register(b1, space1)
+cbuffer Frame : register(b1, space1)
+{
+    float gTime;
+}
+
+cbuffer ResourceIndices : register(b2, space1)
 {
     DECLARE_RESOURCE(Texture2D, float4, Texture);
 }
@@ -40,7 +45,11 @@ VertexOutput VSMain(VertexInput input)
 
     output.clipPos = float4(positions[input.vertexId], 0.0, 1.0);
     output.uv = texCoords[input.vertexId];
-    output.color = colors[input.vertexId];
+
+    float timeIntegerComponent;
+    const float timeFrac = modf(gTime, timeIntegerComponent);
+    const int timeSeconds = timeIntegerComponent;
+    output.color = colors[input.vertexId] * ((timeSeconds % 2 == 0) ? timeFrac : 1.0 - timeFrac);
 
     return output;
 }

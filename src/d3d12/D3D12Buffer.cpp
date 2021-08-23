@@ -17,6 +17,11 @@ Buffer::~Buffer()
 {
     DeviceContext::instance().queueResourceForDestruction(std::move(mResource), std::move(mDescriptorHeapReservation),
                                                           mLastUsedFrameCode);
+
+    if(mUploadResource != nullptr)
+    {
+        DeviceContext::instance().queueResourceForDestruction(std::move(mUploadResource), mLastUsedFrameCode);
+    }
 }
 
 std::optional<Buffer::Error> Buffer::init(const SimpleParams& params, nonstd::span<const std::byte> buffer)
@@ -54,6 +59,16 @@ D3D12_GPU_DESCRIPTOR_HANDLE Buffer::getUavGpu() const
     return mDescriptorHeapReservation.getGpuHandle(mUavIndex);
 }
 
+D3D12_CPU_DESCRIPTOR_HANDLE Buffer::getCbvCpu() const
+{
+    return mDescriptorHeapReservation.getCpuHandle(mCbvIndex);
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE Buffer::getCbvGpu() const
+{
+    return mDescriptorHeapReservation.getGpuHandle(mCbvIndex);
+}
+
 D3D12_INDEX_BUFFER_VIEW Buffer::getIndexView() const
 {
     return getIndexView(mParams.dxgiFormat);
@@ -79,6 +94,30 @@ void Buffer::markAsUsed()
     mLastUsedFrameCode = DeviceContext::instance().getCurrentFrameCode();
 }
 
+nonstd::span<std::byte> Buffer::map()
+{
+    void* data;
+    if(FAILED(mUploadResource->Map(0, nullptr, &data))) { return {}; }
+
+    return nonstd::span<std::byte>(reinterpret_cast<std::byte*>(data), mParams.byteSize);
+}
+
+void Buffer::unmap(ID3D12GraphicsCommandList* commandList)
+{
+    mUploadResource->Unmap(0, nullptr);
+
+    commandList->CopyBufferRegion(mResource.Get(), 0, mUploadResource.Get(), 0, mParams.byteSize);
+    markAsUsed();
+}
+
+void Buffer::transition(ID3D12GraphicsCommandList* commandList,
+                        D3D12_RESOURCE_STATES before,
+                        D3D12_RESOURCE_STATES after)
+{
+    const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(mResource.Get(), before, after);
+    commandList->ResourceBarrier(1, &barrier);
+}
+
 std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<const std::byte> buffer)
 {
     DeviceContext& deviceContext = DeviceContext::instance();
@@ -97,6 +136,18 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
     {
         params.dxgiFormat = DXGI_FORMAT_UNKNOWN;
         params.byteSize = params.numElements * params.elementByteSize;
+    }
+    else if(params.isConstantBuffer)
+    {
+        // Got a d3d12 debug layer error when creating a constant buffer view that wasn't a multiple of 256. Don't know
+        // if this is device specific or if it's queriable. Tested on an NVIDIA GeForce GTX 970M and an Intel HD
+        // Graphics 530 and both reported the same 256 byte alignment requirement.
+        //
+        // D3D12 ERROR: ID3D12Device::CreateConstantBufferView: Size of 4 is invalid.  Device requires
+        // SizeInBytes be a multiple of 256. [ STATE_CREATION ERROR #650: CREATE_CONSTANT_BUFFER_VIEW_INVALID_DESC]
+
+        params.dxgiFormat = DXGI_FORMAT_UNKNOWN;
+        params.byteSize = AlignInteger(params.byteSize, 256u);
     }
     else
     {
@@ -146,14 +197,10 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
     defaultHeapProps.CreationNodeMask = 0;
     defaultHeapProps.VisibleNodeMask = 0;
 
-    // Maybe use D3D12_RESOURCE_STATE_COMMON when not copy the texture???
-    D3D12_RESOURCE_STATES initialResourceState =
-        (!buffer.empty()) ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommittedresource
     HRESULT hr = deviceContext.getDevice()->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE,
-                                                                    &bufferDesc, D3D12_RESOURCE_STATE_COPY_DEST,
-                                                                    nullptr, IID_PPV_ARGS(&mResource));
+                                                                    &bufferDesc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+                                                                    IID_PPV_ARGS(&mResource));
 
     if(FAILED(hr)) { return Error::FailedToCreateGpuResource; }
 
@@ -206,7 +253,7 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
     const gpufmt::FormatInfo& formatInfo = gpufmt::formatInfo(params.format);
 
     //============================================
-    // 3. Copy cpu texture data to upload buffer
+    // 3. Copy cpu buffer data to upload buffer
     //============================================
     if(!buffer.empty())
     {
@@ -219,14 +266,22 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
                               0, 1, &subresourceData);
     }
 
+    if((params.accessFlags & ResourceAccessFlags::CpuWrite) == ResourceAccessFlags::CpuWrite)
+    {
+        mUploadResource = uploadResource;
+    }
+
     deviceContext.getCopyContext().trackCopyResource(mResource, std::move(uploadResource));
 
     uint32_t descriptorCount = 0;
-    const bool needsSrv = (params.accessFlags & ResourceAccessFlags::GpuRead) == ResourceAccessFlags::GpuRead;
+    const bool needsSrv =
+        (params.accessFlags & ResourceAccessFlags::GpuRead) == ResourceAccessFlags::GpuRead && !params.isConstantBuffer;
     const bool needsUav = (params.accessFlags & ResourceAccessFlags::GpuWrite) == ResourceAccessFlags::GpuWrite;
+    const bool needsCbv = params.isConstantBuffer;
 
     if(needsSrv) { ++descriptorCount; }
     if(needsUav) { ++descriptorCount; }
+    if(needsCbv) { ++descriptorCount; }
 
     auto descriptorHeapReservation = deviceContext.getCbvSrvUavHeap().reserve(descriptorCount);
     if(!descriptorHeapReservation) { return Error::InsufficientDescriptorHeapSpace; }
@@ -265,6 +320,17 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
 
         deviceContext.getCbvSrvUavHeap().createUnorderedAccessView(deviceContext, mDescriptorHeapReservation, mUavIndex,
                                                                    mResource.Get(), nullptr, uavDesc);
+    }
+
+    if(needsCbv)
+    {
+        mCbvIndex = nextDescriptorIndex++;
+        D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
+        cbvDesc.BufferLocation = mResource->GetGPUVirtualAddress();
+        cbvDesc.SizeInBytes = params.byteSize;
+
+        deviceContext.getCbvSrvUavHeap().createConstantBufferView(deviceContext, mDescriptorHeapReservation, mCbvIndex,
+                                                                  cbvDesc);
     }
 
     mUploadFrameCode = deviceContext.getCopyContext().getCurrentFrameCode();

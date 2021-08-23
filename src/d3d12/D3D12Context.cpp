@@ -361,6 +361,11 @@ void DeviceContext::waitForGpu()
     WaitForSingleObject(mFenceEvent, INFINITE);
 }
 
+void DeviceContext::queueResourceForDestruction(Microsoft::WRL::ComPtr<ID3D12Resource> &&resource, RenderFrameCode lastUsed)
+{
+    queueResourceForDestruction(std::move(resource), FixedDescriptorHeapReservation{}, lastUsed);
+}
+
 void DeviceContext::queueResourceForDestruction(Microsoft::WRL::ComPtr<ID3D12Resource>&& resource,
                                                 FixedDescriptorHeapReservation&& descriptors,
                                                 RenderFrameCode lastUsedFrameCode)

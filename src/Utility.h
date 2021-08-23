@@ -69,4 +69,10 @@ constexpr size_t GetArraySize(const T(&)[N])
     return N;
 }
 
+template<typename T>
+constexpr T AlignInteger(T value, T alignment)
+{
+    static_assert(std::is_integral_v<T>);
+    return (value + (alignment - T(1))) & (~(alignment - T(1)));
+}
 } // namespace scrap

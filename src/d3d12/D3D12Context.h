@@ -93,6 +93,8 @@ public:
 
     void waitForGpu();
 
+    void queueResourceForDestruction(Microsoft::WRL::ComPtr<ID3D12Resource>&& resource, RenderFrameCode lastUsed);
+
     void queueResourceForDestruction(Microsoft::WRL::ComPtr<ID3D12Resource>&& resource,
                                      FixedDescriptorHeapReservation&& descriptors,
                                      RenderFrameCode lastUsed);

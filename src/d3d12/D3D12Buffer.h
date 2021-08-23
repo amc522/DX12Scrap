@@ -6,12 +6,14 @@
 
 #include <optional>
 
+#include <d3d12.h>
 #include <dxgiformat.h>
 #include <gpufmt/format.h>
 #include <nonstd/span.hpp>
 #include <wrl/client.h>
 
 struct D3D12_INDEX_BUFFER_VIEW;
+struct ID3D12GraphicsCommandList;
 struct ID3D12Resource;
 
 namespace scrap::d3d12
@@ -41,11 +43,12 @@ public:
     struct ByteBased
     {
         uint32_t byteSize = 0;
+        bool isConstantBuffer = false;
     };
 
     struct FormattedSpecificParams
     {
-        gpufmt::Format format;
+        gpufmt::Format format = gpufmt::Format::UNDEFINED;
     };
 
     struct StructuredSpecificParams
@@ -78,9 +81,12 @@ public:
     D3D12_GPU_DESCRIPTOR_HANDLE getSrvGpu() const;
     D3D12_CPU_DESCRIPTOR_HANDLE getUavCpu() const;
     D3D12_GPU_DESCRIPTOR_HANDLE getUavGpu() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE getCbvCpu() const;
+    D3D12_GPU_DESCRIPTOR_HANDLE getCbvGpu() const;
 
     uint32_t getSrvDescriptorHeapIndex() const { return mDescriptorHeapReservation.getStartHeapIndex() + mSrvIndex; }
     uint32_t getUavDescriptorHeapIndex() const { return mDescriptorHeapReservation.getStartHeapIndex() + mUavIndex; }
+    uint32_t getCbvDescriptorHeapIndex() const { return mDescriptorHeapReservation.getStartHeapIndex() + mCbvIndex; }
 
     D3D12_INDEX_BUFFER_VIEW getIndexView() const;
     D3D12_INDEX_BUFFER_VIEW getIndexView(DXGI_FORMAT format) const;
@@ -88,9 +94,23 @@ public:
     bool isReady() const;
     void markAsUsed();
 
+    nonstd::span<std::byte> map();
+
+    template<class T>
+    nonstd::span<T> mapAs()
+    {
+        auto buffer = map();
+        return nonstd::span<T>(reinterpret_cast<T*>(buffer.data()), buffer.size_bytes() / sizeof(T));
+    }
+
+    void unmap(ID3D12GraphicsCommandList* commandList);
+
+    void transition(ID3D12GraphicsCommandList* commandList, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after);
+
 private:
     enum class Type
     {
+        Unknown,
         Simple,
         Formatted,
         Structured
@@ -116,18 +136,74 @@ private:
         {}
 
         DXGI_FORMAT dxgiFormat = DXGI_FORMAT_UNKNOWN;
-        Type type;
+        Type type = Type::Unknown;
     };
 
     std::optional<Error> initInternal(Params params, nonstd::span<const std::byte> buffer);
 
     Params mParams;
     Microsoft::WRL::ComPtr<ID3D12Resource> mResource;
+    Microsoft::WRL::ComPtr<ID3D12Resource> mUploadResource;
     FixedDescriptorHeapReservation mDescriptorHeapReservation;
     uint32_t mSrvIndex = 0;
     uint32_t mUavIndex = 0;
+    uint32_t mCbvIndex = 0;
 
     CopyFrameCode mUploadFrameCode;
     RenderFrameCode mLastUsedFrameCode;
+};
+
+template<class T>
+class GpuBufferWriteGuard
+{
+public:
+    GpuBufferWriteGuard() = default;
+    GpuBufferWriteGuard(T& gpuBuffer, ID3D12GraphicsCommandList* commandList)
+        : mGpuBuffer(&gpuBuffer)
+        , mCommandList(commandList)
+    {
+        mWriteBuffer = mGpuBuffer->map();
+    }
+
+    GpuBufferWriteGuard(const GpuBufferWriteGuard<T>&) = delete;
+    GpuBufferWriteGuard(GpuBufferWriteGuard<T>&& other)
+        : mGpuBuffer(other.mGpuBuffer)
+        , mCommandList(other.mCommandList)
+        , mWriteBuffer(std::move(other.mWriteBuffer))
+    {
+        other.mGpuBuffer = nullptr;
+        other.mCommandList = nullptr;
+    }
+
+    ~GpuBufferWriteGuard()
+    {
+        if(mGpuBuffer != nullptr) { mGpuBuffer->unmap(mCommandList); }
+    }
+
+    GpuBufferWriteGuard& operator=(const GpuBufferWriteGuard<T>&) = delete;
+    GpuBufferWriteGuard& operator=(GpuBufferWriteGuard<T>&& other)
+    {
+        if(mGpuBuffer != nullptr) { mGpuBuffer->unmap(mCommandList); }
+        mGpuBuffer = other.mGpuBuffer;
+        other.mGpuBuffer = nullptr;
+
+        mCommandList = other.mCommandList;
+        other.mCommandList = nullptr;
+
+        mWriteBuffer = std::move(other.mWriteBuffer);
+    }
+
+    nonstd::span<std::byte> getWriteBuffer() { return mWriteBuffer; }
+
+    template<class U>
+    nonstd::span<U> getWriteBufferAs()
+    {
+        return nonstd::span<U>(reinterpret_cast<U*>(mWriteBuffer.data()), mWriteBuffer.size_bytes() / sizeof(U));
+    }
+
+private:
+    T* mGpuBuffer = nullptr;
+    ID3D12GraphicsCommandList* mCommandList = nullptr;
+    nonstd::span<std::byte> mWriteBuffer;
 };
 } // namespace scrap::d3d12

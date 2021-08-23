@@ -36,7 +36,14 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_root_parameter1
         // The root parameter describes a parameter or argument being passed into the shader as described or declared by
         // the root signautre. Here we are saying we have a constant buffer with 3 constants.
-        std::array<D3D12_ROOT_PARAMETER1, 2> rootParameters = {};
+        std::array<D3D12_ROOT_PARAMETER1, 3> rootParameters = {};
+
+        D3D12_ROOT_PARAMETER1& frameConstantBuffer = rootParameters[d3d12::RootParamIndex::kRootParamIndex_FrameCB];
+        frameConstantBuffer.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+        frameConstantBuffer.Descriptor.ShaderRegister = d3d12::reservedShaderRegister::kFrameCB.shaderRegister;
+        frameConstantBuffer.Descriptor.RegisterSpace = d3d12::reservedShaderRegister::kFrameCB.registerSpace;
+        frameConstantBuffer.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
+        frameConstantBuffer.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         D3D12_ROOT_PARAMETER1& resourceRootConstants = rootParameters[d3d12::kRootParamIndex_ResourceIndices];
         resourceRootConstants.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
@@ -139,6 +146,7 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         spdlog::info("Created d3d12 command list");
     }
 
+    createFrameConstantBuffer();
     createIndexBuffer();
     createVertexBuffer();
     createTexture();
@@ -190,6 +198,20 @@ bool RenderScene::loadShaders()
     mPso = d3d12::DeviceContext::instance().createGraphicsPipelineState(std::move(psoParams));
 
     return true;
+}
+
+void RenderScene::createFrameConstantBuffer()
+{
+    d3d12::Buffer::SimpleParams params;
+    params.accessFlags = ResourceAccessFlags::CpuWrite | ResourceAccessFlags::GpuRead;
+    params.byteSize = sizeof(FrameConstantBuffer);
+    params.isConstantBuffer = true;
+    params.name = "Frame Constant Buffer";
+
+    auto constantBuffer = std::make_unique<d3d12::Buffer>();
+    constantBuffer->init(params);
+
+    mFrameConstantBuffer = std::move(constantBuffer);
 }
 
 void RenderScene::createIndexBuffer()
@@ -314,6 +336,22 @@ void RenderScene::createTexture()
 
 RenderScene& RenderScene::operator=(RenderScene&&) = default;
 
+void RenderScene::preRender()
+{
+    // This function is called before the copy context command list is executed for the frame.
+
+    // Update relevant constant buffers on the copy context command list so they are ready before the frame is rendered.
+    {
+        d3d12::GpuBufferWriteGuard writeGuard(*mFrameConstantBuffer.get(),
+                                              d3d12::DeviceContext::instance().getCopyContext().getCommandList());
+
+        nonstd::span<FrameConstantBuffer> buffer = writeGuard.getWriteBufferAs<FrameConstantBuffer>();
+        buffer.front().time = std::chrono::duration_cast<std::chrono::duration<float>>(
+                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  .count();
+    }
+}
+
 void RenderScene::render(d3d12::DeviceContext& d3d12Context)
 {
     ID3D12CommandAllocator* currentCommandAllocator = mCommandAllocators[d3d12Context.getFrameIndex()].Get();
@@ -358,6 +396,9 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
         mCommandList->SetDescriptorHeaps((UINT)descriptorHeaps.size(), descriptorHeaps.data());
 
         mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
+
+        mCommandList->SetGraphicsRootConstantBufferView(d3d12::RootParamIndex::kRootParamIndex_FrameCB,
+                                                        mFrameConstantBuffer->getResource()->GetGPUVirtualAddress());
 
         mCommandList->RSSetViewports(1, &viewport);
         mCommandList->RSSetScissorRects(1, &scissorRect);

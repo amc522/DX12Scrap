@@ -27,6 +27,11 @@ class GraphicsPipelineState;
 class Texture;
 } // namespace d3d12
 
+struct FrameConstantBuffer
+{
+    float time;
+};
+
 class RenderScene
 {
 public:
@@ -38,12 +43,14 @@ public:
     RenderScene& operator=(const RenderScene&) = delete;
     RenderScene& operator=(RenderScene&&);
 
+    void preRender();
     void render(d3d12::DeviceContext& d3d12Context);
 
     bool initialized() { return mInitialized; }
 
 private:
     bool loadShaders();
+    void createFrameConstantBuffer();
     void createIndexBuffer();
     void createVertexBuffer();
     void createTexture();
@@ -53,6 +60,8 @@ private:
 
     std::array<Microsoft::WRL::ComPtr<ID3D12CommandAllocator>, d3d12::kFrameBufferCount> mCommandAllocators;
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> mCommandList;
+
+    std::shared_ptr<d3d12::Buffer> mFrameConstantBuffer;
 
     struct MeshBuffers
     {
