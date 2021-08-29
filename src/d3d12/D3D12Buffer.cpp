@@ -15,12 +15,13 @@ namespace scrap::d3d12
 {
 Buffer::~Buffer()
 {
-    DeviceContext::instance().queueResourceForDestruction(std::move(mResource), std::move(mDescriptorHeapReservation),
-                                                          mLastUsedFrameCode);
+    DeviceContext& deviceContext = DeviceContext::instance();
+    deviceContext.getGraphicsContext().queueObjectForDestruction(
+        std::move(mResource), std::move(mDescriptorHeapReservation), mLastUsedFrameCode);
 
     if(mUploadResource != nullptr)
     {
-        DeviceContext::instance().queueResourceForDestruction(std::move(mUploadResource), mLastUsedFrameCode);
+        deviceContext.getGraphicsContext().queueObjectForDestruction(std::move(mUploadResource), mLastUsedFrameCode);
     }
 }
 
@@ -91,7 +92,7 @@ bool Buffer::isReady() const
 
 void Buffer::markAsUsed()
 {
-    mLastUsedFrameCode = DeviceContext::instance().getCurrentFrameCode();
+    mLastUsedFrameCode = DeviceContext::instance().getGraphicsContext().getCurrentFrameCode();
 }
 
 nonstd::span<std::byte> Buffer::map()
@@ -271,7 +272,8 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
         mUploadResource = uploadResource;
     }
 
-    deviceContext.getCopyContext().trackCopyResource(mResource, std::move(uploadResource));
+    deviceContext.getCopyContext().queueObjectForDestruction(std::move(uploadResource),
+                                                             deviceContext.getCopyContext().getCurrentFrameCode());
 
     uint32_t descriptorCount = 0;
     const bool needsSrv =

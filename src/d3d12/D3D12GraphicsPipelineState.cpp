@@ -14,7 +14,7 @@ GraphicsPipelineState::GraphicsPipelineState(GraphicsPipelineStateParams&& param
 
 GraphicsPipelineState::~GraphicsPipelineState()
 {
-    DeviceContext::instance().queuePipelineStateForDesctruction(std::move(mPipelineState), mLastUsedFrameCode);
+    DeviceContext::instance().getGraphicsContext().queueObjectForDestruction(std::move(mPipelineState), mLastUsedFrameCode);
 }
 
 void GraphicsPipelineState::create()
@@ -59,6 +59,6 @@ void GraphicsPipelineState::create()
 
 void GraphicsPipelineState::markAsUsed()
 {
-    mLastUsedFrameCode = DeviceContext::instance().getCurrentFrameCode();
+    mLastUsedFrameCode = DeviceContext::instance().getGraphicsContext().getCurrentFrameCode();
 }
 } // namespace scrap::d3d12

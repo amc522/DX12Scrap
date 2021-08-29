@@ -110,20 +110,8 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
         }
     }
 
-    { // create command queue
-        D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
-        commandQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-        commandQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-
-        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandqueue
-        if(FAILED(mDevice->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&mCommandQueue))))
-        {
-            spdlog::critical("Failed to create d3d12 direct command queue");
-            return;
-        }
-
-        spdlog::info("Created d3d12 direct command queue");
-    }
+    mGraphicsContext = std::make_unique<GraphicsContext>();
+    mGraphicsContext->init();
 
     { // create swap chain
         const glm::i32vec2 frameSize = window.getDrawableSize();
@@ -141,7 +129,7 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
 
         // https://docs.microsoft.com/en-us/windows/win32/api/dxgi1_2/nf-dxgi1_2-idxgifactory2-createswapchainforhwnd
         if(FAILED(dxgiFactory4->CreateSwapChainForHwnd(
-               mCommandQueue.Get(), // Swap chain needs the queue so that it can force a flush on it.
+               mGraphicsContext->getCommandQueue(), // Swap chain needs the queue so that it can force a flush on it.
                window.getHwnd(), &swapChainDesc, nullptr, nullptr, &swapChain)))
         {
             spdlog::critical("Failed to create d3d12 swap chain");
@@ -213,25 +201,9 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
         spdlog::info("Created render target views");
     }
 
-    { // Create synchronization objects and wait until assets have been uploaded to the GPU.
-        HRESULT hr = mDevice->CreateFence(*mFenceValues[mFrameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence));
-        ++mFenceValues[mFrameIndex];
-
-        // Create an event handle to use for frame synchronization.
-        // https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createeventw
-        mFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-        if(mFenceEvent == nullptr)
-        {
-            hr = HRESULT_FROM_WIN32(GetLastError());
-            spdlog::critical("Failed to create fence event");
-        }
-
-        spdlog::info("Created syncronization objects");
-    }
-
     mCopyContext = std::make_unique<CopyContext>();
-    mCopyContext->init(*this);
-    mCopyContext->beginCopyFrame();
+    mCopyContext->init();
+    mCopyContext->beginFrame();
 
     mInitialized = true;
 }
@@ -240,17 +212,12 @@ DeviceContext::~DeviceContext()
 {
     spdlog::info("Destroying D3D12");
 
-    waitForGpu();
-
     for(auto& future : mFutures)
     {
         if(!future.valid()) { continue; }
         future.wait();
     }
     mFutures.clear();
-    mPendingFreeList.clear();
-
-    if(mFenceEvent != nullptr) { CloseHandle(mFenceEvent); }
 
     assert(sInstance != nullptr);
     sInstance = nullptr;
@@ -276,7 +243,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE DeviceContext::getBackBufferRtv() const
 
 void DeviceContext::beginFrame()
 {
-    mDebug.beginGpuEvent(mCommandQueue.Get(), "Render Frame {}", (uint64_t)mFenceValues[mFrameIndex]);
+    mGraphicsContext->beginFrame();
 
     mCbvSrvUavHeap->uploadPendingDescriptors(*this);
 
@@ -287,8 +254,8 @@ void DeviceContext::beginFrame()
                                   }),
                    mFutures.end());
 
-    mCopyContext->endCopyFrame();
-    mCopyContext->beginCopyFrame();
+    mCopyContext->endFrame();
+    mCopyContext->beginFrame();
 }
 
 void DeviceContext::endFrame()
@@ -299,90 +266,10 @@ void DeviceContext::endFrame()
         return;
     }
 
-    // Schedule a Signal command in the queue.
-    const UINT64 currentFenceValue = *mFenceValues[mFrameIndex];
-    if(FAILED(mCommandQueue->Signal(mFence.Get(), currentFenceValue)))
-    {
-        spdlog::error("Failed to signal command queue;");
-        return;
-    }
-
     // Update the frame index.
     mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
 
-    // If the next frame is not ready to be rendered yet, wait until it is ready.
-    if(mFence->GetCompletedValue() < *mFenceValues[mFrameIndex])
-    {
-        if(FAILED(mFence->SetEventOnCompletion(*mFenceValues[mFrameIndex], mFenceEvent)))
-        {
-            spdlog::error("Fence SetEventOnCompletion call failed");
-            return;
-        }
-
-        WaitForSingleObjectEx(mFenceEvent, INFINITE, FALSE);
-    }
-
-    mLastCompletedFrame = mFenceValues[mFrameIndex];
-
-    // Set the fence value for the next frame.
-    mFenceValues[mFrameIndex] = currentFenceValue + 1;
-
-    { // Free all resources that are no longer being used by the gpu
-        std::lock_guard lockGuard(mPendingFreeListMutex);
-        mPendingFreeList.erase(std::remove_if(mPendingFreeList.begin(), mPendingFreeList.end(),
-                                              [&](const PendingFreeObject& resource) {
-                                                  return resource.lastUsedFrameCode <= mLastCompletedFrame;
-                                              }),
-                               mPendingFreeList.end());
-    }
-
-    mDebug.endGpuEvent(mCommandQueue.Get());
-}
-
-void DeviceContext::waitForGpu()
-{
-    if(mFence == nullptr) { return; }
-
-    const uint64_t fenceValue = *mFenceValues[mFrameIndex];
-
-    // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12commandqueue-signal
-    if(FAILED(mCommandQueue->Signal(mFence.Get(), fenceValue)))
-    {
-        spdlog::error("Failed to update fence.");
-        return;
-    }
-
-    if(FAILED(mFence->SetEventOnCompletion(fenceValue, mFenceEvent)))
-    {
-        spdlog::error("Fence SetEventOnCompletion call failed");
-        return;
-    }
-
-    WaitForSingleObject(mFenceEvent, INFINITE);
-}
-
-void DeviceContext::queueResourceForDestruction(Microsoft::WRL::ComPtr<ID3D12Resource> &&resource, RenderFrameCode lastUsed)
-{
-    queueResourceForDestruction(std::move(resource), FixedDescriptorHeapReservation{}, lastUsed);
-}
-
-void DeviceContext::queueResourceForDestruction(Microsoft::WRL::ComPtr<ID3D12Resource>&& resource,
-                                                FixedDescriptorHeapReservation&& descriptors,
-                                                RenderFrameCode lastUsedFrameCode)
-{
-    if(resource == nullptr || lastUsedFrameCode <= mLastCompletedFrame) { return; }
-
-    std::lock_guard lockGuard(mPendingFreeListMutex);
-    mPendingFreeList.emplace_back(std::move(resource), std::move(descriptors), lastUsedFrameCode);
-}
-
-void DeviceContext::queuePipelineStateForDesctruction(Microsoft::WRL::ComPtr<ID3D12PipelineState>&& pipelineState,
-                                                      RenderFrameCode lastUsed)
-{
-    if(pipelineState == nullptr || lastUsed <= mLastCompletedFrame) { return; }
-
-    std::lock_guard lockGuard(mPendingFreeListMutex);
-    mPendingFreeList.emplace_back(std::move(pipelineState), FixedDescriptorHeapReservation{}, lastUsed);
+    mGraphicsContext->endFrame();
 }
 
 std::shared_ptr<GraphicsPipelineState> DeviceContext::createGraphicsPipelineState(GraphicsPipelineStateParams&& params)
@@ -529,18 +416,5 @@ HRESULT DeviceContext::createDevice(D3D_FEATURE_LEVEL featureLevel)
 
     return S_OK;
 }
-DeviceContext::PendingFreeObject::PendingFreeObject(Microsoft::WRL::ComPtr<ID3D12DeviceChild>&& resource_,
-                                                    FixedDescriptorHeapReservation&& descriptors_,
-                                                    RenderFrameCode lastUsedFrameCode_)
-    : resource(std::move(resource_))
-    , descriptors(std::move(descriptors_))
-    , lastUsedFrameCode(lastUsedFrameCode_)
-{}
-
-DeviceContext::PendingFreeObject::PendingFreeObject(PendingFreeObject&&) = default;
-
-DeviceContext::PendingFreeObject::~PendingFreeObject() = default;
-
-DeviceContext::PendingFreeObject& DeviceContext::PendingFreeObject::operator=(PendingFreeObject&&) = default;
 } // namespace d3d12
 } // namespace scrap

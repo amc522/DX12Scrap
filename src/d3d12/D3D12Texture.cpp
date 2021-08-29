@@ -43,8 +43,8 @@ D3D12_SRV_DIMENSION TranslateTextureDimensionToSrv(cputex::TextureDimension text
 
 Texture::~Texture()
 {
-    DeviceContext::instance().queueResourceForDestruction(std::move(mResource), std::move(mDescriptorHeapReservation),
-                                                          mLastUsedFrameCode);
+    DeviceContext::instance().getGraphicsContext().queueObjectForDestruction(
+        std::move(mResource), std::move(mDescriptorHeapReservation), mLastUsedFrameCode);
 }
 
 std::optional<Texture::Error> Texture::initUninitialized(const Params& params)
@@ -84,7 +84,7 @@ bool Texture::isReady() const
 
 void Texture::markAsUsed()
 {
-    mLastUsedFrameCode = DeviceContext::instance().getCurrentFrameCode();
+    mLastUsedFrameCode = DeviceContext::instance().getGraphicsContext().getCurrentFrameCode();
 }
 
 std::optional<Texture::Error> Texture::init(const Params& params, const cputex::TextureView* texture)
@@ -264,7 +264,8 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
         }
     }
 
-    deviceContext.getCopyContext().trackCopyResource(mResource, std::move(uploadResource));
+    deviceContext.getCopyContext().queueObjectForDestruction(std::move(uploadResource),
+                                                             deviceContext.getCopyContext().getCurrentFrameCode());
 
     auto descriptorHeapReservation = deviceContext.getCbvSrvUavHeap().reserve(1);
     if(!descriptorHeapReservation) { return Texture::Error::InsufficientDescriptorHeapSpace; }

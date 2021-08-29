@@ -10,6 +10,7 @@
 #include "d3d12/D3D12Debug.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
 #include "d3d12/D3D12FrameCodes.h"
+#include "d3d12/D3D12GraphicsContext.h"
 #include "d3d12/D3D12MonotonicDescriptorHeap.h"
 
 #include <array>
@@ -74,33 +75,22 @@ public:
     ID3D12Device6* getDevice6() { return mDevice6.Get(); }
 
     uint32_t getFrameIndex() const { return mFrameIndex; }
-    RenderFrameCode getLastCompletedFrameCode() const { return mLastCompletedFrame; }
-    RenderFrameCode getCurrentFrameCode() const { return mFenceValues[mFrameIndex]; }
-
-    ID3D12CommandQueue* getCommandQueue() { return mCommandQueue.Get(); }
 
     ID3D12Resource* getBackBuffer() { return mRenderTargets[mFrameIndex].Get(); }
     D3D12_CPU_DESCRIPTOR_HANDLE getBackBufferRtv() const;
 
+    GraphicsContext& getGraphicsContext() { return *mGraphicsContext; }
+    const GraphicsContext& getGraphicsContext() const { return *mGraphicsContext; }
+
     CopyContext& getCopyContext() { return *mCopyContext; }
     const CopyContext& getCopyContext() const { return *mCopyContext; }
+
     d3d12::FixedDescriptorHeap_CBV_SRV_UAV& getCbvSrvUavHeap() { return *mCbvSrvUavHeap; }
 
     glm::i32vec2 frameSize() const { return mFrameBufferSize; }
 
     void beginFrame();
     void endFrame();
-
-    void waitForGpu();
-
-    void queueResourceForDestruction(Microsoft::WRL::ComPtr<ID3D12Resource>&& resource, RenderFrameCode lastUsed);
-
-    void queueResourceForDestruction(Microsoft::WRL::ComPtr<ID3D12Resource>&& resource,
-                                     FixedDescriptorHeapReservation&& descriptors,
-                                     RenderFrameCode lastUsed);
-
-    void queuePipelineStateForDesctruction(Microsoft::WRL::ComPtr<ID3D12PipelineState>&& pipelineState,
-                                           RenderFrameCode lastUsed);
 
     std::shared_ptr<GraphicsPipelineState> createGraphicsPipelineState(GraphicsPipelineStateParams&& params);
 
@@ -120,42 +110,20 @@ private:
     Microsoft::WRL::ComPtr<ID3D12Device4> mDevice4;
     Microsoft::WRL::ComPtr<ID3D12Device5> mDevice5;
     Microsoft::WRL::ComPtr<ID3D12Device6> mDevice6;
-    Microsoft::WRL::ComPtr<ID3D12CommandQueue> mCommandQueue;
-    Microsoft::WRL::ComPtr<ID3D12Fence> mFence;
-    std::array<RenderFrameCode, d3d12::kFrameBufferCount> mFenceValues{};
-    HANDLE mFenceEvent = nullptr;
     Microsoft::WRL::ComPtr<IDXGISwapChain3> mSwapChain;
     std::unique_ptr<d3d12::MonotonicDescriptorHeap_RTV> mRtvHeap;
     d3d12::MonotonicDescriptorHeapAllocation mSwapChainRtvs;
     std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, d3d12::kFrameBufferCount> mRenderTargets;
 
-    std::unique_ptr<CopyContext> mCopyContext;
     std::unique_ptr<d3d12::FixedDescriptorHeap_CBV_SRV_UAV> mCbvSrvUavHeap;
+    // Graphcs and copy context need to be declared after the descriptor heaps so they are destroyed before the
+    // descriptor heaps.
+    std::unique_ptr<GraphicsContext> mGraphicsContext;
+    std::unique_ptr<CopyContext> mCopyContext;
 
     glm::i32vec2 mFrameBufferSize{0, 0};
 
     uint32_t mFrameIndex = 0;
-    RenderFrameCode mLastCompletedFrame;
-
-    struct PendingFreeObject
-    {
-        PendingFreeObject(Microsoft::WRL::ComPtr<ID3D12DeviceChild>&& resource_,
-                          FixedDescriptorHeapReservation&& descriptors_,
-                          RenderFrameCode lastUsedFrameCode_);
-
-        PendingFreeObject(const PendingFreeObject&) = delete;
-        PendingFreeObject(PendingFreeObject&&);
-        ~PendingFreeObject();
-
-        PendingFreeObject& operator=(const PendingFreeObject&) = delete;
-        PendingFreeObject& operator=(PendingFreeObject&&);
-
-        Microsoft::WRL::ComPtr<ID3D12DeviceChild> resource;
-        FixedDescriptorHeapReservation descriptors;
-        RenderFrameCode lastUsedFrameCode;
-    };
-    std::mutex mPendingFreeListMutex;
-    std::vector<PendingFreeObject> mPendingFreeList;
 
     std::vector<std::future<void>> mFutures;
 

@@ -10,18 +10,16 @@ using namespace Microsoft::WRL;
 
 namespace scrap::d3d12
 {
-CopyContext::~CopyContext()
+HRESULT CopyContext::init()
 {
-    waitOnGpu();
-    if(mFenceEvent != nullptr) { CloseHandle(mFenceEvent); }
-}
+    DeviceContext& deviceContext = DeviceContext::instance();
 
-HRESULT CopyContext::init(DeviceContext& deviceContext)
-{
+    BaseCommandContext<CopyFrameCode>::initInternal(deviceContext.instance().getDevice());
+
     D3D12_COMMAND_QUEUE_DESC desc = {};
     desc.Type = D3D12_COMMAND_LIST_TYPE_COPY;
 
-    HRESULT hr = deviceContext.getDevice()->CreateCommandQueue(&desc, IID_PPV_ARGS(&mCopyQueue));
+    HRESULT hr = deviceContext.getDevice()->CreateCommandQueue(&desc, IID_PPV_ARGS(&mCommandQueue));
     if(FAILED(hr))
     {
         spdlog::error("Failed to create copy queue");
@@ -51,114 +49,26 @@ HRESULT CopyContext::init(DeviceContext& deviceContext)
         return hr;
     }
 
-    hr = deviceContext.getDevice()->CreateFence(*mFenceValues[mFrameIndex], D3D12_FENCE_FLAG_NONE,
-                                                IID_PPV_ARGS(&mFence));
-    if(FAILED(hr))
-    {
-        spdlog::error("Failed to create copy queue fence");
-        return hr;
-    }
-
-    mFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-    if(mFenceEvent == nullptr)
-    {
-        hr = HRESULT_FROM_WIN32(GetLastError());
-        spdlog::critical("Failed to create fence event");
-    }
-
-    ++mFenceValues[mFrameIndex];
-
     return S_OK;
 }
 
-ID3D12CommandQueue* CopyContext::getCommandQueue() const
+void CopyContext::beginFrame()
 {
-    return mCopyQueue.Get();
-}
-
-ID3D12GraphicsCommandList* CopyContext::getCommandList() const
-{
-    return mCommandList.Get();
-}
-
-void CopyContext::trackCopyResource(Microsoft::WRL::ComPtr<ID3D12Resource> sourceResource,
-                                    Microsoft::WRL::ComPtr<ID3D12Resource> destResource)
-{
-    mPendingResources.emplace_back(std::move(sourceResource), std::move(destResource), mFenceValues[mFrameIndex]);
-}
-
-void CopyContext::beginCopyFrame()
-{
-    Debug::instance().beginGpuEvent(mCopyQueue.Get(), "Copy Frame {}", (uint64_t)mFenceValues[mFrameIndex]);
+    BaseCommandContext<CopyFrameCode>::beginFrame();
 
     ID3D12CommandAllocator* currentCommandAllocator = mCommandAllocators[mFrameIndex].Get();
     currentCommandAllocator->Reset();
     mCommandList->Reset(currentCommandAllocator, nullptr);
 }
 
-void CopyContext::endCopyFrame()
+void CopyContext::endFrame()
 {
     mCommandList->Close();
 
     const std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.Get()};
-    mCopyQueue->ExecuteCommandLists(static_cast<UINT>(commandLists.size()), commandLists.data());
+    mCommandQueue->ExecuteCommandLists(static_cast<UINT>(commandLists.size()), commandLists.data());
 
-    // Schedule a Signal command in the queue.
-    const UINT64 currentFenceValue = *mFenceValues[mFrameIndex];
-    if(FAILED(mCopyQueue->Signal(mFence.Get(), currentFenceValue)))
-    {
-        spdlog::error("Failed to signal command queue;");
-        return;
-    }
-
-    // Update the frame index.
-    mFrameIndex = (mFrameIndex + 1u) % kFrameBufferCount;
-    mLastCompletedFrameCode = mFence->GetCompletedValue();
-
-    // Set the fence value for the next frame.
-    mFenceValues[mFrameIndex] = currentFenceValue + 1;
-
-    mPendingResources.erase(std::remove_if(mPendingResources.begin(), mPendingResources.end(),
-                                           [&](const PendingResource& pendingResource) {
-                                               return pendingResource.copyFrameCode <= mLastCompletedFrameCode;
-                                           }),
-                            mPendingResources.end());
-
-    Debug::instance().endGpuEvent(mCopyQueue.Get());
+    BaseCommandContext<CopyFrameCode>::endFrame();
 }
 
-void CopyContext::waitOnGpu()
-{
-    if(mFence == nullptr) { return; }
-
-    const uint64_t fenceValue = *mFenceValues[mFrameIndex];
-
-    // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12commandqueue-signal
-    if(FAILED(mCopyQueue->Signal(mFence.Get(), fenceValue)))
-    {
-        spdlog::error("Failed to update fence.");
-        return;
-    }
-
-    if(FAILED(mFence->SetEventOnCompletion(fenceValue, mFenceEvent)))
-    {
-        spdlog::error("Fence SetEventOnCompletion call failed");
-        return;
-    }
-
-    WaitForSingleObject(mFenceEvent, INFINITE);
-}
-
-CopyContext::PendingResource::PendingResource(Microsoft::WRL::ComPtr<ID3D12Resource>&& source,
-                                              Microsoft::WRL::ComPtr<ID3D12Resource>&& dest,
-                                              CopyFrameCode frameCode)
-    : sourceResource(std::move(source))
-    , destResource(std::move(dest))
-    , copyFrameCode(frameCode)
-{}
-
-CopyContext::PendingResource::PendingResource(PendingResource&&) = default;
-
-CopyContext::PendingResource::~PendingResource() = default;
-CopyContext::PendingResource& CopyContext::PendingResource::operator=(PendingResource&&) = default;
 } // namespace scrap::d3d12

@@ -155,12 +155,13 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
 
     // Execute the command list.
     std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.Get()};
-    d3d12Context.getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()), commandLists.data());
+    d3d12Context.getGraphicsContext().getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()),
+                                                                             commandLists.data());
 
     // Wait for the command list to execute; we are reusing the same command
     // list in our main loop but for now, we just want to wait for setup to
     // complete before continuing.
-    d3d12Context.waitForGpu();
+    d3d12Context.getGraphicsContext().waitOnGpu();
 
     if(!loadShaders()) { return; }
 
@@ -489,7 +490,8 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
 
     // Execute the command list.
     std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.Get()};
-    d3d12Context.getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()), commandLists.data());
+    d3d12Context.getGraphicsContext().getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()),
+                                                                             commandLists.data());
 }
 
 } // namespace scrap
