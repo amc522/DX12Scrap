@@ -4,6 +4,7 @@
 #include "Utility.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
 #include "d3d12/D3D12FrameCodes.h"
+#include "d3d12/D3D12TrackedGpuObject.h"
 
 #include <array>
 
@@ -42,7 +43,7 @@ public:
     Texture() = default;
     Texture(const Texture&) = delete;
     Texture(Texture&&) = delete;
-    ~Texture();
+    ~Texture() = default;
 
     Texture& operator=(const Texture&) = delete;
     Texture& operator=(Texture&&) = delete;
@@ -51,16 +52,17 @@ public:
     std::optional<Error>
     initFromMemory(const cputex::TextureView& texture, ResourceAccessFlags accessFlags, std::string_view name);
 
-    ID3D12Resource* getResource() const { return mResource.Get(); }
+    ID3D12Resource* getResource() const { return mResource.getResource(); }
 
     D3D12_CPU_DESCRIPTOR_HANDLE getSrvCpu() const;
     D3D12_GPU_DESCRIPTOR_HANDLE getSrvGpu() const;
 
-    uint32_t getSrvDescriptorHeapIndex() const { return mDescriptorHeapReservation.getStartHeapIndex() + mSrvIndex; }
+    uint32_t getSrvDescriptorHeapIndex() const { return mResource.getDescriptorHeapReservation().getStartHeapIndex() + mSrvIndex; }
 
     bool isReady() const;
 
-    void markAsUsed();
+    void markAsUsed(ID3D12CommandQueue *commandQueue);
+    void markAsUsed(ID3D12CommandList* commandList);
 
 private:
     std::optional<Error> init(const Params& params, const cputex::TextureView* texture);
@@ -72,15 +74,14 @@ private:
     // the gpu processor. This type of memory is most of the memory on the gpu.
     // For more information read https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_heap_type.
     // Specifically look at the descriptions for 'D3D12_HEAP_TYPE_UPLOAD' and 'D3D12_HEAP_TYPE_DEFAULT'.
-    Microsoft::WRL::ComPtr<ID3D12Resource> mResource;
-    FixedDescriptorHeapReservation mDescriptorHeapReservation;
+    TrackedShaderResource mResource;
+    TrackedGpuObject<ID3D12Resource> mUploadResource;
     uint32_t mSrvIndex = 0;
     uint32_t mUavIndex = 0;
     std::array<uint32_t, 15> mSrvMipIndices{0};
     std::array<uint32_t, 15> mUavMipIndices{0};
 
-    CopyFrameCode mUploadFrameCode;
-    RenderFrameCode mLastUsedFrameCode;
+    CopyFrameCode mInitFrameCode;
 };
 
 } // namespace scrap::d3d12

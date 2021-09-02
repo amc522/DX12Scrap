@@ -1,6 +1,7 @@
 #pragma once
 
 #include "d3d12/D3D12FrameCodes.h"
+#include "d3d12/D3D12TrackedGpuObject.h"
 
 #include <memory>
 #include <mutex>
@@ -33,7 +34,7 @@ public:
     GraphicsPipelineState(GraphicsPipelineStateParams&& params);
     GraphicsPipelineState(const GraphicsPipelineState&) = delete;
     GraphicsPipelineState(GraphicsPipelineState&& other) = default;
-    ~GraphicsPipelineState();
+    ~GraphicsPipelineState() = default;
 
     GraphicsPipelineState& operator=(const GraphicsPipelineState&) = delete;
     GraphicsPipelineState& operator=(GraphicsPipelineState&& other) = default;
@@ -41,16 +42,16 @@ public:
     void create();
     bool isReady() const { return mPipelineState != nullptr; }
 
-    ID3D12PipelineState* getPipelineState() const { return mPipelineState.Get(); }
+    ID3D12PipelineState* getPipelineState() const { return mPipelineState.get(); }
 
     const GraphicsShader* getShader() const { return mParams.shader.get(); }
 
-    void markAsUsed();
+    void markAsUsed(ID3D12CommandQueue* commandQueue);
+    void markAsUsed(ID3D12CommandList* commandList);
 
 private:
     GraphicsPipelineStateParams mParams;
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> mPipelineState;
+    TrackedGpuObject<ID3D12PipelineState> mPipelineState;
     std::mutex mCreationMutex;
-    RenderFrameCode mLastUsedFrameCode;
 };
 } // namespace scrap::d3d12

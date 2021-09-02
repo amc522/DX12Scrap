@@ -41,12 +41,6 @@ D3D12_SRV_DIMENSION TranslateTextureDimensionToSrv(cputex::TextureDimension text
     }
 }
 
-Texture::~Texture()
-{
-    DeviceContext::instance().getGraphicsContext().queueObjectForDestruction(
-        std::move(mResource), std::move(mDescriptorHeapReservation), mLastUsedFrameCode);
-}
-
 std::optional<Texture::Error> Texture::initUninitialized(const Params& params)
 {
     return init(params, nullptr);
@@ -68,23 +62,27 @@ Texture::initFromMemory(const cputex::TextureView& texture, ResourceAccessFlags 
 
 D3D12_CPU_DESCRIPTOR_HANDLE Texture::getSrvCpu() const
 {
-    return mDescriptorHeapReservation.getCpuHandle(mSrvIndex);
+    return mResource.getDescriptorHeapReservation().getCpuHandle(mSrvIndex);
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE Texture::getSrvGpu() const
 {
-    return mDescriptorHeapReservation.getGpuHandle(mSrvIndex);
+    return mResource.getDescriptorHeapReservation().getGpuHandle(mSrvIndex);
 }
 
 bool Texture::isReady() const
 {
-    return mResource != nullptr &&
-           mUploadFrameCode <= DeviceContext::instance().getCopyContext().getLastCompletedFrameCode();
+    return mResource != nullptr && mInitFrameCode < DeviceContext::instance().getCopyContext().getCurrentFrameCode();
 }
 
-void Texture::markAsUsed()
+void Texture::markAsUsed(ID3D12CommandQueue* commandQueue)
 {
-    mLastUsedFrameCode = DeviceContext::instance().getGraphicsContext().getCurrentFrameCode();
+    mResource.markAsUsed(commandQueue);
+}
+
+void Texture::markAsUsed(ID3D12CommandList* commandList)
+{
+    mResource.markAsUsed(commandList);
 }
 
 std::optional<Texture::Error> Texture::init(const Params& params, const cputex::TextureView* texture)
@@ -109,6 +107,8 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
     const auto formatTranslation = gpufmt::dxgi::translateFormat(params.format);
 
     if(!formatTranslation || !formatTranslation.exact) { return Error::InvalidFormat; }
+
+    HRESULT hr;
 
     //-----------------------------------------------------------------------------------
     // 1.a.
@@ -158,12 +158,17 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
     D3D12_RESOURCE_STATES initialResourceState =
         (texture != nullptr) ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
-    // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommittedresource
-    HRESULT hr = deviceContext.getDevice()->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE,
-                                                                    &textureDesc, D3D12_RESOURCE_STATE_COPY_DEST,
-                                                                    nullptr, IID_PPV_ARGS(&mResource));
+    {
+        ComPtr<ID3D12Resource> resource;
+        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommittedresource
+        hr = deviceContext.getDevice()->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &textureDesc,
+                                                                D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+                                                                IID_PPV_ARGS(&resource));
 
-    if(FAILED(hr)) { return Error::FailedToCreateResource; }
+        if(FAILED(hr)) { return Error::FailedToCreateResource; }
+
+        mResource = TrackedShaderResource(std::move(resource));
+    }
 
     std::wstring wideName;
     int wideStrSize = MultiByteToWideChar(CP_UTF8, 0u, params.name.data(), (int)params.name.size(), nullptr, 0);
@@ -173,7 +178,7 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
                         (int)wideName.size());
     wideName.data()[wideStrSize] = 0;
 
-    mResource->SetName(wideName.c_str());
+    mResource.getResource()->SetName(wideName.c_str());
 
     //==========================
     // 2. Create upload buffer
@@ -198,6 +203,7 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
     uploadHeapProps.CreationNodeMask = 0;
     uploadHeapProps.VisibleNodeMask = 0;
 
+    {
     ComPtr<ID3D12Resource> uploadResource;
     hr = deviceContext.getDevice()->CreateCommittedResource(&uploadHeapProps, D3D12_HEAP_FLAG_NONE, &textureUploadDesc,
                                                             D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
@@ -208,8 +214,11 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
         return Error::FailedToCreateUploadResource;
     }
 
+    mUploadResource = TrackedGpuObject(std::move(uploadResource));
+    }
+
     wideName.append(L" (Upload)");
-    uploadResource->SetName(wideName.c_str());
+    mUploadResource->SetName(wideName.c_str());
 
     //============================================
     // 3. Copy cpu texture data to upload buffer
@@ -247,7 +256,7 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
 
                     if(subresourceCount == subresources.size())
                     {
-                        UpdateSubresources<subresources.size()>(commandList, mResource.Get(), uploadResource.Get(), 0,
+                        UpdateSubresources<subresources.size()>(commandList, mResource.getResource(), mUploadResource.get(), 0,
                                                                 firstSubresource, subresourceCount,
                                                                 subresources.data());
                         firstSubresource = subresourceCount;
@@ -259,18 +268,25 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
 
         if(subresourceCount != 0)
         {
-            UpdateSubresources<subresources.size()>(commandList, mResource.Get(), uploadResource.Get(), 0,
+            UpdateSubresources<subresources.size()>(commandList, mResource.getResource(), mUploadResource.get(), 0,
                                                     firstSubresource, subresourceCount, subresources.data());
         }
+
+        mResource.markAsUsed(commandList);
+        mUploadResource.markAsUsed(commandList);
+        mInitFrameCode = deviceContext.getCopyContext().getCurrentFrameCode();
     }
 
-    deviceContext.getCopyContext().queueObjectForDestruction(std::move(uploadResource),
-                                                             deviceContext.getCopyContext().getCurrentFrameCode());
+    if((params.accessFlags & ResourceAccessFlags::CpuWrite) != ResourceAccessFlags::CpuWrite)
+    {
+        // The upload buffer was only needed to initialize the resource and will not be used again.
+        mUploadResource.reset();
+    }
 
     auto descriptorHeapReservation = deviceContext.getCbvSrvUavHeap().reserve(1);
     if(!descriptorHeapReservation) { return Texture::Error::InsufficientDescriptorHeapSpace; }
 
-    mDescriptorHeapReservation = std::move(descriptorHeapReservation.value());
+    mResource.setDescriptorHeapReservation(std::move(descriptorHeapReservation.value()));
 
     uint32_t nextDescriptorIndex = 0;
     mSrvIndex = nextDescriptorIndex++;
@@ -328,10 +344,8 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
     default: break;
     }
 
-    deviceContext.getCbvSrvUavHeap().createShaderResourceView(deviceContext, mDescriptorHeapReservation, mSrvIndex,
-                                                              mResource.Get(), srvDesc);
-
-    mUploadFrameCode = deviceContext.getCopyContext().getCurrentFrameCode();
+    deviceContext.getCbvSrvUavHeap().createShaderResourceView(deviceContext, mResource.getDescriptorHeapReservation(), mSrvIndex,
+                                                              mResource.getResource(), srvDesc);
 
     return std::nullopt;
 }

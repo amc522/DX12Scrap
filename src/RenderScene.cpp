@@ -460,12 +460,12 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
                     resourceIndices.data(), 0);
             }
 
-            mPso->markAsUsed();
-            mIndexBuffer->markAsUsed();
-            mMeshBuffers.positions->markAsUsed();
-            mMeshBuffers.texCoords->markAsUsed();
-            mMeshBuffers.colors->markAsUsed();
-            mTexture->markAsUsed();
+            mPso->markAsUsed(mCommandList.Get());
+            mIndexBuffer->markAsUsed(mCommandList.Get());
+            mMeshBuffers.positions->markAsUsed(mCommandList.Get());
+            mMeshBuffers.texCoords->markAsUsed(mCommandList.Get());
+            mMeshBuffers.colors->markAsUsed(mCommandList.Get());
+            mTexture->markAsUsed(mCommandList.Get());
 
             const D3D12_INDEX_BUFFER_VIEW ibv = mIndexBuffer->getIndexView();
 

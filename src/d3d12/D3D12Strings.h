@@ -103,6 +103,22 @@ constexpr std::string_view ToStringView(D3D_SHADER_INPUT_TYPE sit)
     default: return "Unknown D3D12_SHADER_INPUT_TYPE";
     }
 }
+
+template<>
+constexpr std::string_view ToStringView(D3D12_COMMAND_LIST_TYPE commandListType)
+{
+    switch(commandListType)
+    {
+    case D3D12_COMMAND_LIST_TYPE_DIRECT: return "D3D12_COMMAND_LIST_TYPE_DIRECT";
+    case D3D12_COMMAND_LIST_TYPE_BUNDLE: return "D3D12_COMMAND_LIST_TYPE_BUNDLE";
+    case D3D12_COMMAND_LIST_TYPE_COMPUTE: return "D3D12_COMMAND_LIST_TYPE_COMPUTE";
+    case D3D12_COMMAND_LIST_TYPE_COPY: return "D3D12_COMMAND_LIST_TYPE_COPY";
+    case D3D12_COMMAND_LIST_TYPE_VIDEO_DECODE: return "D3D12_COMMAND_LIST_TYPE_VIDEO_DECODE";
+    case D3D12_COMMAND_LIST_TYPE_VIDEO_PROCESS: return "D3D12_COMMAND_LIST_TYPE_VIDEO_PROCESS";
+    case D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE: return "D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE";
+    default: return "Unknown D3D12_COMMAND_LIST_TYPE";
+    }
+}
 } // namespace scrap
 
 template<>
@@ -190,4 +206,8 @@ struct fmt::formatter<D3D12_RESOURCE_BINDING_TIER> : public scrap::ToStringViewF
 
 template<>
 struct fmt::formatter<D3D_SHADER_INPUT_TYPE> : public scrap::ToStringViewFormatter<D3D_SHADER_INPUT_TYPE>
+{};
+
+template<>
+struct fmt::formatter<D3D12_COMMAND_LIST_TYPE> : public scrap::ToStringViewFormatter<D3D12_COMMAND_LIST_TYPE>
 {};

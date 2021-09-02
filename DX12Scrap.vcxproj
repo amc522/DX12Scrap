@@ -31,6 +31,7 @@
     <ClCompile Include="src\d3d12\D3D12GraphicsPipelineState.cpp" />
     <ClCompile Include="src\d3d12\D3D12Texture.cpp" />
     <ClCompile Include="src\d3d12\D3D12GraphicsShader.cpp" />
+    <ClCompile Include="src\d3d12\D3D12TrackedGpuObject.cpp" />
     <ClCompile Include="src\FreeBlockTracker.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\RenderScene.cpp" />
@@ -52,6 +53,7 @@
     <ClInclude Include="src\d3d12\D3D12Texture.h" />
     <ClInclude Include="src\d3d12\D3D12FrameCodes.h" />
     <ClInclude Include="src\d3d12\D3D12GraphicsShader.h" />
+    <ClInclude Include="src\d3d12\D3D12TrackedGpuObject.h" />
     <ClInclude Include="src\FreeBlockTracker.h" />
     <ClInclude Include="src\RenderDefs.h" />
     <ClInclude Include="src\RenderScene.h" />

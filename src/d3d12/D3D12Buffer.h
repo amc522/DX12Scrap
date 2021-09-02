@@ -2,7 +2,7 @@
 
 #include "RenderDefs.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
-#include "d3d12/D3D12FrameCodes.h"
+#include "d3d12/D3D12TrackedGpuObject.h"
 
 #include <optional>
 
@@ -66,7 +66,7 @@ public:
     Buffer() = default;
     Buffer(const Buffer&) = delete;
     Buffer(Buffer&&) = delete;
-    ~Buffer();
+    ~Buffer() = default;
 
     Buffer& operator=(const Buffer&) = delete;
     Buffer& operator=(Buffer&&) = delete;
@@ -75,7 +75,7 @@ public:
     std::optional<Error> init(const FormattedParams& params, nonstd::span<const std::byte> buffer = {});
     std::optional<Error> init(const StructuredParams& params, nonstd::span<const std::byte> buffer = {});
 
-    ID3D12Resource* getResource() const { return mResource.Get(); }
+    ID3D12Resource* getResource() const { return mResource.getResource(); }
 
     D3D12_CPU_DESCRIPTOR_HANDLE getSrvCpu() const;
     D3D12_GPU_DESCRIPTOR_HANDLE getSrvGpu() const;
@@ -84,15 +84,25 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE getCbvCpu() const;
     D3D12_GPU_DESCRIPTOR_HANDLE getCbvGpu() const;
 
-    uint32_t getSrvDescriptorHeapIndex() const { return mDescriptorHeapReservation.getStartHeapIndex() + mSrvIndex; }
-    uint32_t getUavDescriptorHeapIndex() const { return mDescriptorHeapReservation.getStartHeapIndex() + mUavIndex; }
-    uint32_t getCbvDescriptorHeapIndex() const { return mDescriptorHeapReservation.getStartHeapIndex() + mCbvIndex; }
+    uint32_t getSrvDescriptorHeapIndex() const
+    {
+        return mResource.getDescriptorHeapReservation().getStartHeapIndex() + mSrvIndex;
+    }
+    uint32_t getUavDescriptorHeapIndex() const
+    {
+        return mResource.getDescriptorHeapReservation().getStartHeapIndex() + mUavIndex;
+    }
+    uint32_t getCbvDescriptorHeapIndex() const
+    {
+        return mResource.getDescriptorHeapReservation().getStartHeapIndex() + mCbvIndex;
+    }
 
     D3D12_INDEX_BUFFER_VIEW getIndexView() const;
     D3D12_INDEX_BUFFER_VIEW getIndexView(DXGI_FORMAT format) const;
 
     bool isReady() const;
-    void markAsUsed();
+    void markAsUsed(ID3D12CommandQueue* commandQueue);
+    void markAsUsed(ID3D12CommandList* commandList);
 
     nonstd::span<std::byte> map();
 
@@ -142,15 +152,12 @@ private:
     std::optional<Error> initInternal(Params params, nonstd::span<const std::byte> buffer);
 
     Params mParams;
-    Microsoft::WRL::ComPtr<ID3D12Resource> mResource;
-    Microsoft::WRL::ComPtr<ID3D12Resource> mUploadResource;
-    FixedDescriptorHeapReservation mDescriptorHeapReservation;
+    TrackedShaderResource mResource;
+    TrackedGpuObject<ID3D12Resource> mUploadResource;
+    CopyFrameCode mInitFrameCode;
     uint32_t mSrvIndex = 0;
     uint32_t mUavIndex = 0;
     uint32_t mCbvIndex = 0;
-
-    CopyFrameCode mUploadFrameCode;
-    RenderFrameCode mLastUsedFrameCode;
 };
 
 template<class T>

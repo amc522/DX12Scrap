@@ -8,14 +8,11 @@
 #include <d3dx12.h>
 #include <spdlog/spdlog.h>
 
+using namespace Microsoft::WRL;
+
 namespace scrap::d3d12
 {
 GraphicsPipelineState::GraphicsPipelineState(GraphicsPipelineStateParams&& params): mParams(std::move(params)) {}
-
-GraphicsPipelineState::~GraphicsPipelineState()
-{
-    DeviceContext::instance().getGraphicsContext().queueObjectForDestruction(std::move(mPipelineState), mLastUsedFrameCode);
-}
 
 void GraphicsPipelineState::create()
 {
@@ -49,16 +46,24 @@ void GraphicsPipelineState::create()
     desc.SampleMask = UINT_MAX;
     desc.SampleDesc.Count = 1;
 
+    ComPtr<ID3D12PipelineState> pipelineState;
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-creategraphicspipelinestate
-    if(FAILED(DeviceContext::instance().getDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&mPipelineState))))
+    if(FAILED(DeviceContext::instance().getDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState))))
     {
         spdlog::critical("Failed to create d3d12 pipeline state object");
         return;
     }
+
+    mPipelineState = TrackedGpuObject(std::move(pipelineState));
 }
 
-void GraphicsPipelineState::markAsUsed()
+void GraphicsPipelineState::markAsUsed(ID3D12CommandList* commandList)
 {
-    mLastUsedFrameCode = DeviceContext::instance().getGraphicsContext().getCurrentFrameCode();
+    mPipelineState.markAsUsed(commandList);
+}
+
+void GraphicsPipelineState::markAsUsed(ID3D12CommandQueue* commandQueue)
+{
+    mPipelineState.markAsUsed(commandQueue);
 }
 } // namespace scrap::d3d12
