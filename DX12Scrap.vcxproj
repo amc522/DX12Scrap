@@ -22,6 +22,7 @@
   <ItemGroup>
     <ClCompile Include="src\Application.cpp" />
     <ClCompile Include="src\d3d12\D3D12Buffer.cpp" />
+    <ClCompile Include="src\d3d12\D3D12CommandList.cpp" />
     <ClCompile Include="src\d3d12\D3D12Context.cpp" />
     <ClCompile Include="src\d3d12\D3D12CopyContext.cpp" />
     <ClCompile Include="src\d3d12\D3D12Debug.cpp" />
@@ -41,6 +42,7 @@
     <ClInclude Include="src\Application.h" />
     <ClInclude Include="src\d3d12\D3D12BaseCommandContext.h" />
     <ClInclude Include="src\d3d12\D3D12Buffer.h" />
+    <ClInclude Include="src\d3d12\D3D12CommandList.h" />
     <ClInclude Include="src\d3d12\D3D12CopyContext.h" />
     <ClInclude Include="src\d3d12\D3D12Config.h" />
     <ClInclude Include="src\d3d12\D3D12Context.h" />

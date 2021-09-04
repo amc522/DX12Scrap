@@ -55,6 +55,31 @@ void TrackedDeviceChild::markAsUsed(ID3D12CommandList* commandList)
     UpdateFrameCode(commandList, mLastUsedRenderFrameCode, mLastUsedCopyFrameCode);
 }
 
+bool IsInUse(D3D12_COMMAND_LIST_TYPE commandListType, RenderFrameCode renderFrameCode, CopyFrameCode copyFrameCode)
+{
+    switch(commandListType)
+    {
+    case D3D12_COMMAND_LIST_TYPE_DIRECT:
+        return renderFrameCode > DeviceContext::instance().getGraphicsContext().getLastCompletedFrameCode();
+    case D3D12_COMMAND_LIST_TYPE_COPY:
+        return copyFrameCode > DeviceContext::instance().getCopyContext().getLastCompletedFrameCode();
+    default:
+        assert(false);
+        spdlog::critical("TrackedDeviceChild::isInUse unsupported D3D12_COMMAND_LIST_TYPE '{}'", commandListType);
+        return false;
+    }
+}
+
+bool TrackedDeviceChild::isInUse(ID3D12CommandQueue* commandQueue) const
+{
+    return IsInUse(commandQueue->GetDesc().Type, mLastUsedRenderFrameCode, mLastUsedCopyFrameCode);
+}
+
+bool TrackedDeviceChild::isInUse(ID3D12CommandList* commandList) const
+{
+    return IsInUse(commandList->GetType(), mLastUsedRenderFrameCode, mLastUsedCopyFrameCode);
+}
+
 void TrackedShaderResource::destroy()
 {
     if(mResource == nullptr) { return; }
@@ -65,7 +90,7 @@ void TrackedShaderResource::destroy()
     deviceContext.getCopyContext().queueObjectForDestruction(std::move(mResource), mLastUsedCopyFrameCode);
 }
 
-void TrackedShaderResource::setDescriptorHeapReservation(FixedDescriptorHeapReservation &&descriptorHeapReservation)
+void TrackedShaderResource::setDescriptorHeapReservation(FixedDescriptorHeapReservation&& descriptorHeapReservation)
 {
     if(mDescriptorHeapReservation.isValid())
     {
@@ -84,5 +109,15 @@ void TrackedShaderResource::markAsUsed(ID3D12CommandQueue* commandQueue)
 void TrackedShaderResource::markAsUsed(ID3D12CommandList* commandList)
 {
     UpdateFrameCode(commandList, mLastUsedRenderFrameCode, mLastUsedCopyFrameCode);
+}
+
+bool TrackedShaderResource::isInUse(ID3D12CommandQueue* commandQueue) const
+{
+    return IsInUse(commandQueue->GetDesc().Type, mLastUsedRenderFrameCode, mLastUsedCopyFrameCode);
+}
+
+bool TrackedShaderResource::isInUse(ID3D12CommandList* commandList) const
+{
+    return IsInUse(commandList->GetType(), mLastUsedRenderFrameCode, mLastUsedCopyFrameCode);
 }
 } // namespace scrap::d3d12

@@ -46,6 +46,9 @@ public:
     void markAsUsed(ID3D12CommandQueue* commandQueue);
     void markAsUsed(ID3D12CommandList* commandList);
 
+    bool isInUse(ID3D12CommandQueue* commandQueue) const;
+    bool isInUse(ID3D12CommandList* commandList) const;
+
     void reset()
     {
         destroy();
@@ -67,12 +70,10 @@ class TrackedShaderResource
 public:
     TrackedShaderResource() = default;
 
-    explicit TrackedShaderResource(Microsoft::WRL::ComPtr<ID3D12Resource> resource)
-        : mResource(std::move(resource))
-    {}
+    explicit TrackedShaderResource(Microsoft::WRL::ComPtr<ID3D12Resource> resource): mResource(std::move(resource)) {}
 
     explicit TrackedShaderResource(Microsoft::WRL::ComPtr<ID3D12Resource> resource,
-                                FixedDescriptorHeapReservation&& descriptorHeapReservation)
+                                   FixedDescriptorHeapReservation&& descriptorHeapReservation)
         : mResource(std::move(resource))
         , mDescriptorHeapReservation(std::move(descriptorHeapReservation))
     {}
@@ -95,6 +96,9 @@ public:
 
     void markAsUsed(ID3D12CommandQueue* commandQueue);
     void markAsUsed(ID3D12CommandList* commandList);
+
+    bool isInUse(ID3D12CommandQueue* commandQueue) const;
+    bool isInUse(ID3D12CommandList* commandList) const;
 
     void reset()
     {
@@ -134,6 +138,9 @@ public:
 
     void markAsUsed(ID3D12CommandQueue* commandQueue) { mDeviceChild.markAsUsed(commandQueue); }
     void markAsUsed(ID3D12CommandList* commandList) { mDeviceChild.markAsUsed(commandList); }
+
+    bool isInUse(ID3D12CommandQueue* commandQueue) const { return mDeviceChild.isInUse(commandQueue); }
+    bool isInUse(ID3D12CommandList* commandList) const { return mDeviceChild.isInUse(commandList); }
 
     void reset() { mDeviceChild.reset(); }
 

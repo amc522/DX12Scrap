@@ -29,14 +29,12 @@ public:
         if(mFenceEvent != nullptr) { CloseHandle(mFenceEvent); }
     }
 
-    void queueObjectForDestruction(Microsoft::WRL::ComPtr<ID3D12DeviceChild> deviceChild,
-                                   FrameCodeT lastUsedFrameCode)
+    void queueObjectForDestruction(Microsoft::WRL::ComPtr<ID3D12DeviceChild> deviceChild, FrameCodeT lastUsedFrameCode)
     {
         queueObjectForDestruction(std::move(deviceChild), {}, lastUsedFrameCode);
     }
 
-    void queueObjectForDestruction(FixedDescriptorHeapReservation &&descriptors,
-                                   FrameCodeT lastUsedFrameCode)
+    void queueObjectForDestruction(FixedDescriptorHeapReservation&& descriptors, FrameCodeT lastUsedFrameCode)
     {
         queueObjectForDestruction(nullptr, std::move(descriptors), lastUsedFrameCode);
     }
@@ -45,7 +43,10 @@ public:
                                    FixedDescriptorHeapReservation&& descriptors,
                                    FrameCodeT lastUsedFrameCode)
     {
-        if((deviceChild == nullptr && descriptors.isValid()) || lastUsedFrameCode <= mLastCompletedFrameCode) { return; }
+        if((deviceChild == nullptr && descriptors.isValid()) || lastUsedFrameCode <= mLastCompletedFrameCode)
+        {
+            return;
+        }
 
         std::lock_guard lockGuard(mPendingFreeListMutex);
         mPendingFreeList.emplace_back(std::move(deviceChild), std::move(descriptors), lastUsedFrameCode);

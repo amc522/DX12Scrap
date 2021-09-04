@@ -18,6 +18,7 @@ using namespace Microsoft::WRL;
 namespace scrap
 {
 RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
+    : mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "RenderScene")
 {
     // Create an empty root signature.
     {
@@ -120,41 +121,15 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         spdlog::info("Created d3d12 root signature");
     }
 
-    { // Create the command allocators and command list.
-        for(size_t frameIndex = 0; frameIndex < d3d12::kFrameBufferCount; ++frameIndex)
-        {
-            // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandallocator
-            if(FAILED(d3d12Context.getDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                                                       IID_PPV_ARGS(&mCommandAllocators[frameIndex]))))
-            {
-                spdlog::critical("Failed to create d3d12 command allocator");
-                return;
-            }
-        }
-
-        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandlist
-        HRESULT hr = d3d12Context.getDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                                                 mCommandAllocators[d3d12Context.getFrameIndex()].Get(),
-                                                                 nullptr, IID_PPV_ARGS(&mCommandList));
-
-        if(FAILED(hr))
-        {
-            spdlog::critical("Failed to create d3d12 command list");
-            return;
-        }
-
-        spdlog::info("Created d3d12 command list");
-    }
-
     createFrameConstantBuffer();
     createIndexBuffer();
     createVertexBuffer();
     createTexture();
 
-    if(FAILED(mCommandList->Close())) { spdlog::error("Failed to close graphics command list"); }
+    if(FAILED(mCommandList.close())) { spdlog::error("Failed to close graphics command list"); }
 
     // Execute the command list.
-    std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.Get()};
+    std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.get()};
     d3d12Context.getGraphicsContext().getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()),
                                                                              commandLists.data());
 
@@ -355,28 +330,10 @@ void RenderScene::preRender()
 
 void RenderScene::render(d3d12::DeviceContext& d3d12Context)
 {
-    ID3D12CommandAllocator* currentCommandAllocator = mCommandAllocators[d3d12Context.getFrameIndex()].Get();
-
-    // Command list allocators can only be reset when the associated
-    // command lists have finished execution on the GPU; apps should use
-    // fences to determine GPU execution progress.
-    if(FAILED(currentCommandAllocator->Reset()))
-    {
-        spdlog::error("Failed to reset d3d12 command allocator");
-        return;
-    }
-
-    // However, when ExecuteCommandList() is called on a particular command
-    // list, that command list can then be reset at any time and must be before
-    // re-recording.
-    if(FAILED(mCommandList->Reset(currentCommandAllocator, nullptr)))
-    {
-        spdlog::error("Failed to reset d3d12 command list");
-        return;
-    }
+    mCommandList.reset();
 
     {
-        d3d12::ScopedGpuEvent gpuEvent(mCommandList.Get(), "RenderScene");
+        d3d12::ScopedGpuEvent gpuEvent(mCommandList.get(), "RenderScene");
 
         D3D12_VIEWPORT viewport{};
         viewport.TopLeftX = 0.0f;
@@ -394,28 +351,29 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
         // Descriptor heaps need to be set before setting the root signature when using dynamic resources.
         // https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html#setdescriptorheaps-and-setrootsignature
         std::array<ID3D12DescriptorHeap*, 1> descriptorHeaps = {d3d12Context.getCbvSrvUavHeap().getGpuDescriptorHeap()};
-        mCommandList->SetDescriptorHeaps((UINT)descriptorHeaps.size(), descriptorHeaps.data());
+        mCommandList.get()->SetDescriptorHeaps((UINT)descriptorHeaps.size(), descriptorHeaps.data());
 
-        mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
+        mCommandList.get()->SetGraphicsRootSignature(mRootSignature.Get());
 
-        mCommandList->SetGraphicsRootConstantBufferView(d3d12::RootParamIndex::kRootParamIndex_FrameCB,
-                                                        mFrameConstantBuffer->getResource()->GetGPUVirtualAddress());
+        mCommandList.get()->SetGraphicsRootConstantBufferView(
+            d3d12::RootParamIndex::kRootParamIndex_FrameCB,
+            mFrameConstantBuffer->getResource()->GetGPUVirtualAddress());
 
-        mCommandList->RSSetViewports(1, &viewport);
-        mCommandList->RSSetScissorRects(1, &scissorRect);
+        mCommandList.get()->RSSetViewports(1, &viewport);
+        mCommandList.get()->RSSetScissorRects(1, &scissorRect);
 
         // Indicate that the back buffer will be used as a render target.
         D3D12_RESOURCE_BARRIER renderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
             d3d12Context.getBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-        mCommandList->ResourceBarrier(1, &renderTargetBarrier);
+        mCommandList.get()->ResourceBarrier(1, &renderTargetBarrier);
 
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = d3d12Context.getBackBufferRtv();
-        mCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+        mCommandList.get()->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
         // Record commands.
         const float clearColor[] = {0.0f, 0.2f, 0.4f, 1.0f};
-        mCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+        mCommandList.get()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
         if(mPso->isReady() && mIndexBuffer->isReady() && mMeshBuffers.positions->isReady() &&
            mMeshBuffers.texCoords->isReady() && mMeshBuffers.colors->isReady() && mTexture->isReady())
@@ -439,7 +397,7 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
                     mMeshBuffers.texCoords->getSrvDescriptorHeapIndex();
                 vertexBufferDescriptorIndices[vertexColorIndex] = mMeshBuffers.colors->getSrvDescriptorHeapIndex();
 
-                mCommandList->SetGraphicsRoot32BitConstants(
+                mCommandList.get()->SetGraphicsRoot32BitConstants(
                     (UINT)d3d12::kRootParamIndex_VertexIndices,
                     std::min(d3d12::kMaxBindlessVertexBuffers,
                              (uint32_t)shader.getShaderInputs().vertexElements.size()),
@@ -454,42 +412,42 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
                 std::array<uint32_t, d3d12::kMaxBindlessResources + 1> resourceIndices;
                 resourceIndices[textureIndex] = mTexture->getSrvDescriptorHeapIndex();
 
-                mCommandList->SetGraphicsRoot32BitConstants(
+                mCommandList.get()->SetGraphicsRoot32BitConstants(
                     d3d12::kRootParamIndex_ResourceIndices,
                     std::min(d3d12::kMaxBindlessResources, (uint32_t)shader.getShaderInputs().resources.size()),
                     resourceIndices.data(), 0);
             }
 
-            mPso->markAsUsed(mCommandList.Get());
-            mIndexBuffer->markAsUsed(mCommandList.Get());
-            mMeshBuffers.positions->markAsUsed(mCommandList.Get());
-            mMeshBuffers.texCoords->markAsUsed(mCommandList.Get());
-            mMeshBuffers.colors->markAsUsed(mCommandList.Get());
-            mTexture->markAsUsed(mCommandList.Get());
+            mPso->markAsUsed(mCommandList.get());
+            mIndexBuffer->markAsUsed(mCommandList.get());
+            mMeshBuffers.positions->markAsUsed(mCommandList.get());
+            mMeshBuffers.texCoords->markAsUsed(mCommandList.get());
+            mMeshBuffers.colors->markAsUsed(mCommandList.get());
+            mTexture->markAsUsed(mCommandList.get());
 
             const D3D12_INDEX_BUFFER_VIEW ibv = mIndexBuffer->getIndexView();
 
-            mCommandList->SetPipelineState(mPso->getPipelineState());
-            mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            mCommandList->IASetIndexBuffer(&ibv);
-            mCommandList->DrawIndexedInstanced(3, 1, 0, 0, 0);
+            mCommandList.get()->SetPipelineState(mPso->getPipelineState());
+            mCommandList.get()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            mCommandList.get()->IASetIndexBuffer(&ibv);
+            mCommandList.get()->DrawIndexedInstanced(3, 1, 0, 0, 0);
         }
 
         // Indicate that the back buffer will now be used to present.
         renderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
             d3d12Context.getBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 
-        mCommandList->ResourceBarrier(1, &renderTargetBarrier);
+        mCommandList.get()->ResourceBarrier(1, &renderTargetBarrier);
     }
 
-    if(FAILED(mCommandList->Close()))
+    if(FAILED(mCommandList.close()))
     {
         spdlog::error("Failed to close d3d12 command list");
         return;
     }
 
     // Execute the command list.
-    std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.Get()};
+    std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.get()};
     d3d12Context.getGraphicsContext().getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()),
                                                                              commandLists.data());
 }
