@@ -8,6 +8,9 @@
     <Filter Include="Source Files\d3d12">
       <UniqueIdentifier>{8d19b11a-7bc3-42fe-8d0b-b378931c56ae}</UniqueIdentifier>
     </Filter>
+    <Filter Include="misc">
+      <UniqueIdentifier>{2236b3cd-332d-41ad-b296-17bb49363516}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -135,5 +138,13 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="external\glm\util\glm.natvis">
+      <Filter>misc</Filter>
+    </Natvis>
+    <Natvis Include="external\span\nonstd_span.natvis">
+      <Filter>misc</Filter>
+    </Natvis>
   </ItemGroup>
 </Project>
