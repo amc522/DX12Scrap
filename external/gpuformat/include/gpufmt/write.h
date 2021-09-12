@@ -25,13 +25,17 @@ namespace gpufmt {
         Writer& operator=(Writer &&other) noexcept;
 
         [[nodiscard]]
+        bool isFormatWriteable() const noexcept;
+
+        [[nodiscard]]
         gpufmt::Format format() const noexcept;
 
         [[nodiscard]]
         std::vector<gpufmt::byte> write(const gpufmt::SampleVariant &variant, WriteError &error) const noexcept;
 
-        [[nodiscard]]
         WriteError writeTo(const gpufmt::SampleVariant &variant, gpufmt::span<gpufmt::byte> dest) const noexcept;
+
+        WriteError fill(gpufmt::span<gpufmt::byte> dest, const gpufmt::SampleVariant &value) const noexcept;
 
     private:
         std::unique_ptr<gpufmt::internal::BaseWriter> mWriter;
