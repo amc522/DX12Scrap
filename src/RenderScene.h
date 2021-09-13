@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "GpuMesh.h"
+#include "d3d12/D3D12CommandList.h"
 #include "d3d12/D3D12Config.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
 
@@ -51,27 +53,18 @@ public:
 private:
     bool loadShaders();
     void createFrameConstantBuffer();
-    void createIndexBuffer();
-    void createVertexBuffer();
+    void createTriangle();
     void createTexture();
 
     Microsoft::WRL::ComPtr<ID3D12RootSignature> mRootSignature;
-    std::shared_ptr<d3d12::GraphicsPipelineState> mPso;
+    std::shared_ptr<d3d12::GraphicsPipelineState> mHelloTrianglePso;
 
-    std::array<Microsoft::WRL::ComPtr<ID3D12CommandAllocator>, d3d12::kFrameBufferCount> mCommandAllocators;
-    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> mCommandList;
+    d3d12::GraphicsCommandList mCommandList;
 
     std::shared_ptr<d3d12::Buffer> mFrameConstantBuffer;
 
-    struct MeshBuffers
-    {
-        std::unique_ptr<d3d12::Buffer> positions;
-        std::unique_ptr<d3d12::Buffer> texCoords;
-        std::unique_ptr<d3d12::Buffer> colors;
-    };
+    GpuMesh mTriangleMesh{PrimitiveTopology::TriangleList};
 
-    std::unique_ptr<d3d12::Buffer> mIndexBuffer;
-    MeshBuffers mMeshBuffers;
     std::unique_ptr<d3d12::Texture> mTexture;
     bool mInitialized = false;
 };

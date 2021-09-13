@@ -7,6 +7,8 @@
 #include <string_view>
 #include <vector>
 
+#include <gpufmt/format.h>
+
 namespace scrap
 {
 enum class GpuPreference
@@ -50,18 +52,12 @@ constexpr std::string_view ToStringView(GraphicsShaderStage shaderStage)
 {
     switch(shaderStage)
     {
-    case scrap::GraphicsShaderStage::Vertex:
-        return "Vertex";
-    case scrap::GraphicsShaderStage::Hull:
-        return "Hull";
-    case scrap::GraphicsShaderStage::Domain:
-        return "Domain";
-    case scrap::GraphicsShaderStage::Geometry:
-        return "Geometry";
-    case scrap::GraphicsShaderStage::Pixel:
-        return "Pixel";
-    default:
-        return "Unknow GraphicsShaderstage";
+    case scrap::GraphicsShaderStage::Vertex: return "Vertex";
+    case scrap::GraphicsShaderStage::Hull: return "Hull";
+    case scrap::GraphicsShaderStage::Domain: return "Domain";
+    case scrap::GraphicsShaderStage::Geometry: return "Geometry";
+    case scrap::GraphicsShaderStage::Pixel: return "Pixel";
+    default: return "Unknow GraphicsShaderstage";
     }
 }
 
@@ -83,7 +79,7 @@ enum class GraphicsShaderStageMask
 };
 DEFINE_ENUM_BITWISE_OPERATORS(GraphicsShaderStageMask);
 
-inline GraphicsShaderStageMask GraphicsShaderStageToMask(GraphicsShaderStage stage)
+constexpr GraphicsShaderStageMask GraphicsShaderStageToMask(GraphicsShaderStage stage)
 {
     switch(stage)
     {
@@ -109,11 +105,30 @@ DEFINE_ENUM_BITWISE_OPERATORS(ResourceAccessFlags);
 enum class ShaderVertexSemantic
 {
     Position,
+    Normal,
+    Tangent,
+    Binormal,
     TexCoord,
     Color,
     Count,
     Unknown
 };
+
+template<>
+constexpr std::string_view ToStringView(ShaderVertexSemantic semantic)
+{
+    switch(semantic)
+    {
+    case scrap::ShaderVertexSemantic::Position: return "Position";
+    case scrap::ShaderVertexSemantic::Normal: return "Normal";
+    case scrap::ShaderVertexSemantic::Tangent: return "Tangent";
+    case scrap::ShaderVertexSemantic::Binormal: return "Binormal";
+    case scrap::ShaderVertexSemantic::TexCoord: return "TexCoord";
+    case scrap::ShaderVertexSemantic::Color: return "Color";
+    case scrap::ShaderVertexSemantic::Unknown: return "Unknown";
+    default: return "Unhandled ShaderVertexSemantic";
+    }
+}
 
 struct ShaderVertexElement
 {
@@ -134,6 +149,58 @@ struct ShaderInputs
     std::vector<ShaderVertexElement> vertexElements;
     std::vector<ShaderResource> resources;
 };
+
+enum class IndexBufferFormat
+{
+    UInt16,
+    Int16,
+    UInt32,
+    Int32,
+};
+
+constexpr size_t IndexBufferFormatByteSize(IndexBufferFormat format)
+{
+    switch(format)
+    {
+    case IndexBufferFormat::UInt16: return sizeof(uint16_t);
+    case IndexBufferFormat::Int16: return sizeof(int16_t);
+    case IndexBufferFormat::UInt32: return sizeof(uint32_t);
+    case IndexBufferFormat::Int32: return sizeof(int32_t);
+    default: return 0;
+    }
+}
+
+constexpr gpufmt::Format TranslateIndexBufferFormat(IndexBufferFormat format)
+{
+    switch(format)
+    {
+    case IndexBufferFormat::UInt16: return gpufmt::Format::R16_UINT;
+    case IndexBufferFormat::Int16: return gpufmt::Format::R16_SINT;
+    case IndexBufferFormat::UInt32: return gpufmt::Format::R32_UINT;
+    case IndexBufferFormat::Int32: return gpufmt::Format::R32_SINT;
+    default: return gpufmt::Format::UNDEFINED;
+    }
+}
+
+enum class PrimitiveTopology
+{
+    Undefined,
+    PointList,
+    LineList,
+    LineStrip,
+    TriangleList,
+    TriangleStrip,
+    LineListAdj,
+    LineStripAdj,
+    TriangleListAdj,
+    TriangleStripAdj,
+    Patch_1ControlPoint,
+    Patch_2ControlPoint,
+    Patch_3ControlPoint,
+    Patch_4ControlPoint,
+    Patch_5ControlPoint,
+    Patch_6ControlPoint,
+};
 } // namespace scrap
 
 template<>
@@ -142,4 +209,8 @@ struct fmt::formatter<scrap::GpuPreference> : public scrap::ToStringViewFormatte
 
 template<>
 struct fmt::formatter<scrap::GraphicsShaderStage> : public scrap::ToStringViewFormatter<scrap::GraphicsShaderStage>
+{};
+
+template<>
+struct fmt::formatter<scrap::ShaderVertexSemantic> : public scrap::ToStringViewFormatter<scrap::ShaderVertexSemantic>
 {};

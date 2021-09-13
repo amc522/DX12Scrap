@@ -1,11 +1,13 @@
 #include "RenderScene.h"
 
+#include "CpuMesh.h"
 #include "d3d12/D3D12Buffer.h"
 #include "d3d12/D3D12Context.h"
 #include "d3d12/D3D12Debug.h"
 #include "d3d12/D3D12GraphicsPipelineState.h"
 #include "d3d12/D3D12GraphicsShader.h"
 #include "d3d12/D3D12Texture.h"
+#include "d3d12/D3D12Translations.h"
 
 #include <cputex/utility.h>
 #include <d3d12.h>
@@ -122,8 +124,7 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
     }
 
     createFrameConstantBuffer();
-    createIndexBuffer();
-    createVertexBuffer();
+    createTriangle();
     createTexture();
 
     if(FAILED(mCommandList.close())) { spdlog::error("Failed to close graphics command list"); }
@@ -160,18 +161,20 @@ bool RenderScene::loadShaders()
 #endif
 
     // Describe and create the graphics pipeline state object (PSO).
-    d3d12::GraphicsPipelineStateParams psoParams = {};
-    psoParams.rootSignature = mRootSignature.Get();
-    psoParams.shader = std::make_shared<d3d12::GraphicsShader>(std::move(shaderParams));
-    psoParams.rasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    psoParams.rasterizerState.FrontCounterClockwise = true;
-    psoParams.blendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-    psoParams.depthStencilState.DepthEnable = FALSE;
-    psoParams.depthStencilState.StencilEnable = FALSE;
-    psoParams.primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    psoParams.renderTargetFormats = {DXGI_FORMAT_R8G8B8A8_UNORM};
+    {
+        d3d12::GraphicsPipelineStateParams psoParams = {};
+        psoParams.rootSignature = mRootSignature.Get();
+        psoParams.shader = std::make_shared<d3d12::GraphicsShader>(std::move(shaderParams));
+        psoParams.rasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+        psoParams.rasterizerState.FrontCounterClockwise = true;
+        psoParams.blendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+        psoParams.depthStencilState.DepthEnable = FALSE;
+        psoParams.depthStencilState.StencilEnable = FALSE;
+        psoParams.primitiveTopologyType = d3d12::TranslatePrimitiveTopologyType(mTriangleMesh.getPrimitiveTopology());
+        psoParams.renderTargetFormats = {DXGI_FORMAT_R8G8B8A8_UNORM};
 
-    mPso = d3d12::DeviceContext::instance().createGraphicsPipelineState(std::move(psoParams));
+        mHelloTrianglePso = d3d12::DeviceContext::instance().createGraphicsPipelineState(std::move(psoParams));
+    }
 
     return true;
 }
@@ -190,23 +193,7 @@ void RenderScene::createFrameConstantBuffer()
     mFrameConstantBuffer = std::move(constantBuffer);
 }
 
-void RenderScene::createIndexBuffer()
-{
-    d3d12::Buffer::FormattedParams params;
-    params.format = gpufmt::Format::R16_UINT;
-    params.numElements = 3;
-    params.accessFlags = ResourceAccessFlags::GpuRead;
-    params.name = "Index Buffer";
-
-    std::array<uint16_t, 3> indices{0, 1, 2};
-
-    auto indexBuffer = std::make_unique<d3d12::Buffer>();
-    indexBuffer->init(params, nonstd::as_bytes(nonstd::span(indices)));
-
-    mIndexBuffer = std::move(indexBuffer);
-}
-
-void RenderScene::createVertexBuffer()
+void RenderScene::createTriangle()
 {
     { // Positions
         d3d12::Buffer::FormattedParams params;
@@ -216,11 +203,8 @@ void RenderScene::createVertexBuffer()
         params.name = "Triangle Positions Buffer";
 
         std::array<glm::vec2, 3> vertices{{{-0.5f, -0.5f}, {0.5f, -0.5f}, {0.0f, 0.5f}}};
-
-        auto vertexBuffer = std::make_unique<d3d12::Buffer>();
-        vertexBuffer->init(params, nonstd::as_bytes(nonstd::span(vertices)));
-
-        mMeshBuffers.positions = std::move(vertexBuffer);
+        mTriangleMesh.createVertexElement(ShaderVertexSemantic::Position, 0, params,
+                                          nonstd::as_bytes(nonstd::span(vertices)));
     }
 
     { // UVs
@@ -231,11 +215,8 @@ void RenderScene::createVertexBuffer()
         params.name = "Triangle TexCoords Buffer";
 
         std::array<glm::vec2, 3> vertices{{{0.0f, 1.0f}, {1.0f, 1.0f}, {0.5f, 0.0f}}};
-
-        auto vertexBuffer = std::make_unique<d3d12::Buffer>();
-        vertexBuffer->init(params, nonstd::as_bytes(nonstd::span(vertices)));
-
-        mMeshBuffers.texCoords = std::move(vertexBuffer);
+        mTriangleMesh.createVertexElement(ShaderVertexSemantic::TexCoord, 0, params,
+                                          nonstd::as_bytes(nonstd::span(vertices)));
     }
 
     { // Colors
@@ -246,11 +227,20 @@ void RenderScene::createVertexBuffer()
         params.name = "Triangle TexCoords Buffer";
 
         std::array<glm::vec4, 3> vertices{{{1.0f, 0.0, 0.0, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
+        mTriangleMesh.createVertexElement(ShaderVertexSemantic::Color, 0, params,
+                                          nonstd::as_bytes(nonstd::span(vertices)));
+    }
 
-        auto vertexBuffer = std::make_unique<d3d12::Buffer>();
-        vertexBuffer->init(params, nonstd::as_bytes(nonstd::span(vertices)));
+    { // Indices
+        d3d12::Buffer::FormattedParams params;
+        params.format = gpufmt::Format::R16_UINT;
+        params.numElements = 3;
+        params.accessFlags = ResourceAccessFlags::GpuRead;
+        params.name = "Index Buffer";
 
-        mMeshBuffers.colors = std::move(vertexBuffer);
+        std::array<uint16_t, 3> indices{0, 1, 2};
+        mTriangleMesh.initIndices(IndexBufferFormat::UInt16, 3, ResourceAccessFlags::GpuRead, "Index Buffer",
+                                  nonstd::as_bytes(nonstd::span(indices)));
     }
 }
 
@@ -375,27 +365,24 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
         const float clearColor[] = {0.0f, 0.2f, 0.4f, 1.0f};
         mCommandList.get()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-        if(mPso->isReady() && mIndexBuffer->isReady() && mMeshBuffers.positions->isReady() &&
-           mMeshBuffers.texCoords->isReady() && mMeshBuffers.colors->isReady() && mTexture->isReady())
+        if(mHelloTrianglePso->isReady() && mTriangleMesh.isReady())
         {
-            const d3d12::GraphicsShader& shader = *mPso->getShader();
+            const d3d12::GraphicsShader& shader = *mHelloTrianglePso->getShader();
 
             { // bind vertex buffers
-                const uint32_t vertexPositionIndex = shader.getVertexElementIndex(ShaderVertexSemantic::Position, 0)
-                                                         .value_or(d3d12::kMaxBindlessVertexBuffers);
-                const uint32_t vertexTexCoordIndex = shader.getVertexElementIndex(ShaderVertexSemantic::TexCoord, 0)
-                                                         .value_or(d3d12::kMaxBindlessVertexBuffers);
-                const uint32_t vertexColorIndex = shader.getVertexElementIndex(ShaderVertexSemantic::Color, 0)
-                                                      .value_or(d3d12::kMaxBindlessVertexBuffers);
-
                 // creating an array with one more than necessary to give a slot to assign buffers not used by the
                 // shader.
                 std::array<uint32_t, d3d12::kMaxBindlessVertexBuffers + 1> vertexBufferDescriptorIndices;
-                vertexBufferDescriptorIndices[vertexPositionIndex] =
-                    mMeshBuffers.positions->getSrvDescriptorHeapIndex();
-                vertexBufferDescriptorIndices[vertexTexCoordIndex] =
-                    mMeshBuffers.texCoords->getSrvDescriptorHeapIndex();
-                vertexBufferDescriptorIndices[vertexColorIndex] = mMeshBuffers.colors->getSrvDescriptorHeapIndex();
+
+                for(const GpuMesh::VertexElement& vertexElement : mTriangleMesh.getVertexElements())
+                {
+                    const uint32_t constantBufferIndex =
+                        shader.getVertexElementIndex(vertexElement.semantic, vertexElement.semanticIndex)
+                            .value_or(d3d12::kMaxBindlessVertexBuffers);
+
+                    vertexBufferDescriptorIndices[constantBufferIndex] =
+                        vertexElement.buffer->getSrvDescriptorHeapIndex();
+                }
 
                 mCommandList.get()->SetGraphicsRoot32BitConstants(
                     (UINT)d3d12::kRootParamIndex_VertexIndices,
@@ -418,19 +405,17 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
                     resourceIndices.data(), 0);
             }
 
-            mPso->markAsUsed(mCommandList.get());
-            mIndexBuffer->markAsUsed(mCommandList.get());
-            mMeshBuffers.positions->markAsUsed(mCommandList.get());
-            mMeshBuffers.texCoords->markAsUsed(mCommandList.get());
-            mMeshBuffers.colors->markAsUsed(mCommandList.get());
+            mHelloTrianglePso->markAsUsed(mCommandList.get());
+            mTriangleMesh.markAsUsed(mCommandList.get());
             mTexture->markAsUsed(mCommandList.get());
 
-            const D3D12_INDEX_BUFFER_VIEW ibv = mIndexBuffer->getIndexView();
+            const D3D12_INDEX_BUFFER_VIEW ibv = mTriangleMesh.getIndexBuffer()->getIndexView();
 
-            mCommandList.get()->SetPipelineState(mPso->getPipelineState());
-            mCommandList.get()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            mCommandList.get()->SetPipelineState(mHelloTrianglePso->getPipelineState());
+            mCommandList.get()->IASetPrimitiveTopology(
+                d3d12::TranslatePrimitiveTopology(mTriangleMesh.getPrimitiveTopology()));
             mCommandList.get()->IASetIndexBuffer(&ibv);
-            mCommandList.get()->DrawIndexedInstanced(3, 1, 0, 0, 0);
+            mCommandList.get()->DrawIndexedInstanced(mTriangleMesh.getIndexCount(), 1, 0, 0, 0);
         }
 
         // Indicate that the back buffer will now be used to present.

@@ -21,6 +21,7 @@ bool EndsWith(std::basic_string_view<CharT> str, std::basic_string_view<CharT> p
 template<class T>
 constexpr std::string_view ToStringView(T)
 {
+    static_assert(false, "Is a ToStringView function missing template<>?");
     return {};
 }
 
