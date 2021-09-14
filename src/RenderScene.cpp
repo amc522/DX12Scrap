@@ -318,6 +318,68 @@ void RenderScene::preRender()
     }
 }
 
+void RenderScene::drawIndexed(d3d12::GraphicsPipelineState& pso,
+                              GpuMesh& mesh,
+                              nonstd::span<TextureBindingDesc> textures)
+{
+    if(!pso.isReady() || !mesh.isReady()) { return; }
+
+    if(textures.size() > d3d12::kMaxBindlessResources)
+    {
+        spdlog::warn("Binding more textures than bindless slots available.");
+    }
+
+    const d3d12::GraphicsShader& shader = *mHelloTrianglePso->getShader();
+
+    { // bind vertex buffers
+        // creating an array with one more than necessary to give a slot to assign buffers not used by the
+        // shader.
+        std::array<uint32_t, d3d12::kMaxBindlessVertexBuffers + 1> vertexBufferDescriptorIndices;
+
+        for(const GpuMesh::VertexElement& vertexElement : mesh.getVertexElements())
+        {
+            const uint32_t constantBufferIndex =
+                shader.getVertexElementIndex(vertexElement.semantic, vertexElement.semanticIndex)
+                    .value_or(d3d12::kMaxBindlessVertexBuffers);
+
+            vertexBufferDescriptorIndices[constantBufferIndex] = vertexElement.buffer->getSrvDescriptorHeapIndex();
+        }
+
+        mCommandList.get()->SetGraphicsRoot32BitConstants(
+            (UINT)d3d12::kRootParamIndex_VertexIndices,
+            std::min(d3d12::kMaxBindlessVertexBuffers, (uint32_t)shader.getShaderInputs().vertexElements.size()),
+            vertexBufferDescriptorIndices.data(), 0);
+    }
+
+    { // bind resources
+        std::array<uint32_t, d3d12::kMaxBindlessResources + 1> resourceIndices;
+
+        for(const TextureBindingDesc& textureBindingDesc : textures)
+        {
+            const uint32_t textureIndex =
+                shader.getResourceIndex(textureBindingDesc.nameHash).value_or(d3d12::kMaxBindlessResources);
+            resourceIndices[textureIndex] = mTexture->getSrvDescriptorHeapIndex();
+        }
+
+        mCommandList.get()->SetGraphicsRoot32BitConstants(
+            d3d12::kRootParamIndex_ResourceIndices,
+            std::min(d3d12::kMaxBindlessResources, (uint32_t)shader.getShaderInputs().resources.size()),
+            resourceIndices.data(), 0);
+    }
+
+    pso.markAsUsed(mCommandList.get());
+    mesh.markAsUsed(mCommandList.get());
+    mTexture->markAsUsed(mCommandList.get());
+
+    const D3D_PRIMITIVE_TOPOLOGY primitiveTopology = d3d12::TranslatePrimitiveTopology(mesh.getPrimitiveTopology());
+    const D3D12_INDEX_BUFFER_VIEW ibv = mesh.getIndexBuffer()->getIndexView();
+
+    mCommandList.get()->SetPipelineState(pso.getPipelineState());
+    mCommandList.get()->IASetPrimitiveTopology(primitiveTopology);
+    mCommandList.get()->IASetIndexBuffer(&ibv);
+    mCommandList.get()->DrawIndexedInstanced(mesh.getIndexCount(), 1, 0, 0, 0);
+}
+
 void RenderScene::render(d3d12::DeviceContext& d3d12Context)
 {
     mCommandList.reset();
@@ -365,58 +427,10 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
         const float clearColor[] = {0.0f, 0.2f, 0.4f, 1.0f};
         mCommandList.get()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-        if(mHelloTrianglePso->isReady() && mTriangleMesh.isReady())
-        {
-            const d3d12::GraphicsShader& shader = *mHelloTrianglePso->getShader();
+        std::array<TextureBindingDesc, 1> textureBindings = {
+            TextureBindingDesc{std::hash<std::string_view>()("Texture"), mTexture.get()}};
 
-            { // bind vertex buffers
-                // creating an array with one more than necessary to give a slot to assign buffers not used by the
-                // shader.
-                std::array<uint32_t, d3d12::kMaxBindlessVertexBuffers + 1> vertexBufferDescriptorIndices;
-
-                for(const GpuMesh::VertexElement& vertexElement : mTriangleMesh.getVertexElements())
-                {
-                    const uint32_t constantBufferIndex =
-                        shader.getVertexElementIndex(vertexElement.semantic, vertexElement.semanticIndex)
-                            .value_or(d3d12::kMaxBindlessVertexBuffers);
-
-                    vertexBufferDescriptorIndices[constantBufferIndex] =
-                        vertexElement.buffer->getSrvDescriptorHeapIndex();
-                }
-
-                mCommandList.get()->SetGraphicsRoot32BitConstants(
-                    (UINT)d3d12::kRootParamIndex_VertexIndices,
-                    std::min(d3d12::kMaxBindlessVertexBuffers,
-                             (uint32_t)shader.getShaderInputs().vertexElements.size()),
-                    vertexBufferDescriptorIndices.data(), 0);
-            }
-
-            { // bind resources
-                const uint64_t textureNameHash = std::hash<std::string_view>()("Texture");
-                const uint32_t textureIndex =
-                    shader.getResourceIndex(textureNameHash).value_or(d3d12::kMaxBindlessResources);
-
-                std::array<uint32_t, d3d12::kMaxBindlessResources + 1> resourceIndices;
-                resourceIndices[textureIndex] = mTexture->getSrvDescriptorHeapIndex();
-
-                mCommandList.get()->SetGraphicsRoot32BitConstants(
-                    d3d12::kRootParamIndex_ResourceIndices,
-                    std::min(d3d12::kMaxBindlessResources, (uint32_t)shader.getShaderInputs().resources.size()),
-                    resourceIndices.data(), 0);
-            }
-
-            mHelloTrianglePso->markAsUsed(mCommandList.get());
-            mTriangleMesh.markAsUsed(mCommandList.get());
-            mTexture->markAsUsed(mCommandList.get());
-
-            const D3D12_INDEX_BUFFER_VIEW ibv = mTriangleMesh.getIndexBuffer()->getIndexView();
-
-            mCommandList.get()->SetPipelineState(mHelloTrianglePso->getPipelineState());
-            mCommandList.get()->IASetPrimitiveTopology(
-                d3d12::TranslatePrimitiveTopology(mTriangleMesh.getPrimitiveTopology()));
-            mCommandList.get()->IASetIndexBuffer(&ibv);
-            mCommandList.get()->DrawIndexedInstanced(mTriangleMesh.getIndexCount(), 1, 0, 0, 0);
-        }
+        drawIndexed(*mHelloTrianglePso, mTriangleMesh, textureBindings);
 
         // Indicate that the back buffer will now be used to present.
         renderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(

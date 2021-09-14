@@ -51,10 +51,17 @@ public:
     bool initialized() { return mInitialized; }
 
 private:
+    struct TextureBindingDesc
+    {
+        size_t nameHash;
+        d3d12::Texture* texture;
+    };
     bool loadShaders();
     void createFrameConstantBuffer();
     void createTriangle();
     void createTexture();
+
+    void drawIndexed(d3d12::GraphicsPipelineState& pso, GpuMesh& mesh, nonstd::span<TextureBindingDesc> textures);
 
     Microsoft::WRL::ComPtr<ID3D12RootSignature> mRootSignature;
     std::shared_ptr<d3d12::GraphicsPipelineState> mHelloTrianglePso;
