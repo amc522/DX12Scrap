@@ -235,8 +235,7 @@ ShaderResource ParseBindlessResourceName(std::string_view name,
 
 ShaderVertexElement ParseBindlessVertexBufferName(std::string_view name,
                                                   std::string_view prefix = "g",
-                                                  std::string_view suffix = "DescriptorIndex",
-                                                  std::string_view vertexPrefix = "Vertex")
+                                                  std::string_view suffix = "DescriptorIndex")
 {
     ShaderVertexElement vertexElement{ParseBindlessResourceName(name, prefix, suffix)};
 
@@ -244,9 +243,10 @@ ShaderVertexElement ParseBindlessVertexBufferName(std::string_view name,
 
     name = vertexElement.name;
 
-    if(!StartsWith(name, vertexPrefix)) { return {}; }
-
-    name.remove_prefix(vertexPrefix.size());
+    if(StartsWith(name, std::string_view("Vertex")))
+    {
+        name.remove_prefix(6);
+    }
 
     const size_t digitIndex = name.find_first_of("0123456789");
 
@@ -518,6 +518,91 @@ std::optional<uint32_t> GraphicsShader::getResourceIndex(uint64_t nameHash,
     return std::nullopt;
 }
 
+template<class Pred>
+bool ParseBindlessConstantBufferVariable(const GraphicsShaderParams& params,
+                                         GraphicsShaderStage stage,
+                                         const D3D12_SHADER_BUFFER_DESC& constantBufferDesc,
+                                         ID3D12ShaderReflectionType* shaderVariableType,
+                                         std::string_view name,
+                                         uint32_t byteOffset,
+                                         Pred pred)
+{
+    D3D12_SHADER_TYPE_DESC variableTypeDesc;
+    shaderVariableType->GetDesc(&variableTypeDesc);
+
+    if(variableTypeDesc.Class == D3D_SVC_SCALAR && variableTypeDesc.Type == D3D_SVT_UINT)
+    {
+        pred(name, byteOffset / sizeof(uint32_t));
+    }
+    else if(variableTypeDesc.Class == D3D_SVC_STRUCT)
+    {
+        EnumerateBindlessConstantBufferVariables(params, stage, constantBufferDesc, shaderVariableType, byteOffset,
+                                                 pred);
+    }
+    else
+    {
+        spdlog::error("{}({}): '{}' in cbuffer '{}' must be a uint.",
+                      params.filepaths[(size_t)stage].generic_u8string(), stage, variableTypeDesc.Name,
+                      constantBufferDesc.Name);
+        return false;
+    }
+
+    return true;
+}
+
+template<class Pred>
+bool EnumerateBindlessConstantBufferVariables(const GraphicsShaderParams& params,
+                                              GraphicsShaderStage stage,
+                                              const D3D12_SHADER_BUFFER_DESC& constantBufferDesc,
+                                              ID3D12ShaderReflectionType* structType,
+                                              uint32_t byteOffset,
+                                              Pred pred)
+{
+    D3D12_SHADER_TYPE_DESC structTypeDesc;
+    structType->GetDesc(&structTypeDesc);
+
+    for(uint32_t memberIndex = 0; memberIndex < structTypeDesc.Members; ++memberIndex)
+    {
+        ID3D12ShaderReflectionType* memberType = structType->GetMemberTypeByIndex(memberIndex);
+
+        D3D12_SHADER_TYPE_DESC memberTypeDesc;
+        memberType->GetDesc(&memberTypeDesc);
+
+        const std::string_view name = structType->GetMemberTypeName(memberIndex);
+
+        const bool success = ParseBindlessConstantBufferVariable(params, stage, constantBufferDesc, memberType, name,
+                                                                 byteOffset + memberTypeDesc.Offset, pred);
+        if(!success) { return false; }
+    }
+
+    return true;
+}
+
+template<class Pred>
+bool EnumerateBindlessConstantBufferVariables(const GraphicsShaderParams& params,
+                                              GraphicsShaderStage stage,
+                                              ID3D12ShaderReflectionConstantBuffer* shaderConstantBuffer,
+                                              Pred pred)
+{
+    D3D12_SHADER_BUFFER_DESC constantBufferDesc;
+    shaderConstantBuffer->GetDesc(&constantBufferDesc);
+
+    for(uint32_t variableIndex = 0; variableIndex < constantBufferDesc.Variables; ++variableIndex)
+    {
+        ID3D12ShaderReflectionVariable* shaderVariable = shaderConstantBuffer->GetVariableByIndex(variableIndex);
+
+        D3D12_SHADER_VARIABLE_DESC shaderVariableDesc;
+        shaderVariable->GetDesc(&shaderVariableDesc);
+
+        const bool success =
+            ParseBindlessConstantBufferVariable(params, stage, constantBufferDesc, shaderVariable->GetType(),
+                                                shaderVariableDesc.Name, shaderVariableDesc.StartOffset, pred);
+        if(!success) { return false; }
+    }
+
+    return true;
+}
+
 void GraphicsShader::collectVertexInputs(GraphicsShaderStage stage,
                                          ID3D12ShaderReflection* reflection,
                                          const D3D12_SHADER_INPUT_BIND_DESC& shaderInputBindDesc)
@@ -542,56 +627,29 @@ void GraphicsShader::collectVertexInputs(GraphicsShaderStage stage,
 
     mVertexConstantBufferFound = true;
 
-    if(vertexCbDesc.Variables > d3d12::kMaxBindlessVertexBuffers)
+    // First enumerate the variables and count them up
+    size_t vertexBufferCount = 0;
+    EnumerateBindlessConstantBufferVariables(mParams, stage, constantBufferReflection,
+                                             [&vertexBufferCount](std::string_view, uint32_t) { ++vertexBufferCount; });
+
+    if(vertexBufferCount > d3d12::kMaxBindlessVertexBuffers)
     {
         spdlog::error("{}({}): Exceeded the maximum allowed number of vertex buffers ({}). Found {} vertex buffers.",
                       mParams.filepaths[(size_t)stage].generic_u8string(), stage, d3d12::kMaxBindlessVertexBuffers,
-                      vertexCbDesc.Variables);
+                      vertexBufferCount);
         return;
     }
 
-    mShaderInputs.vertexElements.reserve(vertexCbDesc.Variables);
+    // Now actually parse each variable
+    mShaderInputs.vertexElements.reserve(vertexBufferCount);
 
-    for(uint32_t variableIndex = 0; variableIndex < vertexCbDesc.Variables; ++variableIndex)
-    {
-        ID3D12ShaderReflectionVariable* variable = constantBufferReflection->GetVariableByIndex(variableIndex);
+    EnumerateBindlessConstantBufferVariables(
+        mParams, stage, constantBufferReflection, [&](std::string_view name, uint32_t index) {
+            ShaderVertexElement vertexElement = ParseBindlessVertexBufferName(name);
+            vertexElement.index = index;
 
-        D3D12_SHADER_VARIABLE_DESC variableDesc;
-        variable->GetDesc(&variableDesc);
-
-        ID3D12ShaderReflectionType* type = variable->GetType();
-
-        D3D12_SHADER_TYPE_DESC variableTypeDesc;
-        if(FAILED(type->GetDesc(&variableTypeDesc)))
-        {
-            spdlog::error("{}({}): Failed to get type information for variable '{}' in constant buffer '{}'.",
-                          mParams.filepaths[(size_t)stage].generic_u8string(), stage, variableDesc.Name,
-                          vertexCbDesc.Name);
-            continue;
-        }
-
-        if(variableTypeDesc.Class != D3D_SVC_SCALAR && variableTypeDesc.Type != D3D_SVT_UINT)
-        {
-            spdlog::error("{}({}): '{}' in cbuffer '{}' must be a uint.",
-                          mParams.filepaths[(size_t)stage].generic_u8string(), stage, variableDesc.Name,
-                          vertexCbDesc.Name);
-            continue;
-        }
-
-        ShaderVertexElement vertexLayoutElement{ParseBindlessVertexBufferName(variableDesc.Name)};
-
-        if(vertexLayoutElement.type != ShaderResourceType::Buffer)
-        {
-            spdlog::error(
-                "{}({}): '{}' in cbuffer '{}' must be of the form gBuffer_[ReturnType]_Vertex[Semantic]DescriptorIndex",
-                mParams.filepaths[(size_t)stage].generic_u8string(), stage, variableDesc.Name, vertexCbDesc.Name);
-            continue;
-        }
-
-        vertexLayoutElement.index = variableDesc.StartOffset / sizeof(uint32_t);
-
-        mShaderInputs.vertexElements.push_back(std::move(vertexLayoutElement));
-    }
+            mShaderInputs.vertexElements.push_back(std::move(vertexElement));
+        });
 }
 
 void GraphicsShader::collectResourceInputs(GraphicsShaderStage stage,
@@ -616,44 +674,29 @@ void GraphicsShader::collectResourceInputs(GraphicsShaderStage stage,
         return;
     }
 
-    if(resourceCbDesc.Variables > d3d12::kMaxBindlessResources)
+    // First enumerate the variables and count them up
+    size_t resourceCount = 0;
+    EnumerateBindlessConstantBufferVariables(mParams, stage, constantBufferReflection,
+                                             [&resourceCount](std::string_view, uint32_t) { ++resourceCount; });
+
+    if(resourceCount > d3d12::kMaxBindlessResources)
     {
         spdlog::error("{}({}): Exceeded the maximum allowed number of bindless resources ({}). Found {} "
                       "bindless resources.",
                       mParams.filepaths[(size_t)stage].generic_u8string(), stage, d3d12::kMaxBindlessResources,
-                      resourceCbDesc.Variables);
+                      resourceCount);
         return;
     }
 
-    mShaderInputs.resources.reserve(resourceCbDesc.Variables);
+    // Now actually parse each variable
+    mShaderInputs.resources.reserve(resourceCount);
 
-    for(uint32_t variableIndex = 0; variableIndex < resourceCbDesc.Variables; ++variableIndex)
-    {
-        ID3D12ShaderReflectionVariable* variable = constantBufferReflection->GetVariableByIndex(variableIndex);
+    EnumerateBindlessConstantBufferVariables(
+        mParams, stage, constantBufferReflection, [&](std::string_view name, uint32_t index) {
+        ShaderResource resource = ParseBindlessResourceName(name);
+        resource.index = index;
 
-        D3D12_SHADER_VARIABLE_DESC variableDesc;
-        variable->GetDesc(&variableDesc);
-
-        ID3D12ShaderReflectionType* type = variable->GetType();
-
-        D3D12_SHADER_TYPE_DESC variableTypeDesc;
-        if(FAILED(type->GetDesc(&variableTypeDesc)))
-        {
-            spdlog::error("{}({}): Failed to get type information for variable '{}' in constant buffer '{}'.",
-                          mParams.filepaths[(size_t)stage].generic_u8string(), stage, variableDesc.Name,
-                          resourceCbDesc.Name);
-            continue;
-        }
-
-        if(variableTypeDesc.Class != D3D_SVC_SCALAR && variableTypeDesc.Type != D3D_SVT_UINT)
-        {
-            spdlog::error("{}({}): '{}' in cbuffer '{}' must be a uint.",
-                          mParams.filepaths[(size_t)stage].generic_u8string(), stage, variableDesc.Name,
-                          resourceCbDesc.Name);
-            continue;
-        }
-
-        mShaderInputs.resources.push_back(std::move(ParseBindlessResourceName(variableDesc.Name)));
-    }
+        mShaderInputs.resources.push_back(std::move(resource));
+    });
 }
 } // namespace scrap::d3d12

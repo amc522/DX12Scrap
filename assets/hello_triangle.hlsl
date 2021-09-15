@@ -12,25 +12,27 @@ struct VertexOutput
     float4 color : COLOR;
 };
 
-cbuffer VertexIndices : register(VERTEX_INDICES_CBUFFER_REGISTER)
+struct VertexIndices
 {
     DECLARE_VERTEX_BUFFER(float2, Positions)
     DECLARE_VERTEX_BUFFER(float2, TexCoords)
     DECLARE_VERTEX_BUFFER(float4, Colors)
-}
+};
+ConstantBuffer<VertexIndices> vertexBuffers : register(VERTEX_INDICES_CBUFFER_REGISTER);
 
-cbuffer ResourceIndices : register(RESOURCE_INDICES_CBUFFER_REGISTER)
+struct ResourceIndices
 {
     DECLARE_RESOURCE(Texture2D, float4, Texture);
-}
+};
+ConstantBuffer<ResourceIndices> resources : register(RESOURCE_INDICES_CBUFFER_REGISTER);
 
 SamplerState gSampler : register(s0);
 
 VertexOutput VSMain(VertexInput input)
 {
-    Buffer<float2> positions = GetVertexPositions();
-    Buffer<float2> texCoords = GetVertexTexCoords();
-    Buffer<float4> colors = GetVertexColors();
+    Buffer<float2> positions = vertexBuffers.getPositions();
+    Buffer<float2> texCoords = vertexBuffers.getTexCoords();
+    Buffer<float4> colors = vertexBuffers.getColors();
 
     VertexOutput output;
 
@@ -47,7 +49,6 @@ VertexOutput VSMain(VertexInput input)
 
 float4 PSMain(VertexOutput input) : SV_Target
 {
-    Texture2D<float4> gTexture = GetTexture();
-
-    return lerp(input.color, gTexture.Sample(gSampler, input.uv), 0.5);
+    Texture2D<float4> texture = resources.getTexture();
+    return lerp(input.color, texture.Sample(gSampler, input.uv), 0.5);
 }
