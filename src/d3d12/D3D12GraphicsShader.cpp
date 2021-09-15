@@ -50,52 +50,12 @@ constexpr bool IsResourceIndicesRegister(const D3D12_SHADER_INPUT_BIND_DESC& des
            desc.Space == reservedShaderRegister::kResourceCB.registerSpace;
 }
 
-std::pair<ShaderVertexSemantic, uint32_t> VariableNameToVertexSemantic(std::string_view name,
-                                                                       std::string_view prefix = "gVertex",
-                                                                       std::string_view suffix = "DescriptorIndex")
+ShaderResource ParseBindlessResourceName(std::string_view name,
+                                         std::string_view prefix = "g",
+                                         std::string_view suffix = "DescriptorIndex")
 {
-    if(name.empty()) { return std::make_pair(ShaderVertexSemantic::Unknown, 0u); }
+    ShaderResource resource;
 
-    if(!StartsWith(name, prefix)) { return std::make_pair(ShaderVertexSemantic::Unknown, 0u); }
-
-    name.remove_prefix(prefix.size());
-
-    if(!EndsWith(name, suffix)) { return std::make_pair(ShaderVertexSemantic::Unknown, 0u); }
-
-    name.remove_suffix(suffix.size());
-
-    const size_t digitIndex = name.find_first_of("0123456789");
-
-    uint32_t semanticIndex = 0;
-
-    if(digitIndex != std::string_view::npos)
-    {
-        const std::string_view semanticIndexStr = name.substr(digitIndex);
-        name = name.substr(0, digitIndex);
-
-        const std::from_chars_result result =
-            std::from_chars(semanticIndexStr.data(), semanticIndexStr.data() + semanticIndexStr.size(), semanticIndex);
-
-        if(result.ec != std::errc()) { return std::make_pair(ShaderVertexSemantic::Unknown, 0u); }
-    }
-
-    if(name == "Positions") { return std::make_pair(ShaderVertexSemantic::Position, semanticIndex); }
-    else if(name == "TexCoords" || name == "Uvs")
-    {
-        return std::make_pair(ShaderVertexSemantic::TexCoord, semanticIndex);
-    }
-    else if(name == "Colors")
-    {
-        return std::make_pair(ShaderVertexSemantic::Color, semanticIndex);
-    }
-
-    return std::make_pair(ShaderVertexSemantic::Unknown, semanticIndex);
-}
-
-std::string_view VariableNameToResourceName(std::string_view name,
-                                            std::string_view prefix = "g",
-                                            std::string_view suffix = "DescriptorIndex")
-{
     if(name.empty()) { return {}; }
 
     if(!StartsWith(name, prefix)) { return {}; }
@@ -106,7 +66,228 @@ std::string_view VariableNameToResourceName(std::string_view name,
 
     name.remove_suffix(suffix.size());
 
-    return name;
+    // get the resource type
+    size_t nextSeparatorPos = name.find("_");
+    if(nextSeparatorPos == std::string_view::npos) { return {}; }
+
+    const std::string_view typeName = name.substr(0, nextSeparatorPos);
+    name = name.substr(nextSeparatorPos + 1);
+
+    if(typeName == "AppendStructuredBuffer")
+    {
+        resource.type = ShaderResourceType::AppendBuffer;
+        resource.dimension = ShaderResourceDimension::Buffer;
+    }
+    else if(typeName == "Buffer")
+    {
+        resource.type = ShaderResourceType::Buffer;
+        resource.dimension = ShaderResourceDimension::Buffer;
+    }
+    else if(typeName == "ByteAddressBuffer")
+    {
+        resource.type = ShaderResourceType::ByteAddressBuffer;
+        resource.dimension = ShaderResourceDimension::Buffer;
+    }
+    else if(typeName == "ConsumeStructuredBuffer")
+    {
+        resource.type = ShaderResourceType::ConsumeBuffer;
+        resource.dimension = ShaderResourceDimension::Buffer;
+    }
+    else if(typeName == "RWBuffer")
+    {
+        resource.type = ShaderResourceType::RwBuffer;
+        resource.dimension = ShaderResourceDimension::Buffer;
+    }
+    else if(typeName == "RWByteAddressBuffer")
+    {
+        resource.type = ShaderResourceType::RwByteAddressBuffer;
+        resource.dimension = ShaderResourceDimension::Buffer;
+    }
+    else if(typeName == "RWStructuredBuffer")
+    {
+        resource.type = ShaderResourceType::RwStructuredBuffer;
+        resource.dimension = ShaderResourceDimension::Buffer;
+    }
+    else if(typeName == "RWTexture1D")
+    {
+        resource.type = ShaderResourceType::RwTexture;
+        resource.dimension = ShaderResourceDimension::Texture1d;
+    }
+    else if(typeName == "RWTexture1DArray")
+    {
+        resource.type = ShaderResourceType::RwTexture;
+        resource.dimension = ShaderResourceDimension::Texture1dArray;
+    }
+    else if(typeName == "RWTexture2D")
+    {
+        resource.type = ShaderResourceType::RwTexture;
+        resource.dimension = ShaderResourceDimension::Texture2d;
+    }
+    else if(typeName == "RWTexture2DArray")
+    {
+        resource.type = ShaderResourceType::RwTexture;
+        resource.dimension = ShaderResourceDimension::Texture2dArray;
+    }
+    else if(typeName == "RWTexture3D")
+    {
+        resource.type = ShaderResourceType::RwTexture;
+        resource.dimension = ShaderResourceDimension::Texture3d;
+    }
+    else if(typeName == "StructuredBuffer")
+    {
+        resource.type = ShaderResourceType::StructuredBuffer;
+        resource.dimension = ShaderResourceDimension::Buffer;
+    }
+    else if(typeName == "Texture1D")
+    {
+        resource.type = ShaderResourceType::Texture;
+        resource.dimension = ShaderResourceDimension::Texture1d;
+    }
+    else if(typeName == "Texture1DArray")
+    {
+        resource.type = ShaderResourceType::Texture;
+        resource.dimension = ShaderResourceDimension::Texture1dArray;
+    }
+    else if(typeName == "Texture2D")
+    {
+        resource.type = ShaderResourceType::Texture;
+        resource.dimension = ShaderResourceDimension::Texture2d;
+    }
+    else if(typeName == "Texture2DArray")
+    {
+        resource.type = ShaderResourceType::Texture;
+        resource.dimension = ShaderResourceDimension::Texture2dArray;
+    }
+    else if(typeName == "Texture2DMS")
+    {
+        resource.type = ShaderResourceType::Texture;
+        resource.dimension = ShaderResourceDimension::Texture2d;
+        resource.multisample = true;
+    }
+    else if(typeName == "Texture2DMSArray")
+    {
+        resource.type = ShaderResourceType::Texture;
+        resource.dimension = ShaderResourceDimension::Texture2dArray;
+        resource.multisample = true;
+    }
+    else if(typeName == "Texture3D")
+    {
+        resource.type = ShaderResourceType::Texture;
+        resource.dimension = ShaderResourceDimension::Texture3d;
+    }
+    else if(typeName == "TextureCube")
+    {
+        resource.type = ShaderResourceType::Texture;
+        resource.dimension = ShaderResourceDimension::TextureCube;
+    }
+    else if(typeName == "TextureCubeArray")
+    {
+        resource.type = ShaderResourceType::Texture;
+        resource.dimension = ShaderResourceDimension::TextureCubeArray;
+    }
+
+    // get the resource type
+    nextSeparatorPos = name.find("_");
+    if(nextSeparatorPos == std::string_view::npos) { return {}; }
+
+    std::string_view returnTypeStr = name.substr(0, nextSeparatorPos);
+
+    const size_t componentCountPos = name.find_first_of("1234");
+
+    std::string_view componentCountStr;
+    if(componentCountPos != std::string_view::npos)
+    {
+        componentCountStr = returnTypeStr.substr(componentCountPos);
+        returnTypeStr = returnTypeStr.substr(0, componentCountPos);
+
+        std::from_chars(componentCountStr.data(), componentCountStr.data() + componentCountStr.size(),
+                        resource.returnTypeComponentCount);
+    }
+
+    if(returnTypeStr == "unorm") { resource.returnType = ShaderResourceReturnType::Unorm; }
+    else if(returnTypeStr == "snorm")
+    {
+        resource.returnType = ShaderResourceReturnType::Snorm;
+    }
+    else if(returnTypeStr == "int")
+    {
+        resource.returnType = ShaderResourceReturnType::Int;
+    }
+    else if(returnTypeStr == "uint")
+    {
+        resource.returnType = ShaderResourceReturnType::UInt;
+    }
+    else if(returnTypeStr == "float")
+    {
+        resource.returnType = ShaderResourceReturnType::Float;
+    }
+    else if(returnTypeStr == "double")
+    {
+        resource.returnType = ShaderResourceReturnType::Double;
+    }
+
+    name = name.substr(nextSeparatorPos + 1);
+    resource.name = name;
+    resource.nameHash = std::hash<std::string_view>()(resource.name);
+
+    return resource;
+}
+
+ShaderVertexElement ParseBindlessVertexBufferName(std::string_view name,
+                                                  std::string_view prefix = "g",
+                                                  std::string_view suffix = "DescriptorIndex",
+                                                  std::string_view vertexPrefix = "Vertex")
+{
+    ShaderVertexElement vertexElement{ParseBindlessResourceName(name, prefix, suffix)};
+
+    if(vertexElement.name.empty()) { return {}; }
+
+    name = vertexElement.name;
+
+    if(!StartsWith(name, vertexPrefix)) { return {}; }
+
+    name.remove_prefix(vertexPrefix.size());
+
+    const size_t digitIndex = name.find_first_of("0123456789");
+
+    if(digitIndex != std::string_view::npos)
+    {
+        const std::string_view semanticIndexStr = name.substr(digitIndex);
+        name = name.substr(0, digitIndex);
+
+        const std::from_chars_result result = std::from_chars(
+            semanticIndexStr.data(), semanticIndexStr.data() + semanticIndexStr.size(), vertexElement.semanticIndex);
+
+        if(result.ec != std::errc()) { return {}; }
+    }
+    else
+    {
+        vertexElement.semanticIndex = 0;
+    }
+
+    if(name == "Positions" || name == "Position") { vertexElement.semantic = ShaderVertexSemantic::Position; }
+    else if(name == "Normals" || name == "Normal")
+    {
+        vertexElement.semantic = ShaderVertexSemantic::Normal;
+    }
+    else if(name == "Tangents" || name == "Tangent")
+    {
+        vertexElement.semantic = ShaderVertexSemantic::Tangent;
+    }
+    else if(name == "Binormals" || name == "Binormal")
+    {
+        vertexElement.semantic = ShaderVertexSemantic::Binormal;
+    }
+    else if(name == "TexCoords" || name == "TexCoord" || name == "Uvs" || name == "Uv")
+    {
+        vertexElement.semantic = ShaderVertexSemantic::TexCoord;
+    }
+    else if(name == "Colors" || name == "Color")
+    {
+        vertexElement.semantic = ShaderVertexSemantic::Color;
+    }
+
+    return vertexElement;
 }
 
 void GraphicsShader::create()
@@ -260,7 +441,7 @@ void GraphicsShader::create()
             {
                 spdlog::error(
                     "{}({}): Global resource '{}' is not supported. Global resources (Texture, Buffer, etc.) are not "
-                    "supported. Only ressources access through the ResourceDescriptorHeap array are supported.",
+                    "supported. Only ressources accessed through the ResourceDescriptorHeap array are supported.",
                     filepath.generic_u8string(), stage, shaderInputBindDesc.Name);
                 compiled = false;
                 continue;
@@ -321,11 +502,17 @@ std::optional<uint32_t> GraphicsShader::getVertexElementIndex(ShaderVertexSemant
     return std::nullopt;
 }
 
-std::optional<uint32_t> GraphicsShader::getResourceIndex(uint64_t nameHash) const
+std::optional<uint32_t> GraphicsShader::getResourceIndex(uint64_t nameHash,
+                                                         ShaderResourceType resourceType,
+                                                         ShaderResourceDimension resourceDimension) const
 {
     for(const ShaderResource& resource : mShaderInputs.resources)
     {
-        if(resource.nameHash == resource.nameHash) { return resource.index; }
+        if(resource.nameHash == resource.nameHash && resource.type == resourceType &&
+           resource.dimension == resourceDimension)
+        {
+            return resource.index;
+        }
     }
 
     return std::nullopt;
@@ -357,10 +544,9 @@ void GraphicsShader::collectVertexInputs(GraphicsShaderStage stage,
 
     if(vertexCbDesc.Variables > d3d12::kMaxBindlessVertexBuffers)
     {
-        spdlog::error(
-            "{}({}): Exceeded the maximum allowed number of vertex buffers ({}). Found {} vertex buffers.",
-            mParams.filepaths[(size_t)stage].generic_u8string(), stage, d3d12::kMaxBindlessVertexBuffers,
-            vertexCbDesc.Variables);
+        spdlog::error("{}({}): Exceeded the maximum allowed number of vertex buffers ({}). Found {} vertex buffers.",
+                      mParams.filepaths[(size_t)stage].generic_u8string(), stage, d3d12::kMaxBindlessVertexBuffers,
+                      vertexCbDesc.Variables);
         return;
     }
 
@@ -392,18 +578,22 @@ void GraphicsShader::collectVertexInputs(GraphicsShaderStage stage,
             continue;
         }
 
-        ShaderVertexElement vertexLayoutElement;
+        ShaderVertexElement vertexLayoutElement{ParseBindlessVertexBufferName(variableDesc.Name)};
+
+        if(vertexLayoutElement.type != ShaderResourceType::Buffer)
+        {
+            spdlog::error(
+                "{}({}): '{}' in cbuffer '{}' must be of the form gBuffer_[ReturnType]_Vertex[Semantic]DescriptorIndex",
+                mParams.filepaths[(size_t)stage].generic_u8string(), stage, variableDesc.Name, vertexCbDesc.Name);
+            continue;
+        }
+
         vertexLayoutElement.index = variableDesc.StartOffset / sizeof(uint32_t);
 
-        std::string_view semanticName = variableDesc.Name;
-
-        const auto [semantic, semanticIndex] = VariableNameToVertexSemantic(variableDesc.Name);
-        vertexLayoutElement.semantic = semantic;
-        vertexLayoutElement.semanticIndex = semanticIndex;
-
-        mShaderInputs.vertexElements.push_back(vertexLayoutElement);
+        mShaderInputs.vertexElements.push_back(std::move(vertexLayoutElement));
     }
 }
+
 void GraphicsShader::collectResourceInputs(GraphicsShaderStage stage,
                                            ID3D12ShaderReflection* reflection,
                                            const D3D12_SHADER_INPUT_BIND_DESC& shaderInputBindDesc)
@@ -463,12 +653,7 @@ void GraphicsShader::collectResourceInputs(GraphicsShaderStage stage,
             continue;
         }
 
-        ShaderResource resource;
-        resource.name = VariableNameToResourceName(variableDesc.Name);
-        resource.nameHash = std::hash<std::string>()(resource.name);
-        resource.index = variableDesc.StartOffset / sizeof(uint32_t);
-
-        mShaderInputs.resources.push_back(std::move(resource));
+        mShaderInputs.resources.push_back(std::move(ParseBindlessResourceName(variableDesc.Name)));
     }
 }
 } // namespace scrap::d3d12

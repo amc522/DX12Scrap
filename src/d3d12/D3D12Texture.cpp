@@ -1,6 +1,7 @@
 #include "D3D12Texture.h"
 
 #include "D3D12Context.h"
+#include "D3D12Translations.h"
 
 #include <ostream>
 
@@ -14,33 +15,6 @@ using namespace Microsoft::WRL;
 
 namespace scrap::d3d12
 {
-D3D12_RESOURCE_DIMENSION TranslateTextureDimension(cputex::TextureDimension textureDimension)
-{
-    switch(textureDimension)
-    {
-    case cputex::TextureDimension::Texture1D: return D3D12_RESOURCE_DIMENSION_TEXTURE1D;
-    case cputex::TextureDimension::Texture2D: [[fallthrough]];
-    case cputex::TextureDimension::Texture3D: return D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    case cputex::TextureDimension::TextureCube: return D3D12_RESOURCE_DIMENSION_TEXTURE3D;
-    default: return D3D12_RESOURCE_DIMENSION_UNKNOWN;
-    }
-}
-
-D3D12_SRV_DIMENSION TranslateTextureDimensionToSrv(cputex::TextureDimension textureDimension, size_t arraySize)
-{
-    switch(textureDimension)
-    {
-    case cputex::TextureDimension::Texture1D:
-        return (arraySize > 1) ? D3D12_SRV_DIMENSION_TEXTURE1DARRAY : D3D12_SRV_DIMENSION_TEXTURE1D;
-    case cputex::TextureDimension::Texture2D:
-        return (arraySize > 1) ? D3D12_SRV_DIMENSION_TEXTURE2DARRAY : D3D12_SRV_DIMENSION_TEXTURE2D;
-    case cputex::TextureDimension::Texture3D: return D3D12_SRV_DIMENSION_TEXTURE3D;
-    case cputex::TextureDimension::TextureCube:
-        return (arraySize > 1) ? D3D12_SRV_DIMENSION_TEXTURECUBEARRAY : D3D12_SRV_DIMENSION_TEXTURECUBE;
-    default: return D3D12_SRV_DIMENSION_UNKNOWN;
-    }
-}
-
 std::optional<Texture::Error> Texture::initUninitialized(const Params& params)
 {
     return init(params, nullptr);
@@ -117,7 +91,7 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
     D3D12_RESOURCE_ALLOCATION_INFO allocInfo;
 
     D3D12_RESOURCE_DESC textureDesc = {};
-    textureDesc.Dimension = TranslateTextureDimension(params.dimension);
+    textureDesc.Dimension = TranslateResourceDimension(params.dimension);
     textureDesc.Alignment = 0;
     textureDesc.Width = params.extents.x;
     textureDesc.Height = params.extents.y;
@@ -204,17 +178,17 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
     uploadHeapProps.VisibleNodeMask = 0;
 
     {
-    ComPtr<ID3D12Resource> uploadResource;
-    hr = deviceContext.getDevice()->CreateCommittedResource(&uploadHeapProps, D3D12_HEAP_FLAG_NONE, &textureUploadDesc,
-                                                            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-                                                            IID_PPV_ARGS(&uploadResource));
-    if(FAILED(hr))
-    {
-        spdlog::critical("Failed to create texture upload resource.");
-        return Error::FailedToCreateUploadResource;
-    }
+        ComPtr<ID3D12Resource> uploadResource;
+        hr = deviceContext.getDevice()->CreateCommittedResource(&uploadHeapProps, D3D12_HEAP_FLAG_NONE,
+                                                                &textureUploadDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                                nullptr, IID_PPV_ARGS(&uploadResource));
+        if(FAILED(hr))
+        {
+            spdlog::critical("Failed to create texture upload resource.");
+            return Error::FailedToCreateUploadResource;
+        }
 
-    mUploadResource = TrackedGpuObject(std::move(uploadResource));
+        mUploadResource = TrackedGpuObject(std::move(uploadResource));
     }
 
     wideName.append(L" (Upload)");
@@ -256,9 +230,9 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
 
                     if(subresourceCount == subresources.size())
                     {
-                        UpdateSubresources<subresources.size()>(commandList, mResource.getResource(), mUploadResource.get(), 0,
-                                                                firstSubresource, subresourceCount,
-                                                                subresources.data());
+                        UpdateSubresources<subresources.size()>(commandList, mResource.getResource(),
+                                                                mUploadResource.get(), 0, firstSubresource,
+                                                                subresourceCount, subresources.data());
                         firstSubresource = subresourceCount;
                         subresourceCount = 0;
                     }
@@ -293,7 +267,7 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
     srvDesc.Format = formatTranslation.exact.value();
-    srvDesc.ViewDimension = TranslateTextureDimensionToSrv(params.dimension, params.arraySize);
+    srvDesc.ViewDimension = TranslateSrvDimension(params.dimension, params.arraySize);
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
     switch(srvDesc.ViewDimension)
@@ -344,8 +318,26 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
     default: break;
     }
 
-    deviceContext.getCbvSrvUavHeap().createShaderResourceView(deviceContext, mResource.getDescriptorHeapReservation(), mSrvIndex,
-                                                              mResource.getResource(), srvDesc);
+    deviceContext.getCbvSrvUavHeap().createShaderResourceView(deviceContext, mResource.getDescriptorHeapReservation(),
+                                                              mSrvIndex, mResource.getResource(), srvDesc);
+
+    switch(params.dimension)
+    {
+    case cputex::TextureDimension::Texture1D:
+        mResourceDimension =
+            (params.arraySize > 1) ? ShaderResourceDimension::Texture1dArray : ShaderResourceDimension::Texture1d;
+        break;
+    case cputex::TextureDimension::Texture2D:
+        mResourceDimension =
+            (params.arraySize > 1) ? ShaderResourceDimension::Texture2dArray : ShaderResourceDimension::Texture2d;
+        break;
+    case cputex::TextureDimension::Texture3D: mResourceDimension = ShaderResourceDimension::Texture3d; break;
+    case cputex::TextureDimension::TextureCube:
+        mResourceDimension =
+            (params.arraySize > 1) ? ShaderResourceDimension::TextureCubeArray : ShaderResourceDimension::TextureCube;
+        break;
+    default: mResourceDimension = ShaderResourceDimension::Unknown; break;
+    }
 
     return std::nullopt;
 }

@@ -130,11 +130,43 @@ constexpr std::string_view ToStringView(ShaderVertexSemantic semantic)
     }
 }
 
-struct ShaderVertexElement
+enum class ShaderResourceType
 {
-    ShaderVertexSemantic semantic = ShaderVertexSemantic::Unknown;
-    uint32_t semanticIndex = 0;
-    uint32_t index = 0;
+    AppendBuffer,
+    Buffer,
+    ByteAddressBuffer,
+    ConsumeBuffer,
+    RwBuffer,
+    RwByteAddressBuffer,
+    RwStructuredBuffer,
+    RwTexture,
+    StructuredBuffer,
+    Texture,
+    Unknown
+};
+
+enum class ShaderResourceDimension
+{
+    Buffer,
+    Texture1d,
+    Texture1dArray,
+    Texture2d,
+    Texture2dArray,
+    Texture3d,
+    TextureCube,
+    TextureCubeArray,
+    Unknown
+};
+
+enum class ShaderResourceReturnType
+{
+    Unorm,
+    Snorm,
+    Int,
+    UInt,
+    Float,
+    Double,
+    None
 };
 
 struct ShaderResource
@@ -142,6 +174,17 @@ struct ShaderResource
     std::string name;
     uint64_t nameHash = 0;
     uint32_t index = 0;
+    ShaderResourceType type = ShaderResourceType::Unknown;
+    ShaderResourceDimension dimension = ShaderResourceDimension::Unknown;
+    ShaderResourceReturnType returnType = ShaderResourceReturnType::None;
+    uint8_t returnTypeComponentCount = 1;
+    bool multisample = false;
+};
+
+struct ShaderVertexElement : public ShaderResource
+{
+    ShaderVertexSemantic semantic = ShaderVertexSemantic::Unknown;
+    uint32_t semanticIndex = uint32_t(-1);
 };
 
 struct ShaderInputs

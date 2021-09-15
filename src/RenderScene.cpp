@@ -357,7 +357,10 @@ void RenderScene::drawIndexed(d3d12::GraphicsPipelineState& pso,
         for(const TextureBindingDesc& textureBindingDesc : textures)
         {
             const uint32_t textureIndex =
-                shader.getResourceIndex(textureBindingDesc.nameHash).value_or(d3d12::kMaxBindlessResources);
+                shader
+                    .getResourceIndex(textureBindingDesc.nameHash, ShaderResourceType::Texture,
+                                      textureBindingDesc.texture->getShaderResourceDimension())
+                    .value_or(d3d12::kMaxBindlessResources);
             resourceIndices[textureIndex] = mTexture->getSrvDescriptorHeapIndex();
         }
 

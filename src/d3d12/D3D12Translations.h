@@ -2,6 +2,7 @@
 
 #include "RenderDefs.h"
 
+#include <cputex/definitions.h>
 #include <d3d12.h>
 #include <d3dcommon.h>
 
@@ -52,6 +53,33 @@ namespace scrap::d3d12
     case scrap::PrimitiveTopology::Patch_5ControlPoint: return D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
     case scrap::PrimitiveTopology::Patch_6ControlPoint: return D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
     default: assert(false); return D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED;
+    }
+}
+
+[[nodiscard]] constexpr D3D12_RESOURCE_DIMENSION TranslateResourceDimension(cputex::TextureDimension dimension)
+{
+    switch(dimension)
+    {
+    case cputex::TextureDimension::Texture1D: return D3D12_RESOURCE_DIMENSION_TEXTURE1D;
+    case cputex::TextureDimension::Texture2D: return D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    case cputex::TextureDimension::Texture3D: return D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+    case cputex::TextureDimension::TextureCube: return D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    default: return D3D12_RESOURCE_DIMENSION_UNKNOWN;
+    }
+}
+
+[[nodiscard]] constexpr D3D12_SRV_DIMENSION TranslateSrvDimension(cputex::TextureDimension dimension, size_t arraySize)
+{
+    switch(dimension)
+    {
+    case cputex::TextureDimension::Texture1D:
+        return (arraySize > 1) ? D3D12_SRV_DIMENSION_TEXTURE1DARRAY : D3D12_SRV_DIMENSION_TEXTURE1D;
+    case cputex::TextureDimension::Texture2D:
+        return (arraySize > 1) ? D3D12_SRV_DIMENSION_TEXTURE2DARRAY : D3D12_SRV_DIMENSION_TEXTURE2D;
+    case cputex::TextureDimension::Texture3D: return D3D12_SRV_DIMENSION_TEXTURE3D;
+    case cputex::TextureDimension::TextureCube:
+        return (arraySize > 1) ? D3D12_SRV_DIMENSION_TEXTURECUBEARRAY : D3D12_SRV_DIMENSION_TEXTURECUBE;
+    default: return D3D12_SRV_DIMENSION_UNKNOWN;
     }
 }
 } // namespace scrap::d3d12

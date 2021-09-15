@@ -1,8 +1,4 @@
-#define DECLARE_RESOURCE(ResourceObjectType, ResourceValueType, Name) \
-uint g##Name##DescriptorIndex; \
-ResourceObjectType<ResourceValueType> Get##Name() { return ResourceDescriptorHeap[g##Name##DescriptorIndex]; }
-
-#define DECLARE_VERTEX_BUFFER(ValueType, Name) DECLARE_RESOURCE(Buffer, ValueType, Vertex##Name)
+#include "common.h"
 
 struct VertexInput
 {
@@ -16,19 +12,14 @@ struct VertexOutput
     float4 color : COLOR;
 };
 
-cbuffer VertexIndices : register(b0, space1)
+cbuffer VertexIndices : register(VERTEX_INDICES_CBUFFER_REGISTER)
 {
     DECLARE_VERTEX_BUFFER(float2, Positions)
     DECLARE_VERTEX_BUFFER(float2, TexCoords)
     DECLARE_VERTEX_BUFFER(float4, Colors)
 }
 
-cbuffer Frame : register(b1, space1)
-{
-    float gTime;
-}
-
-cbuffer ResourceIndices : register(b2, space1)
+cbuffer ResourceIndices : register(RESOURCE_INDICES_CBUFFER_REGISTER)
 {
     DECLARE_RESOURCE(Texture2D, float4, Texture);
 }

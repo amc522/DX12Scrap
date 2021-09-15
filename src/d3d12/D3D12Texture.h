@@ -57,11 +57,16 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE getSrvCpu() const;
     D3D12_GPU_DESCRIPTOR_HANDLE getSrvGpu() const;
 
-    uint32_t getSrvDescriptorHeapIndex() const { return mResource.getDescriptorHeapReservation().getStartHeapIndex() + mSrvIndex; }
+    uint32_t getSrvDescriptorHeapIndex() const
+    {
+        return mResource.getDescriptorHeapReservation().getStartHeapIndex() + mSrvIndex;
+    }
+
+    ShaderResourceDimension getShaderResourceDimension() const { return mResourceDimension; }
 
     bool isReady() const;
 
-    void markAsUsed(ID3D12CommandQueue *commandQueue);
+    void markAsUsed(ID3D12CommandQueue* commandQueue);
     void markAsUsed(ID3D12CommandList* commandList);
 
 private:
@@ -78,8 +83,7 @@ private:
     TrackedGpuObject<ID3D12Resource> mUploadResource;
     uint32_t mSrvIndex = 0;
     uint32_t mUavIndex = 0;
-    std::array<uint32_t, 15> mSrvMipIndices{0};
-    std::array<uint32_t, 15> mUavMipIndices{0};
+    ShaderResourceDimension mResourceDimension = ShaderResourceDimension::Unknown;
 
     CopyFrameCode mInitFrameCode;
 };
