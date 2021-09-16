@@ -7,6 +7,10 @@
 
 #pragma once
 
+#include "Keyboard.h"
+#include "Mouse.h"
+
+#include <chrono>
 #include <memory>
 
 namespace scrap
@@ -31,9 +35,14 @@ public:
 
 private:
     std::unique_ptr<Window> mMainWindow;
+    Keyboard mKeyboard;
+    Mouse mMouse;
     std::unique_ptr<d3d12::DeviceContext> mD3D12Context;
     std::unique_ptr<RenderScene> mRenderScene;
     bool mRunning = false;
+
+    std::chrono::steady_clock::time_point mLastFrameTime;
+    std::chrono::nanoseconds mFrameDelta{0};
 };
 
 } // namespace scrap

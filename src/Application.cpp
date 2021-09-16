@@ -1,11 +1,13 @@
 #include "Application.h"
 
+#include "FrameInfo.h"
 #include "RenderScene.h"
 #include "Window.h"
 #include "d3d12/D3D12Context.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_syswm.h>
+#include <fmt/chrono.h>
 #include <spdlog/spdlog.h>
 
 namespace scrap
@@ -52,6 +54,20 @@ Application::operator bool() const
 
 void Application::update()
 {
+    auto now = std::chrono::steady_clock::now();
+    mFrameDelta = now - mLastFrameTime;
+    mLastFrameTime = now;
+
+    mKeyboard.beginFrame();
+    mMouse.beginFrame();
+
+    FrameInfo frameInfo;
+    frameInfo.frameDelta = mFrameDelta;
+    frameInfo.frameDeltaSec = std::chrono::duration_cast<std::chrono::duration<float>>(mFrameDelta);
+    frameInfo.keyboard = &mKeyboard;
+    frameInfo.mouse = &mMouse;
+    frameInfo.windowSize = mMainWindow->getSize();
+
     SDL_Event event;
     while(SDL_PollEvent(&event))
     {
@@ -97,15 +113,33 @@ void Application::update()
                 break;
             }
             break;
-        case SDL_KEYDOWN: spdlog::debug("Event SDL_KEYDOWN"); break;
-        case SDL_KEYUP: spdlog::debug("Event SDL_KEYUP"); break;
+        case SDL_KEYDOWN:
+            spdlog::debug("Event SDL_KEYDOWN");
+            mKeyboard.handleEvent(event);
+            break;
+        case SDL_KEYUP:
+            spdlog::debug("Event SDL_KEYUP");
+            mKeyboard.handleEvent(event);
+            break;
         case SDL_TEXTEDITING: spdlog::debug("Event SDL_TEXTEDITING"); break;
         case SDL_TEXTINPUT: spdlog::debug("Event SDL_TEXTINPUT"); break;
         case SDL_KEYMAPCHANGED: spdlog::debug("Event SDL_KEYMAPCHANGED"); break;
-        case SDL_MOUSEMOTION: spdlog::debug("Event SDL_MOUSEMOTION"); break;
-        case SDL_MOUSEBUTTONDOWN: spdlog::debug("Event SDL_MOUSEBUTTONDOWN"); break;
-        case SDL_MOUSEBUTTONUP: spdlog::debug("Event SDL_MOUSEBUTTONUP"); break;
-        case SDL_MOUSEWHEEL: spdlog::debug("Event SDL_MOUSEWHEEL"); break;
+        case SDL_MOUSEMOTION:
+            spdlog::debug("Event SDL_MOUSEMOTION");
+            mMouse.handleEvent(event);
+            break;
+        case SDL_MOUSEBUTTONDOWN:
+            spdlog::debug("Event SDL_MOUSEBUTTONDOWN");
+            mMouse.handleEvent(event);
+            break;
+        case SDL_MOUSEBUTTONUP:
+            spdlog::debug("Event SDL_MOUSEBUTTONUP");
+            mMouse.handleEvent(event);
+            break;
+        case SDL_MOUSEWHEEL:
+            spdlog::debug("Event SDL_MOUSEWHEEL");
+            mMouse.handleEvent(event);
+            break;
         case SDL_JOYAXISMOTION: spdlog::debug("Event SDL_JOYAXISMOTION"); break;
         case SDL_JOYBALLMOTION: spdlog::debug("Event SDL_JOYBALLMOTION"); break;
         case SDL_JOYHATMOTION: spdlog::debug("Event SDL_JOYHATMOTION"); break;
@@ -144,9 +178,9 @@ void Application::update()
         }
     }
 
-    mRenderScene->preRender();
+    mRenderScene->preRender(frameInfo);
     mD3D12Context->beginFrame();
-    mRenderScene->render(*mD3D12Context);
+    mRenderScene->render(frameInfo, *mD3D12Context);
     mD3D12Context->endFrame();
 }
 

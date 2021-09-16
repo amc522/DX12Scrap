@@ -1,6 +1,7 @@
 #include "RenderScene.h"
 
 #include "CpuMesh.h"
+#include "FrameInfo.h"
 #include "d3d12/D3D12Buffer.h"
 #include "d3d12/D3D12Context.h"
 #include "d3d12/D3D12Debug.h"
@@ -302,7 +303,7 @@ void RenderScene::createTexture()
 
 RenderScene& RenderScene::operator=(RenderScene&&) = default;
 
-void RenderScene::preRender()
+void RenderScene::preRender(const FrameInfo& frameInfo)
 {
     // This function is called before the copy context command list is executed for the frame.
 
@@ -383,7 +384,7 @@ void RenderScene::drawIndexed(d3d12::GraphicsPipelineState& pso,
     mCommandList.get()->DrawIndexedInstanced(mesh.getIndexCount(), 1, 0, 0, 0);
 }
 
-void RenderScene::render(d3d12::DeviceContext& d3d12Context)
+void RenderScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context)
 {
     mCommandList.reset();
 
@@ -453,5 +454,7 @@ void RenderScene::render(d3d12::DeviceContext& d3d12Context)
     d3d12Context.getGraphicsContext().getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()),
                                                                              commandLists.data());
 }
+
+void RenderScene::endFrame() {}
 
 } // namespace scrap

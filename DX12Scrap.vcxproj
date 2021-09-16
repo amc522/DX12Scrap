@@ -36,8 +36,10 @@
     <ClCompile Include="src\FormattedBuffer.cpp" />
     <ClCompile Include="src\FreeBlockTracker.cpp" />
     <ClCompile Include="src\GpuMesh.cpp" />
+    <ClCompile Include="src\Keyboard.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\CpuMesh.cpp" />
+    <ClCompile Include="src\Mouse.cpp" />
     <ClCompile Include="src\RenderScene.cpp" />
     <ClCompile Include="src\Window.cpp" />
   </ItemGroup>
@@ -61,9 +63,12 @@
     <ClInclude Include="src\d3d12\D3D12TrackedGpuObject.h" />
     <ClInclude Include="src\d3d12\D3D12Translations.h" />
     <ClInclude Include="src\FormattedBuffer.h" />
+    <ClInclude Include="src\FrameInfo.h" />
     <ClInclude Include="src\FreeBlockTracker.h" />
     <ClInclude Include="src\CpuMesh.h" />
     <ClInclude Include="src\GpuMesh.h" />
+    <ClInclude Include="src\Keyboard.h" />
+    <ClInclude Include="src\Mouse.h" />
     <ClInclude Include="src\RenderDefs.h" />
     <ClInclude Include="src\RenderScene.h" />
     <ClInclude Include="src\StringUtils.h" />
