@@ -24,7 +24,7 @@ nonstd::span<const std::byte> FormattedBufferSpan::getElement(size_t index) cons
 FormattedBufferSpan FormattedBufferSpan::formattedSubspan(size_t elementOffset, size_t elementCount) const
 {
     const size_t elementByteSize = gpufmt::formatInfo(format).blockByteSize;
-    return {format, buffer.subspan(elementOffset * elementByteSize, elementCount * elementByteSize)};
+    return {format, buffer.subspan(elementOffset * elementByteSize, (elementCount != nonstd::dynamic_extent) ? elementCount * elementByteSize : nonstd::dynamic_extent)};
 }
 
 size_t FormattedBufferView::elementCount() const
@@ -41,6 +41,6 @@ nonstd::span<const std::byte> FormattedBufferView::getElement(size_t index) cons
 FormattedBufferView FormattedBufferView::formattedSubview(size_t elementOffset, size_t elementCount) const
 {
     const size_t elementByteSize = gpufmt::formatInfo(format).blockByteSize;
-    return {format, buffer.subspan(elementOffset * elementByteSize, elementCount * elementByteSize)};
+    return {format, buffer.subspan(elementOffset * elementByteSize, (elementCount != nonstd::dynamic_extent) ? elementCount * elementByteSize : nonstd::dynamic_extent)};
 }
 } // namespace scrap
