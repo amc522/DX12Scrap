@@ -13,7 +13,6 @@ struct ID3D12CommandList;
 struct ID3D12CommandQueue;
 struct ID3D12Device;
 struct ID3D12GraphicsCommandList;
-struct IDXGraphicsAnalysis;
 
 namespace scrap::d3d12
 {
@@ -35,9 +34,6 @@ public:
     void init(DebugOptions options);
 
     void setDevice(Microsoft::WRL::ComPtr<ID3D12Device> device);
-
-    std::wstring getLatestWinPixGpuCapturerPath();
-    bool loadWinPixDll();
 
     template<class... Args>
     void beginGpuEvent(ID3D12GraphicsCommandList* commandList, std::string_view format, Args&&... args)
@@ -132,7 +128,7 @@ public:
     void setGpuMarker(ID3D12CommandQueue* commandQueue, std::wstring_view label);
 
     void beginCapture();
-    void endCapture();
+    void endCapture(bool discard = false);
 
     bool isPixAttached() const { return mIsPixAttached; }
 
@@ -140,7 +136,6 @@ private:
     static Debug* sInstance;
 #ifdef _DEBUG
     Microsoft::WRL::ComPtr<ID3D12Device> mDevice;
-    Microsoft::WRL::ComPtr<IDXGraphicsAnalysis> mGraphicsAnalysis;
     thread_local static std::string tStringBuffer;
     thread_local static std::wstring tWStringBuffer;
 #endif

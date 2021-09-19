@@ -84,7 +84,7 @@ void Debug::init(DebugOptions options)
 {
     if((options & DebugOptions::EnableAttachToProcess) == DebugOptions::EnableAttachToProcess)
     {
-        if(loadWinPixDll())
+        if(PIXLoadLatestWinPixGpuCapturerLibrary() != nullptr)
         {
             spdlog::info("Pix dll loaded. Pix can attach to process.");
             mIsPixAttached = true;
@@ -113,22 +113,6 @@ void Debug::init(DebugOptions options)
     else
     {
         spdlog::error("Failed to enable the d3d12 debug layer.");
-    }
-
-    if(mIsPixAttached)
-    {
-        HRESULT hr = DXGIGetDebugInterface1(0, IID_PPV_ARGS(&mGraphicsAnalysis));
-        if(FAILED(hr))
-        {
-            if(hr == E_NOINTERFACE)
-            {
-                spdlog::error("Failed to get IDXGraphicsAnalysis interface. PIX not attached for gpu capture.");
-            }
-            else
-            {
-                spdlog::error("Failed to get IDXGraphicsAnalysis interface");
-            }
-        }
     }
 
     // https://docs.microsoft.com/en-us/windows/win32/api/dxgidebug/nn-dxgidebug-idxgiinfoqueue
@@ -187,44 +171,6 @@ void Debug::setDevice(Microsoft::WRL::ComPtr<ID3D12Device> device)
     }
 }
 
-std::wstring Debug::getLatestWinPixGpuCapturerPath()
-{
-    LPWSTR programFilesPath = nullptr;
-    SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, NULL, &programFilesPath);
-
-    std::filesystem::path pixInstallationPath = programFilesPath;
-    pixInstallationPath /= "Microsoft PIX";
-
-    std::wstring newestVersionFound;
-
-    for(auto const& directory_entry : std::filesystem::directory_iterator(pixInstallationPath))
-    {
-        if(directory_entry.is_directory())
-        {
-            if(newestVersionFound.empty() || newestVersionFound < directory_entry.path().filename().c_str())
-            {
-                newestVersionFound = directory_entry.path().filename().c_str();
-            }
-        }
-    }
-
-    if(newestVersionFound.empty()) { return {}; }
-
-    return pixInstallationPath / newestVersionFound / L"WinPixGpuCapturer.dll";
-}
-
-bool Debug::loadWinPixDll()
-{
-    // Check to see if a copy of WinPixGpuCapturer.dll has already been injected into the application.
-    // This may happen if the application is launched through the PIX UI.
-    if(GetModuleHandle(L"WinPixGpuCapturer.dll") == 0)
-    {
-        return LoadLibrary(getLatestWinPixGpuCapturerPath().c_str()) != nullptr;
-    }
-
-    return true;
-}
-
 void Debug::beginGpuEvent(ID3D12GraphicsCommandList* commandList, std::string_view label)
 {
     PIXBeginEvent(commandList, PIX_COLOR_DEFAULT, label.data());
@@ -277,12 +223,15 @@ void Debug::setGpuMarker(ID3D12CommandQueue* commandQueue, std::wstring_view lab
 
 void Debug::beginCapture()
 {
-    if(mGraphicsAnalysis) { mGraphicsAnalysis->BeginCapture(); }
+    PIXCaptureParameters params;
+    params.GpuCaptureParameters.FileName = L"pix_capture";
+    params.TimingCaptureParameters = {};
+    PIXBeginCapture(PIX_CAPTURE_GPU, &params);
 }
 
-void Debug::endCapture()
+void Debug::endCapture(bool discard)
 {
-    if(mGraphicsAnalysis) { mGraphicsAnalysis->EndCapture(); }
+    PIXEndCapture(discard);
 }
 
 ScopedGpuEvent::ScopedGpuEvent(ID3D12GraphicsCommandList* commandList, std::string_view label)
