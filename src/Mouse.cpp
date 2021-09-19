@@ -12,7 +12,7 @@ MouseButton TranslateSdlMouseButton(Uint8 button)
     case SDL_BUTTON_LEFT: return MouseButton::Left;
     case SDL_BUTTON_RIGHT: return MouseButton::Right;
     case SDL_BUTTON_MIDDLE: return MouseButton::Middle;
-    default: return Unknown;
+    default: return MouseButton::Unknown;
     }
 }
 
@@ -21,8 +21,8 @@ void Mouse::beginFrame()
     for(MouseButtonState& state : mMouseButtonStates)
     {
         state.clicks = 0;
-        state.pressed = 0;
-        state.released = 0;
+        state.pressedCount = 0;
+        state.releasedCount = 0;
     }
 
     mDistance = 0.0f;
@@ -37,14 +37,16 @@ void Mouse::handleEvent(const SDL_MouseButtonEvent& mouseButtonEvent)
     switch(mouseButtonEvent.type)
     {
     case SDL_MOUSEBUTTONDOWN:
-        mouseButtonState = &mMouseButtonStates[TranslateSdlMouseButton(mouseButtonEvent.button)];
-        ++mouseButtonState->pressed;
+        mouseButtonState = &mMouseButtonStates[(size_t)TranslateSdlMouseButton(mouseButtonEvent.button)];
+        ++mouseButtonState->pressedCount;
         mouseButtonState->clicks = mouseButtonEvent.clicks;
+        mouseButtonState->down = true;
         break;
     case SDL_MOUSEBUTTONUP:
-        mouseButtonState = &mMouseButtonStates[TranslateSdlMouseButton(mouseButtonEvent.button)];
-        ++mouseButtonState->released;
+        mouseButtonState = &mMouseButtonStates[(size_t)TranslateSdlMouseButton(mouseButtonEvent.button)];
+        ++mouseButtonState->releasedCount;
         mouseButtonState->clicks = mouseButtonEvent.clicks;
+        mouseButtonState->down = false;
         break;
 
     case SDL_MOUSEWHEEL: break;

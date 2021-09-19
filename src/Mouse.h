@@ -11,7 +11,7 @@ struct SDL_MouseWheelEvent;
 
 namespace scrap
 {
-enum MouseButton
+enum class MouseButton
 {
     Left,
     Right,
@@ -22,10 +22,11 @@ enum MouseButton
 
 struct MouseButtonState
 {
-    MouseButton button = Unknown;
-    int pressed = 0;
-    int released = 0;
+    MouseButton button = MouseButton::Unknown;
+    int pressedCount = 0;
+    int releasedCount = 0;
     int clicks = 0;
+    bool down = false;
 };
 
 class Mouse
@@ -40,11 +41,15 @@ public:
     glm::ivec2 getDelta() const { return mPosition - mLastPosition; }
     float getDistanceTravelled() const { return mDistance; }
 
+    const MouseButtonState& getButtonState(MouseButton button) const { return mMouseButtonStates[(size_t)button]; }
+    bool isButtonDown(MouseButton button) const { return mMouseButtonStates[(size_t)button].down; }
+
     void invalidatePosition() { mLastPositionSet = false; }
 
 private:
-    std::array<MouseButtonState, MouseButton::Count> mMouseButtonStates{MouseButtonState{Left}, MouseButtonState{Right},
-                                                                        MouseButtonState{Middle}};
+    std::array<MouseButtonState, (size_t)MouseButton::Count> mMouseButtonStates{MouseButtonState{MouseButton::Left},
+                                                                                MouseButtonState{MouseButton::Right},
+                                                                                MouseButtonState{MouseButton::Middle}};
     glm::ivec2 mPosition;
     glm::ivec2 mLastPosition;
     float mDistance = 0.0f;
