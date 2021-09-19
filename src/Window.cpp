@@ -63,6 +63,12 @@ Window::~Window()
     }
 }
 
+void Window::beginFrame()
+{
+    mKeyboard.beginFrame();
+    mMouse.beginFrame();
+}
+
 void Window::setSize(glm::i32vec2 size)
 {
     SDL_SetWindowSize(mSdlWindow, size.x, size.y);
@@ -80,6 +86,26 @@ HWND Window::getHwnd() const
 void Window::show()
 {
     SDL_ShowWindow(mSdlWindow);
+}
+
+void Window::handleEvent(const SDL_KeyboardEvent& keyboardEvent)
+{
+    mKeyboard.handleEvent(keyboardEvent);
+}
+
+void Window::handleEvent(const SDL_MouseButtonEvent& mouseButtonEvent)
+{
+    mMouse.handleEvent(mouseButtonEvent);
+}
+
+void Window::handleEvent(const SDL_MouseMotionEvent& mouseMotionEvent)
+{
+    mMouse.handleEvent(mouseMotionEvent);
+}
+
+void Window::handleEvent(const SDL_MouseWheelEvent& mouseWheelEvent)
+{
+    mMouse.handleEvent(mouseWheelEvent);
 }
 
 void Window::handleEvent(const SDL_WindowEvent& windowEvent)
@@ -105,12 +131,16 @@ void Window::handleEvent(const SDL_WindowEvent& windowEvent)
     case SDL_WINDOWEVENT_MAXIMIZED: spdlog::debug("SDL_WINDOWEVENT_MAXIMIZED: window {}", windowEvent.windowID); break;
     case SDL_WINDOWEVENT_RESTORED: spdlog::debug("SDL_WINDOWEVENT_RESTORED: window {}", windowEvent.windowID); break;
     case SDL_WINDOWEVENT_ENTER: spdlog::debug("SDL_WINDOWEVENT_ENTER: window {}", windowEvent.windowID); break;
-    case SDL_WINDOWEVENT_LEAVE: spdlog::debug("SDL_WINDOWEVENT_LEAVE: window {}", windowEvent.windowID); break;
+    case SDL_WINDOWEVENT_LEAVE:
+        spdlog::debug("SDL_WINDOWEVENT_LEAVE: window {}", windowEvent.windowID);
+        mMouse.invalidatePosition();
+        break;
     case SDL_WINDOWEVENT_FOCUS_GAINED:
         spdlog::debug("SDL_WINDOWEVENT_FOCUS_GAINED: window {}", windowEvent.windowID);
         break;
     case SDL_WINDOWEVENT_FOCUS_LOST:
         spdlog::debug("SDL_WINDOWEVENT_FOCUS_LOST: window {}", windowEvent.windowID);
+        mMouse.invalidatePosition();
         break;
     case SDL_WINDOWEVENT_CLOSE: spdlog::debug("SDL_WINDOWEVENT_CLOSE: window {}", windowEvent.windowID); break;
     case SDL_WINDOWEVENT_TAKE_FOCUS:

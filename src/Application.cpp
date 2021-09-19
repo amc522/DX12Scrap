@@ -61,12 +61,14 @@ void Application::update()
     mKeyboard.beginFrame();
     mMouse.beginFrame();
 
+    mMainWindow->beginFrame();
+
     FrameInfo frameInfo;
     frameInfo.frameDelta = mFrameDelta;
     frameInfo.frameDeltaSec = std::chrono::duration_cast<std::chrono::duration<float>>(mFrameDelta);
+    frameInfo.mainWindow = mMainWindow.get();
     frameInfo.keyboard = &mKeyboard;
     frameInfo.mouse = &mMouse;
-    frameInfo.windowSize = mMainWindow->getSize();
 
     SDL_Event event;
     while(SDL_PollEvent(&event))
@@ -114,31 +116,53 @@ void Application::update()
             }
             break;
         case SDL_KEYDOWN:
-            spdlog::debug("Event SDL_KEYDOWN");
-            mKeyboard.handleEvent(event);
+            mKeyboard.handleEvent(event.key);
+            if(event.key.windowID == SDL_GetWindowID(mMainWindow->sdlWindow()))
+            {
+                mMainWindow->handleEvent(event.key);
+            }
             break;
         case SDL_KEYUP:
-            spdlog::debug("Event SDL_KEYUP");
-            mKeyboard.handleEvent(event);
+            mKeyboard.handleEvent(event.key);
+            if(event.key.windowID == SDL_GetWindowID(mMainWindow->sdlWindow()))
+            {
+                mMainWindow->handleEvent(event.key);
+            }
             break;
         case SDL_TEXTEDITING: spdlog::debug("Event SDL_TEXTEDITING"); break;
         case SDL_TEXTINPUT: spdlog::debug("Event SDL_TEXTINPUT"); break;
         case SDL_KEYMAPCHANGED: spdlog::debug("Event SDL_KEYMAPCHANGED"); break;
         case SDL_MOUSEMOTION:
             spdlog::debug("Event SDL_MOUSEMOTION");
-            mMouse.handleEvent(event);
+            mMouse.handleEvent(event.motion);
+            if(event.motion.windowID == SDL_GetWindowID(mMainWindow->sdlWindow()))
+            {
+                mMainWindow->handleEvent(event.motion);
+            }
             break;
         case SDL_MOUSEBUTTONDOWN:
             spdlog::debug("Event SDL_MOUSEBUTTONDOWN");
-            mMouse.handleEvent(event);
+            mMouse.handleEvent(event.button);
+            if(event.button.windowID == SDL_GetWindowID(mMainWindow->sdlWindow()))
+            {
+                mMainWindow->handleEvent(event.button);
+            }
             break;
         case SDL_MOUSEBUTTONUP:
             spdlog::debug("Event SDL_MOUSEBUTTONUP");
-            mMouse.handleEvent(event);
+            mMouse.handleEvent(event.button);
+            if(event.button.windowID == SDL_GetWindowID(mMainWindow->sdlWindow()))
+            {
+                mMainWindow->handleEvent(event.button);
+            }
             break;
         case SDL_MOUSEWHEEL:
             spdlog::debug("Event SDL_MOUSEWHEEL");
-            mMouse.handleEvent(event);
+            mMouse.handleEvent(event.wheel);
+            if(event.wheel.windowID == SDL_GetWindowID(mMainWindow->sdlWindow()))
+            {
+                mMainWindow->handleEvent(event.wheel);
+            }
             break;
         case SDL_JOYAXISMOTION: spdlog::debug("Event SDL_JOYAXISMOTION"); break;
         case SDL_JOYBALLMOTION: spdlog::debug("Event SDL_JOYBALLMOTION"); break;

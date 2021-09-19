@@ -5,7 +5,9 @@
 #include <SDL2/SDL_mouse.h>
 #include <glm/vec2.hpp>
 
-union SDL_Event;
+struct SDL_MouseButtonEvent;
+struct SDL_MouseMotionEvent;
+struct SDL_MouseWheelEvent;
 
 namespace scrap
 {
@@ -30,17 +32,22 @@ class Mouse
 {
 public:
     void beginFrame();
-    void handleEvent(const SDL_Event& sdlEvent);
+    void handleEvent(const SDL_MouseButtonEvent& sdlEvent);
+    void handleEvent(const SDL_MouseMotionEvent& sdlEvent);
+    void handleEvent(const SDL_MouseWheelEvent& sdlEvent);
 
     glm::ivec2 getPosition() const { return mPosition; }
     glm::ivec2 getDelta() const { return mPosition - mLastPosition; }
     float getDistanceTravelled() const { return mDistance; }
 
+    void invalidatePosition() { mLastPositionSet = false; }
+
 private:
-    std::array<MouseButtonState, MouseButton::Count> mMouseButtonStates{MouseButton{Left}, MouseButton{Right},
-                                                                        MouseButton{Middle}};
+    std::array<MouseButtonState, MouseButton::Count> mMouseButtonStates{MouseButtonState{Left}, MouseButtonState{Right},
+                                                                        MouseButtonState{Middle}};
     glm::ivec2 mPosition;
     glm::ivec2 mLastPosition;
     float mDistance = 0.0f;
+    bool mLastPositionSet = false;
 };
 } // namespace scrap

@@ -5,23 +5,24 @@
 
 #include <SDL2/SDL_keyboard.h>
 
-union SDL_Event;
+struct SDL_KeyboardEvent;
 
 namespace scrap
 {
 struct KeyState
 {
     SDL_Keycode keyCode;
-    int repeat = 0;
-    int pressed = 0;
-    int released = 0;
+    int pressedCount = 0;
+    int releasedCount = 0;
+    bool down = false;
+    bool repeat = false;
 };
 
 class Keyboard
 {
 public:
     void beginFrame();
-    void handleEvent(const SDL_Event& sdlEvent);
+    void handleEvent(const SDL_KeyboardEvent& sdlEvent);
 
     const KeyState& getKeyState(SDL_Keycode keyCode) const;
 

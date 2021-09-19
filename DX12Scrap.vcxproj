@@ -66,6 +66,7 @@
     <ClInclude Include="src\FrameInfo.h" />
     <ClInclude Include="src\FreeBlockTracker.h" />
     <ClInclude Include="src\CpuMesh.h" />
+    <ClInclude Include="src\GlmStrings.h" />
     <ClInclude Include="src\GpuMesh.h" />
     <ClInclude Include="src\Keyboard.h" />
     <ClInclude Include="src\Mouse.h" />

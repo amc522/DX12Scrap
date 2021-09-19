@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include "Keyboard.h"
+#include "Mouse.h"
+
 #include <string_view>
 
 #include <Windows.h>
@@ -22,15 +25,24 @@ public:
 
     bool initialized() const { return mSdlWindow != nullptr; }
 
+    void beginFrame();
+
     void setSize(glm::i32vec2 size);
     glm::i32vec2 getSize() const { return mSize; }
     glm::i32vec2 getDrawableSize() const { return mDrawableSize; }
+
+    const Keyboard& getKeyboard() const { return mKeyboard; }
+    const Mouse& getMouse() const { return mMouse; }
 
     HWND getHwnd() const;
     SDL_Window* sdlWindow() const { return mSdlWindow; }
 
     void show();
 
+    void handleEvent(const SDL_KeyboardEvent& keyboardEvent);
+    void handleEvent(const SDL_MouseButtonEvent& mouseButtonEvent);
+    void handleEvent(const SDL_MouseMotionEvent& mouseMotionEvent);
+    void handleEvent(const SDL_MouseWheelEvent& mouseWheelEvent);
     void handleEvent(const SDL_WindowEvent& windowEvent);
 
 private:
@@ -41,6 +53,9 @@ private:
 
     // This is the actual pixel size of the window content area. This may be different than the requested window size.
     glm::i32vec2 mDrawableSize{0, 0};
+
+    Keyboard mKeyboard;
+    Mouse mMouse;
 };
 
 } // namespace scrap

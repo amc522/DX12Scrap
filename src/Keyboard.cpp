@@ -1,36 +1,42 @@
 #include "Keyboard.h"
 
 #include <SDL2/SDL_events.h>
+#include <spdlog/spdlog.h>
 
 namespace scrap
 {
 void Keyboard::beginFrame()
 {
-    for(auto [key, keyState] : mKeyStates)
+    for(auto& [key, keyState] : mKeyStates)
     {
-        keyState.pressed = 0;
-        keyState.released = 0;
-        keyState.repeat = 0;
+        keyState.pressedCount = 0;
+        keyState.releasedCount = 0;
     }
 }
 
-void Keyboard::handleEvent(const SDL_Event& sdlEvent)
+void Keyboard::handleEvent(const SDL_KeyboardEvent& keyboardEvent)
 {
     KeyState* keyState;
 
-    switch(sdlEvent.type)
+    switch(keyboardEvent.type)
     {
     case SDL_KEYDOWN:
-        keyState = &mKeyStates[sdlEvent.key.keysym.sym];
-        keyState->keyCode = sdlEvent.key.keysym.sym;
-        ++keyState->pressed;
-        keyState->repeat = sdlEvent.key.repeat;
+        spdlog::debug("Event SDL_KEYDOWN: key={}, state={}, repeat={}", keyboardEvent.keysym.sym, keyboardEvent.state,
+                      keyboardEvent.repeat);
+        keyState = &mKeyStates[keyboardEvent.keysym.sym];
+        keyState->keyCode = keyboardEvent.keysym.sym;
+        ++keyState->pressedCount;
+        keyState->down = true;
+        keyState->repeat |= keyboardEvent.repeat > 0;
         break;
     case SDL_KEYUP:
-        keyState = &mKeyStates[sdlEvent.key.keysym.sym];
-        keyState->keyCode = sdlEvent.key.keysym.sym;
-        ++keyState->released;
-        keyState->repeat = sdlEvent.key.repeat;
+        spdlog::debug("Event SDL_KEYUP: key={}, state={}, repeat={}", keyboardEvent.keysym.sym, keyboardEvent.state,
+                      keyboardEvent.repeat);
+        keyState = &mKeyStates[keyboardEvent.keysym.sym];
+        keyState->keyCode = keyboardEvent.keysym.sym;
+        ++keyState->releasedCount;
+        keyState->down = false;
+        keyState->repeat |= keyboardEvent.repeat > 0;
         break;
     }
 }

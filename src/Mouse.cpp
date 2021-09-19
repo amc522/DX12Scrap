@@ -30,28 +30,43 @@ void Mouse::beginFrame()
     mLastPosition = mPosition;
 }
 
-void Mouse::handleEvent(const SDL_Event& sdlEvent)
+void Mouse::handleEvent(const SDL_MouseButtonEvent& mouseButtonEvent)
 {
     MouseButtonState* mouseButtonState = nullptr;
 
-    switch(sdlEvent.type)
+    switch(mouseButtonEvent.type)
     {
     case SDL_MOUSEBUTTONDOWN:
-        mouseButtonState = &mMouseButtonStates[TranslateSdlMouseButton(sdlEvent.button.button)];
+        mouseButtonState = &mMouseButtonStates[TranslateSdlMouseButton(mouseButtonEvent.button)];
         ++mouseButtonState->pressed;
-        mouseButtonState->clicks = sdlEvent.button.clicks;
+        mouseButtonState->clicks = mouseButtonEvent.clicks;
         break;
     case SDL_MOUSEBUTTONUP:
-        mouseButtonState = &mMouseButtonStates[TranslateSdlMouseButton(sdlEvent.button.button)];
+        mouseButtonState = &mMouseButtonStates[TranslateSdlMouseButton(mouseButtonEvent.button)];
         ++mouseButtonState->released;
-        mouseButtonState->clicks = sdlEvent.button.clicks;
+        mouseButtonState->clicks = mouseButtonEvent.clicks;
         break;
-    case SDL_MOUSEMOTION:
-        mPosition.x = sdlEvent.motion.x;
-        mPosition.y = sdlEvent.motion.y;
-        mDistance += glm::length(glm::vec2(sdlEvent.motion.xrel, sdlEvent.motion.yrel));
-        break;
+
     case SDL_MOUSEWHEEL: break;
     }
 }
+
+void Mouse::handleEvent(const SDL_MouseMotionEvent& mouseMotionEvent)
+{
+    switch(mouseMotionEvent.type)
+    {
+    case SDL_MOUSEMOTION:
+        mPosition.x = mouseMotionEvent.x;
+        mPosition.y = mouseMotionEvent.y;
+        if(!mLastPositionSet)
+        {
+            mLastPosition = mPosition;
+            mLastPositionSet = true;
+        }
+        mDistance += glm::length(glm::vec2(mouseMotionEvent.xrel, mouseMotionEvent.yrel));
+        break;
+    }
+}
+
+void Mouse::handleEvent(const SDL_MouseWheelEvent& sdlEvent) {}
 } // namespace scrap
