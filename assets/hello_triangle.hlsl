@@ -40,7 +40,7 @@ VertexOutput VSMain(VertexInput input)
     output.uv = texCoords[input.vertexId];
 
     float timeIntegerComponent;
-    const float timeFrac = modf(gTime, timeIntegerComponent);
+    const float timeFrac = modf(gFrame.time, timeIntegerComponent);
     const int timeSeconds = timeIntegerComponent;
     output.color = colors[input.vertexId] * ((timeSeconds % 2 == 0) ? timeFrac : 1.0 - timeFrac);
 

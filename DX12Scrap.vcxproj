@@ -21,6 +21,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Application.cpp" />
+    <ClCompile Include="src\Camera.cpp" />
     <ClCompile Include="src\d3d12\D3D12Buffer.cpp" />
     <ClCompile Include="src\d3d12\D3D12CommandList.cpp" />
     <ClCompile Include="src\d3d12\D3D12Context.cpp" />
@@ -40,11 +41,14 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\CpuMesh.cpp" />
     <ClCompile Include="src\Mouse.cpp" />
+    <ClCompile Include="src\PrimitiveMesh.cpp" />
     <ClCompile Include="src\RenderScene.cpp" />
     <ClCompile Include="src\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\AABB.h" />
     <ClInclude Include="src\Application.h" />
+    <ClInclude Include="src\Camera.h" />
     <ClInclude Include="src\d3d12\D3D12BaseCommandContext.h" />
     <ClInclude Include="src\d3d12\D3D12Buffer.h" />
     <ClInclude Include="src\d3d12\D3D12CommandList.h" />
@@ -70,6 +74,7 @@
     <ClInclude Include="src\GpuMesh.h" />
     <ClInclude Include="src\Keyboard.h" />
     <ClInclude Include="src\Mouse.h" />
+    <ClInclude Include="src\PrimitiveMesh.h" />
     <ClInclude Include="src\RenderDefs.h" />
     <ClInclude Include="src\RenderScene.h" />
     <ClInclude Include="src\StringUtils.h" />

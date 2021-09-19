@@ -64,6 +64,9 @@
     <ClCompile Include="src\d3d12\D3D12CommandList.cpp">
       <Filter>Source Files\d3d12</Filter>
     </ClCompile>
+    <ClCompile Include="src\PrimitiveMesh.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\CpuMesh.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -71,6 +74,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\FormattedBuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Camera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Keyboard.cpp">
@@ -150,6 +156,12 @@
     <ClInclude Include="src\d3d12\D3D12CommandList.h">
       <Filter>Source Files\d3d12</Filter>
     </ClInclude>
+    <ClInclude Include="src\PrimitiveMesh.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\AABB.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
     <ClInclude Include="src\CpuMesh.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -161,6 +173,9 @@
     </ClInclude>
     <ClInclude Include="src\d3d12\D3D12Translations.h">
       <Filter>Source Files\d3d12</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Camera.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="src\FrameInfo.h">
       <Filter>Source Files</Filter>

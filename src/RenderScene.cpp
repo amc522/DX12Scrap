@@ -2,6 +2,8 @@
 
 #include "CpuMesh.h"
 #include "FrameInfo.h"
+#include "PrimitiveMesh.h"
+#include "Window.h"
 #include "d3d12/D3D12Buffer.h"
 #include "d3d12/D3D12Context.h"
 #include "d3d12/D3D12Debug.h"
@@ -14,6 +16,7 @@
 #include <d3d12.h>
 #include <d3dcompiler.h>
 #include <d3dx12.h>
+#include <glm/ext/matrix_clip_space.hpp>
 #include <spdlog/spdlog.h>
 
 using namespace Microsoft::WRL;
@@ -126,6 +129,7 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
 
     createFrameConstantBuffer();
     createTriangle();
+    createCube();
     createTexture();
 
     if(FAILED(mCommandList.close())) { spdlog::error("Failed to close graphics command list"); }
@@ -142,6 +146,7 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
 
     if(!loadShaders()) { return; }
 
+    mCamera.setPosition(glm::vec3(0.0f, 0.0f, -5.0f));
     mInitialized = true;
 }
 
@@ -151,30 +156,64 @@ RenderScene::~RenderScene() = default;
 
 bool RenderScene::loadShaders()
 {
-    d3d12::GraphicsShaderParams shaderParams;
-    shaderParams.filepaths[(size_t)GraphicsShaderStage::Vertex] = L"assets\\hello_triangle.hlsl";
-    shaderParams.filepaths[(size_t)GraphicsShaderStage::Pixel] = L"assets\\hello_triangle.hlsl";
-    shaderParams.entryPoints[(size_t)GraphicsShaderStage::Vertex] = "VSMain";
-    shaderParams.entryPoints[(size_t)GraphicsShaderStage::Pixel] = "PSMain";
-    shaderParams.stages = GraphicsShaderStageMask::VsPs;
+    { // hello triangle
+        d3d12::GraphicsShaderParams shaderParams;
+        shaderParams.filepaths[(size_t)GraphicsShaderStage::Vertex] = L"assets\\hello_triangle.hlsl";
+        shaderParams.filepaths[(size_t)GraphicsShaderStage::Pixel] = L"assets\\hello_triangle.hlsl";
+        shaderParams.entryPoints[(size_t)GraphicsShaderStage::Vertex] = "VSMain";
+        shaderParams.entryPoints[(size_t)GraphicsShaderStage::Pixel] = "PSMain";
+        shaderParams.stages = GraphicsShaderStageMask::VsPs;
 #ifdef _DEBUG
-    shaderParams.debug = true;
+        shaderParams.debug = true;
 #endif
 
-    // Describe and create the graphics pipeline state object (PSO).
-    {
-        d3d12::GraphicsPipelineStateParams psoParams = {};
-        psoParams.rootSignature = mRootSignature.Get();
-        psoParams.shader = std::make_shared<d3d12::GraphicsShader>(std::move(shaderParams));
-        psoParams.rasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-        psoParams.rasterizerState.FrontCounterClockwise = true;
-        psoParams.blendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-        psoParams.depthStencilState.DepthEnable = FALSE;
-        psoParams.depthStencilState.StencilEnable = FALSE;
-        psoParams.primitiveTopologyType = d3d12::TranslatePrimitiveTopologyType(mTriangleMesh.getPrimitiveTopology());
-        psoParams.renderTargetFormats = {DXGI_FORMAT_R8G8B8A8_UNORM};
+        // Describe and create the graphics pipeline state object (PSO).
+        {
+            d3d12::GraphicsPipelineStateParams psoParams = {};
+            psoParams.rootSignature = mRootSignature.Get();
+            psoParams.shader = std::make_shared<d3d12::GraphicsShader>(std::move(shaderParams));
+            psoParams.rasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+            psoParams.rasterizerState.FrontCounterClockwise = true;
+            psoParams.blendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+            psoParams.depthStencilState.DepthEnable = FALSE;
+            psoParams.depthStencilState.StencilEnable = FALSE;
+            psoParams.primitiveTopologyType =
+                d3d12::TranslatePrimitiveTopologyType(mTriangleMesh.getPrimitiveTopology());
+            psoParams.renderTargetFormats = {DXGI_FORMAT_R8G8B8A8_UNORM};
 
-        mHelloTrianglePso = d3d12::DeviceContext::instance().createGraphicsPipelineState(std::move(psoParams));
+            mHelloTrianglePso = d3d12::DeviceContext::instance().createGraphicsPipelineState(std::move(psoParams));
+        }
+    }
+
+    { // hello cube
+        d3d12::GraphicsShaderParams shaderParams;
+        shaderParams.filepaths[(size_t)GraphicsShaderStage::Vertex] = L"assets\\hello_cube.hlsl";
+        shaderParams.filepaths[(size_t)GraphicsShaderStage::Pixel] = L"assets\\hello_cube.hlsl";
+        shaderParams.entryPoints[(size_t)GraphicsShaderStage::Vertex] = "VSMain";
+        shaderParams.entryPoints[(size_t)GraphicsShaderStage::Pixel] = "PSMain";
+        shaderParams.stages = GraphicsShaderStageMask::VsPs;
+#ifdef _DEBUG
+        shaderParams.debug = true;
+#endif
+
+        // Describe and create the graphics pipeline state object (PSO).
+        {
+            d3d12::GraphicsPipelineStateParams psoParams = {};
+            psoParams.rootSignature = mRootSignature.Get();
+            psoParams.shader = std::make_shared<d3d12::GraphicsShader>(std::move(shaderParams));
+            psoParams.rasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+            psoParams.rasterizerState.FrontCounterClockwise = true;
+            psoParams.blendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+            psoParams.depthStencilState.DepthEnable = TRUE;
+            psoParams.depthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+            psoParams.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            psoParams.depthStencilState.StencilEnable = FALSE;
+            psoParams.primitiveTopologyType =
+                d3d12::TranslatePrimitiveTopologyType(mTriangleMesh.getPrimitiveTopology());
+            psoParams.renderTargetFormats = {DXGI_FORMAT_R8G8B8A8_UNORM};
+
+            mHelloCubePso = d3d12::DeviceContext::instance().createGraphicsPipelineState(std::move(psoParams));
+        }
     }
 
     return true;
@@ -301,10 +340,43 @@ void RenderScene::createTexture()
     mTexture = std::move(texture);
 }
 
+void RenderScene::createCube()
+{
+    constexpr uint32_t subdivisions = 1;
+    MeshSizes meshSizes = CalculateCubeMeshSizes(CubeMeshTopologyType::Triangle, subdivisions);
+
+    CpuMesh cubeMesh(GetCubeMeshPrimitiveTopology(CubeMeshTopologyType::Triangle));
+    cubeMesh.initIndices(IndexBufferFormat::UInt16, meshSizes.indexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::Position, 0, gpufmt::Format::R32G32B32_SFLOAT,
+                                 meshSizes.vertexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::Normal, 0, gpufmt::Format::R32G32B32_SFLOAT,
+                                 meshSizes.vertexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::Tangent, 0, gpufmt::Format::R32G32B32_SFLOAT,
+                                 meshSizes.vertexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::Binormal, 0, gpufmt::Format::R32G32B32_SFLOAT,
+                                 meshSizes.vertexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::TexCoord, 0, gpufmt::Format::R32G32_SFLOAT,
+                                 meshSizes.vertexCount);
+
+    PrimitiveMesh3dParams primitiveParams(cubeMesh);
+    GenerateCubeMeshTris(primitiveParams, subdivisions);
+
+    mCubeMesh = GpuMesh(cubeMesh, ResourceAccessFlags::GpuRead, "Cube");
+}
+
 RenderScene& RenderScene::operator=(RenderScene&&) = default;
 
 void RenderScene::preRender(const FrameInfo& frameInfo)
 {
+    mCamera.update(frameInfo);
+
+    const glm::ivec2 windowSize = frameInfo.mainWindow->getDrawableSize();
+
+    const glm::mat4x4 worldToViewMat = mCamera.worldToViewMatrix();
+    const glm::mat4x4 viewToClipMat =
+        glm::perspectiveFovLH_ZO(1.04719f, (float)windowSize.x, (float)windowSize.y, 0.1f, 100.0f);
+    const glm::mat4x4 worldToClipMat = viewToClipMat * worldToViewMat;
+
     // This function is called before the copy context command list is executed for the frame.
 
     // Update relevant constant buffers on the copy context command list so they are ready before the frame is rendered.
@@ -316,6 +388,10 @@ void RenderScene::preRender(const FrameInfo& frameInfo)
         buffer.front().time = std::chrono::duration_cast<std::chrono::duration<float>>(
                                   std::chrono::steady_clock::now().time_since_epoch())
                                   .count();
+        buffer.front().frameTimeDelta = frameInfo.frameDeltaSec.count();
+        buffer.front().worldToView = glm::transpose(worldToViewMat);
+        buffer.front().worldToClip = glm::transpose(worldToClipMat);
+        buffer.front().viewToClip = glm::transpose(viewToClipMat);
     }
 }
 
@@ -330,7 +406,7 @@ void RenderScene::drawIndexed(d3d12::GraphicsPipelineState& pso,
         spdlog::warn("Binding more textures than bindless slots available.");
     }
 
-    const d3d12::GraphicsShader& shader = *mHelloTrianglePso->getShader();
+    const d3d12::GraphicsShader& shader = *pso.getShader();
 
     { // bind vertex buffers
         // creating an array with one more than necessary to give a slot to assign buffers not used by the
@@ -415,6 +491,8 @@ void RenderScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12
             d3d12::RootParamIndex::kRootParamIndex_FrameCB,
             mFrameConstantBuffer->getResource()->GetGPUVirtualAddress());
 
+        mFrameConstantBuffer->markAsUsed(mCommandList.get());
+
         mCommandList.get()->RSSetViewports(1, &viewport);
         mCommandList.get()->RSSetScissorRects(1, &scissorRect);
 
@@ -434,7 +512,8 @@ void RenderScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12
         std::array<TextureBindingDesc, 1> textureBindings = {
             TextureBindingDesc{std::hash<std::string_view>()("Texture"), mTexture.get()}};
 
-        drawIndexed(*mHelloTrianglePso, mTriangleMesh, textureBindings);
+        // drawIndexed(*mHelloTrianglePso, mTriangleMesh, textureBindings);
+        drawIndexed(*mHelloCubePso, mCubeMesh, textureBindings);
 
         // Indicate that the back buffer will now be used to present.
         renderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
