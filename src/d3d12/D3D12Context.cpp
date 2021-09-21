@@ -107,8 +107,19 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
         {
             spdlog::critical("D3D12 HLSL dynamic resources not supported");
             // This feature isn't being used yet, so don't need to bail. But it will be used in the near future.
-            // return;
+            return;
         }
+    }
+
+    { // check for ray tracing support
+        D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData = {};
+        if(SUCCEEDED(mDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData,
+                                                  sizeof(featureSupportData))))
+        {
+            spdlog::info("{}", featureSupportData.RaytracingTier);
+        }
+
+        mRaytracingSupported = featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
     }
 
     collectFormatSupport();

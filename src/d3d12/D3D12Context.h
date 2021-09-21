@@ -92,6 +92,8 @@ public:
 
     glm::i32vec2 frameSize() const { return mFrameBufferSize; }
 
+    [[nodiscard]] bool isRaytracingSupported() const { return mRaytracingSupported; }
+
     [[nodiscard]] bool isSupportedRenderTargetFormat(DXGI_FORMAT format) const
     {
         return mRenderTargetFormatSupport[format];
@@ -145,6 +147,8 @@ private:
     std::vector<std::future<void>> mFutures;
 
     bool mInitialized = false;
+
+    bool mRaytracingSupported = false;
 
     static constexpr size_t kDxgiFormatBounds = 191;
     std::bitset<kDxgiFormatBounds> mRenderTargetFormatSupport;

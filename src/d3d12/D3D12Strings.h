@@ -40,48 +40,6 @@ constexpr std::string_view ToStringView(D3D_FEATURE_LEVEL featureLevel)
 }
 
 template<>
-constexpr std::string_view ToStringView(D3D_SHADER_MODEL shaderModel)
-{
-    switch(shaderModel)
-    {
-    case D3D_SHADER_MODEL_5_1: return "D3D_SHADER_MODEL_5_1";
-    case D3D_SHADER_MODEL_6_0: return "D3D_SHADER_MODEL_6_0";
-    case D3D_SHADER_MODEL_6_1: return "D3D_SHADER_MODEL_6_1";
-    case D3D_SHADER_MODEL_6_2: return "D3D_SHADER_MODEL_6_2";
-    case D3D_SHADER_MODEL_6_3: return "D3D_SHADER_MODEL_6_3";
-    case D3D_SHADER_MODEL_6_4: return "D3D_SHADER_MODEL_6_4";
-    case D3D_SHADER_MODEL_6_5: return "D3D_SHADER_MODEL_6_5";
-    case D3D_SHADER_MODEL_6_6: return "D3D_SHADER_MODEL_6_6";
-    default: return "Unknown D3D_SHADER_MODEL";
-    }
-}
-
-template<>
-constexpr std::string_view ToStringView(D3D12_DESCRIPTOR_HEAP_TYPE descriptorHeapType)
-{
-    switch(descriptorHeapType)
-    {
-    case D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV: return "D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV";
-    case D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER: return "D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER";
-    case D3D12_DESCRIPTOR_HEAP_TYPE_RTV: return "D3D12_DESCRIPTOR_HEAP_TYPE_RTV";
-    case D3D12_DESCRIPTOR_HEAP_TYPE_DSV: return "D3D12_DESCRIPTOR_HEAP_TYPE_DSV";
-    default: return "Unknown D3D12_DESCRIPTOR_HEAP_TYPE";
-    }
-}
-
-template<>
-constexpr std::string_view ToStringView(D3D12_RESOURCE_BINDING_TIER resourceBindingTier)
-{
-    switch(resourceBindingTier)
-    {
-    case D3D12_RESOURCE_BINDING_TIER_1: return "D3D12_RESOURCE_BINDING_TIER_1";
-    case D3D12_RESOURCE_BINDING_TIER_2: return "D3D12_RESOURCE_BINDING_TIER_2";
-    case D3D12_RESOURCE_BINDING_TIER_3: return "D3D12_RESOURCE_BINDING_TIER_3";
-    default: return "Unknown D3D12_RESOURCE_BIND_TIER";
-    }
-}
-
-template<>
 constexpr std::string_view ToStringView(D3D_SHADER_INPUT_TYPE sit)
 {
     switch(sit)
@@ -105,6 +63,23 @@ constexpr std::string_view ToStringView(D3D_SHADER_INPUT_TYPE sit)
 }
 
 template<>
+constexpr std::string_view ToStringView(D3D_SHADER_MODEL shaderModel)
+{
+    switch(shaderModel)
+    {
+    case D3D_SHADER_MODEL_5_1: return "D3D_SHADER_MODEL_5_1";
+    case D3D_SHADER_MODEL_6_0: return "D3D_SHADER_MODEL_6_0";
+    case D3D_SHADER_MODEL_6_1: return "D3D_SHADER_MODEL_6_1";
+    case D3D_SHADER_MODEL_6_2: return "D3D_SHADER_MODEL_6_2";
+    case D3D_SHADER_MODEL_6_3: return "D3D_SHADER_MODEL_6_3";
+    case D3D_SHADER_MODEL_6_4: return "D3D_SHADER_MODEL_6_4";
+    case D3D_SHADER_MODEL_6_5: return "D3D_SHADER_MODEL_6_5";
+    case D3D_SHADER_MODEL_6_6: return "D3D_SHADER_MODEL_6_6";
+    default: return "Unknown D3D_SHADER_MODEL";
+    }
+}
+
+template<>
 constexpr std::string_view ToStringView(D3D12_COMMAND_LIST_TYPE commandListType)
 {
     switch(commandListType)
@@ -117,6 +92,43 @@ constexpr std::string_view ToStringView(D3D12_COMMAND_LIST_TYPE commandListType)
     case D3D12_COMMAND_LIST_TYPE_VIDEO_PROCESS: return "D3D12_COMMAND_LIST_TYPE_VIDEO_PROCESS";
     case D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE: return "D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE";
     default: return "Unknown D3D12_COMMAND_LIST_TYPE";
+    }
+}
+
+template<>
+constexpr std::string_view ToStringView(D3D12_DESCRIPTOR_HEAP_TYPE descriptorHeapType)
+{
+    switch(descriptorHeapType)
+    {
+    case D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV: return "D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV";
+    case D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER: return "D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER";
+    case D3D12_DESCRIPTOR_HEAP_TYPE_RTV: return "D3D12_DESCRIPTOR_HEAP_TYPE_RTV";
+    case D3D12_DESCRIPTOR_HEAP_TYPE_DSV: return "D3D12_DESCRIPTOR_HEAP_TYPE_DSV";
+    default: return "Unknown D3D12_DESCRIPTOR_HEAP_TYPE";
+    }
+}
+
+template<>
+constexpr std::string_view ToStringView(D3D12_RAYTRACING_TIER raytracingTier)
+{
+    switch(raytracingTier)
+    {
+    case D3D12_RAYTRACING_TIER_NOT_SUPPORTED: return "D3D12_RAYTRACING_TIER_NOT_SUPPORTED";
+    case D3D12_RAYTRACING_TIER_1_0: return "D3D12_RAYTRACING_TIER_1_0";
+    case D3D12_RAYTRACING_TIER_1_1: return "D3D12_RAYTRACING_TIER_1_1";
+    default: assert(false); return "Unknown D3D12_RAYTRACING_TIER";
+    }
+}
+
+template<>
+constexpr std::string_view ToStringView(D3D12_RESOURCE_BINDING_TIER resourceBindingTier)
+{
+    switch(resourceBindingTier)
+    {
+    case D3D12_RESOURCE_BINDING_TIER_1: return "D3D12_RESOURCE_BINDING_TIER_1";
+    case D3D12_RESOURCE_BINDING_TIER_2: return "D3D12_RESOURCE_BINDING_TIER_2";
+    case D3D12_RESOURCE_BINDING_TIER_3: return "D3D12_RESOURCE_BINDING_TIER_3";
+    default: return "Unknown D3D12_RESOURCE_BIND_TIER";
     }
 }
 } // namespace scrap
@@ -193,7 +205,15 @@ struct fmt::formatter<D3D_FEATURE_LEVEL> : public scrap::ToStringViewFormatter<D
 {};
 
 template<>
+struct fmt::formatter<D3D_SHADER_INPUT_TYPE> : public scrap::ToStringViewFormatter<D3D_SHADER_INPUT_TYPE>
+{};
+
+template<>
 struct fmt::formatter<D3D_SHADER_MODEL> : public scrap::ToStringViewFormatter<D3D_SHADER_MODEL>
+{};
+
+template<>
+struct fmt::formatter<D3D12_COMMAND_LIST_TYPE> : public scrap::ToStringViewFormatter<D3D12_COMMAND_LIST_TYPE>
 {};
 
 template<>
@@ -201,13 +221,10 @@ struct fmt::formatter<D3D12_DESCRIPTOR_HEAP_TYPE> : public scrap::ToStringViewFo
 {};
 
 template<>
+struct fmt::formatter<D3D12_RAYTRACING_TIER> : public scrap::ToStringViewFormatter<D3D12_RAYTRACING_TIER>
+{};
+
+template<>
 struct fmt::formatter<D3D12_RESOURCE_BINDING_TIER> : public scrap::ToStringViewFormatter<D3D12_RESOURCE_BINDING_TIER>
 {};
 
-template<>
-struct fmt::formatter<D3D_SHADER_INPUT_TYPE> : public scrap::ToStringViewFormatter<D3D_SHADER_INPUT_TYPE>
-{};
-
-template<>
-struct fmt::formatter<D3D12_COMMAND_LIST_TYPE> : public scrap::ToStringViewFormatter<D3D12_COMMAND_LIST_TYPE>
-{};
