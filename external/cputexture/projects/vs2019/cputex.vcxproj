@@ -94,18 +94,19 @@
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">
     <VcpkgManifestInstall>false</VcpkgManifestInstall>
+    <VcpkgEnableManifest>false</VcpkgEnableManifest>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <VcpkgInstalledDir>..\..\..\..\vcpkg_installed</VcpkgInstalledDir>
+    <VcpkgInstalledDir>..\..\..\..\vcpkg_installed\x64-windows</VcpkgInstalledDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Vcpkg">
-    <VcpkgInstalledDir>..\..\..\..\vcpkg_installed</VcpkgInstalledDir>
+    <VcpkgInstalledDir>..\..\..\..\vcpkg_installed\x86-windows</VcpkgInstalledDir>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <VcpkgInstalledDir>..\..\..\..\vcpkg_installed</VcpkgInstalledDir>
+    <VcpkgInstalledDir>..\..\..\..\vcpkg_installed\x64-windows</VcpkgInstalledDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Vcpkg">
-    <VcpkgInstalledDir>..\..\..\..\vcpkg_installed</VcpkgInstalledDir>
+    <VcpkgInstalledDir>..\..\..\..\vcpkg_installed\x86-windows</VcpkgInstalledDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
