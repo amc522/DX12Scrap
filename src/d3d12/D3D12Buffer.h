@@ -86,15 +86,15 @@ public:
 
     uint32_t getSrvDescriptorHeapIndex() const
     {
-        return mResource.getDescriptorHeapReservation().getStartHeapIndex() + mSrvIndex;
+        return mResource.getCbvSrvUavDescriptorHeapReservation().getStartHeapIndex() + mSrvIndex;
     }
     uint32_t getUavDescriptorHeapIndex() const
     {
-        return mResource.getDescriptorHeapReservation().getStartHeapIndex() + mUavIndex;
+        return mResource.getCbvSrvUavDescriptorHeapReservation().getStartHeapIndex() + mUavIndex;
     }
     uint32_t getCbvDescriptorHeapIndex() const
     {
-        return mResource.getDescriptorHeapReservation().getStartHeapIndex() + mCbvIndex;
+        return mResource.getCbvSrvUavDescriptorHeapReservation().getStartHeapIndex() + mCbvIndex;
     }
 
     D3D12_INDEX_BUFFER_VIEW getIndexView() const;

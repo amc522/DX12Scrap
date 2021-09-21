@@ -14,6 +14,7 @@
 #include "d3d12/D3D12MonotonicDescriptorHeap.h"
 
 #include <array>
+#include <bitset>
 #include <future>
 
 #include <fmt/format.h>
@@ -86,8 +87,20 @@ public:
     const CopyContext& getCopyContext() const { return *mCopyContext; }
 
     d3d12::FixedDescriptorHeap_CBV_SRV_UAV& getCbvSrvUavHeap() { return *mCbvSrvUavHeap; }
+    d3d12::FixedDescriptorHeap_RTV& getRtvHeap() { return *mRtvHeap; }
+    d3d12::FixedDescriptorHeap_DSV& getDsvHeap() { return *mDsvHeap; }
 
     glm::i32vec2 frameSize() const { return mFrameBufferSize; }
+
+    [[nodiscard]] bool isSupportedRenderTargetFormat(DXGI_FORMAT format) const
+    {
+        return mRenderTargetFormatSupport[format];
+    }
+    [[nodiscard]] bool isSupportedDepthStencilFormat(DXGI_FORMAT format) const
+    {
+        return mDepthStencilFormatSupport[format];
+    }
+    [[nodiscard]] bool isSupportedIndexBufferFormat(DXGI_FORMAT format) const { return mIndexFormatSupport[format]; }
 
     void beginFrame();
     void endFrame();
@@ -97,6 +110,7 @@ public:
 private:
     void getHardwareAdapter(GpuPreference gpuPreference, D3D_FEATURE_LEVEL featureLevel, IDXGIFactory4* dxgiFactory);
     HRESULT createDevice(D3D_FEATURE_LEVEL featureLevel);
+    void collectFormatSupport();
 
     // Debug needs to be the first member so it's the last one destroyed. Debug checks to see what
     // d3d12 and dxgi objects are still live on destruction.
@@ -111,11 +125,14 @@ private:
     Microsoft::WRL::ComPtr<ID3D12Device5> mDevice5;
     Microsoft::WRL::ComPtr<ID3D12Device6> mDevice6;
     Microsoft::WRL::ComPtr<IDXGISwapChain3> mSwapChain;
-    std::unique_ptr<d3d12::MonotonicDescriptorHeap_RTV> mRtvHeap;
+    std::unique_ptr<MonotonicDescriptorHeap_RTV> mSwapChainRtvHeap;
     d3d12::MonotonicDescriptorHeapAllocation mSwapChainRtvs;
     std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, d3d12::kFrameBufferCount> mRenderTargets;
 
-    std::unique_ptr<d3d12::FixedDescriptorHeap_CBV_SRV_UAV> mCbvSrvUavHeap;
+    std::unique_ptr<FixedDescriptorHeap_CBV_SRV_UAV> mCbvSrvUavHeap;
+    std::unique_ptr<FixedDescriptorHeap_RTV> mRtvHeap;
+    std::unique_ptr<FixedDescriptorHeap_DSV> mDsvHeap;
+
     // Graphcs and copy context need to be declared after the descriptor heaps so they are destroyed before the
     // descriptor heaps.
     std::unique_ptr<GraphicsContext> mGraphicsContext;
@@ -128,6 +145,11 @@ private:
     std::vector<std::future<void>> mFutures;
 
     bool mInitialized = false;
+
+    static constexpr size_t kDxgiFormatBounds = 191;
+    std::bitset<kDxgiFormatBounds> mRenderTargetFormatSupport;
+    std::bitset<kDxgiFormatBounds> mDepthStencilFormatSupport;
+    std::bitset<kDxgiFormatBounds> mIndexFormatSupport;
 };
 } // namespace d3d12
 } // namespace scrap

@@ -30,32 +30,32 @@ std::optional<Buffer::Error> Buffer::init(const StructuredParams& params, nonstd
 
 D3D12_CPU_DESCRIPTOR_HANDLE Buffer::getSrvCpu() const
 {
-    return mResource.getDescriptorHeapReservation().getCpuHandle(mSrvIndex);
+    return mResource.getCbvSrvUavDescriptorHeapReservation().getCpuHandle(mSrvIndex);
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE Buffer::getSrvGpu() const
 {
-    return mResource.getDescriptorHeapReservation().getGpuHandle(mSrvIndex);
+    return mResource.getCbvSrvUavDescriptorHeapReservation().getGpuHandle(mSrvIndex);
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE Buffer::getUavCpu() const
 {
-    return mResource.getDescriptorHeapReservation().getCpuHandle(mUavIndex);
+    return mResource.getCbvSrvUavDescriptorHeapReservation().getCpuHandle(mUavIndex);
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE Buffer::getUavGpu() const
 {
-    return mResource.getDescriptorHeapReservation().getGpuHandle(mUavIndex);
+    return mResource.getCbvSrvUavDescriptorHeapReservation().getGpuHandle(mUavIndex);
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE Buffer::getCbvCpu() const
 {
-    return mResource.getDescriptorHeapReservation().getCpuHandle(mCbvIndex);
+    return mResource.getCbvSrvUavDescriptorHeapReservation().getCpuHandle(mCbvIndex);
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE Buffer::getCbvGpu() const
 {
-    return mResource.getDescriptorHeapReservation().getGpuHandle(mCbvIndex);
+    return mResource.getCbvSrvUavDescriptorHeapReservation().getGpuHandle(mCbvIndex);
 }
 
 D3D12_INDEX_BUFFER_VIEW Buffer::getIndexView() const
@@ -74,8 +74,7 @@ D3D12_INDEX_BUFFER_VIEW Buffer::getIndexView(DXGI_FORMAT format) const
 
 bool Buffer::isReady() const
 {
-    return mResource != nullptr &&
-           mInitFrameCode < DeviceContext::instance().getCopyContext().getCurrentFrameCode();
+    return mResource != nullptr && mInitFrameCode < DeviceContext::instance().getCopyContext().getCurrentFrameCode();
 }
 
 void Buffer::markAsUsed(ID3D12CommandQueue* commandQueue)
@@ -294,7 +293,7 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
     auto descriptorHeapReservation = deviceContext.getCbvSrvUavHeap().reserve(descriptorCount);
     if(!descriptorHeapReservation) { return Error::InsufficientDescriptorHeapSpace; }
 
-    mResource.setDescriptorHeapReservation(std::move(descriptorHeapReservation.value()));
+    mResource.setCbvSrvUavDescriptorHeapReservation(std::move(descriptorHeapReservation.value()));
 
     uint32_t nextDescriptorIndex = 0;
 
@@ -310,8 +309,9 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
         srvDesc.Buffer.StructureByteStride = (params.type == Type::Structured) ? params.elementByteSize : 0;
         srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
-        deviceContext.getCbvSrvUavHeap().createShaderResourceView(
-            deviceContext, mResource.getDescriptorHeapReservation(), mSrvIndex, mResource.getResource(), srvDesc);
+        deviceContext.getCbvSrvUavHeap().createShaderResourceView(deviceContext,
+                                                                  mResource.getCbvSrvUavDescriptorHeapReservation(),
+                                                                  mSrvIndex, mResource.getResource(), srvDesc);
     }
 
     if(needsUav)
@@ -326,9 +326,9 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
         uavDesc.Buffer.StructureByteStride = (params.type == Type::Structured) ? params.elementByteSize : 0;
         uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 
-        deviceContext.getCbvSrvUavHeap().createUnorderedAccessView(deviceContext,
-                                                                   mResource.getDescriptorHeapReservation(), mUavIndex,
-                                                                   mResource.getResource(), nullptr, uavDesc);
+        deviceContext.getCbvSrvUavHeap().createUnorderedAccessView(
+            deviceContext, mResource.getCbvSrvUavDescriptorHeapReservation(), mUavIndex, mResource.getResource(),
+            nullptr, uavDesc);
     }
 
     if(needsCbv)
@@ -339,7 +339,7 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
         cbvDesc.SizeInBytes = params.byteSize;
 
         deviceContext.getCbvSrvUavHeap().createConstantBufferView(
-            deviceContext, mResource.getDescriptorHeapReservation(), mCbvIndex, cbvDesc);
+            deviceContext, mResource.getCbvSrvUavDescriptorHeapReservation(), mCbvIndex, cbvDesc);
     }
 
     mParams = params;

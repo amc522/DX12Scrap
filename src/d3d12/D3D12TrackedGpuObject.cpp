@@ -84,21 +84,60 @@ void TrackedShaderResource::destroy()
 {
     if(mResource == nullptr) { return; }
 
+    uint32_t validDescriptorReservationCount = 0;
+    validDescriptorReservationCount += (mCbvSrvUavDescriptorHeapReservation.isValid()) ? 1 : 0;
+    validDescriptorReservationCount += (mCbvSrvUavDescriptorHeapReservation.isValid()) ? 1 : 0;
+    validDescriptorReservationCount += (mCbvSrvUavDescriptorHeapReservation.isValid()) ? 1 : 0;
+
     DeviceContext& deviceContext = DeviceContext::instance();
-    deviceContext.getGraphicsContext().queueObjectForDestruction(mResource, std::move(mDescriptorHeapReservation),
-                                                                 mLastUsedRenderFrameCode);
-    deviceContext.getCopyContext().queueObjectForDestruction(std::move(mResource), mLastUsedCopyFrameCode);
+
+    if(validDescriptorReservationCount > 0)
+    {
+        std::array<FixedDescriptorHeapReservation, 3> descriptorHeapReservations = {
+            std::move(mCbvSrvUavDescriptorHeapReservation), std::move(mRtvDescriptorHeapReservation),
+            std::move(mDsvDescriptorHeapReservation)};
+
+        deviceContext.getGraphicsContext().queueObjectForDestruction(mResource, descriptorHeapReservations,
+                                                                     mLastUsedRenderFrameCode);
+    }
+    else
+    {
+        deviceContext.getGraphicsContext().queueObjectForDestruction(mResource, mLastUsedRenderFrameCode);
+    }
 }
 
-void TrackedShaderResource::setDescriptorHeapReservation(FixedDescriptorHeapReservation&& descriptorHeapReservation)
+void TrackedShaderResource::setCbvSrvUavDescriptorHeapReservation(
+    FixedDescriptorHeapReservation&& descriptorHeapReservation)
 {
-    if(mDescriptorHeapReservation.isValid())
+    if(mCbvSrvUavDescriptorHeapReservation.isValid())
     {
-        DeviceContext::instance().getGraphicsContext().queueObjectForDestruction(std::move(mDescriptorHeapReservation),
-                                                                                 mLastUsedRenderFrameCode);
+        DeviceContext::instance().getGraphicsContext().queueObjectForDestruction(
+            std::move(mCbvSrvUavDescriptorHeapReservation), mLastUsedRenderFrameCode);
     }
 
-    mDescriptorHeapReservation = std::move(descriptorHeapReservation);
+    mCbvSrvUavDescriptorHeapReservation = std::move(descriptorHeapReservation);
+}
+
+void TrackedShaderResource::setRtvDescriptorHeapReservation(FixedDescriptorHeapReservation&& descriptorHeapReservation)
+{
+    if(mRtvDescriptorHeapReservation.isValid())
+    {
+        DeviceContext::instance().getGraphicsContext().queueObjectForDestruction(
+            std::move(mRtvDescriptorHeapReservation), mLastUsedRenderFrameCode);
+    }
+
+    mRtvDescriptorHeapReservation = std::move(descriptorHeapReservation);
+}
+
+void TrackedShaderResource::setDsvDescriptorHeapReservation(FixedDescriptorHeapReservation&& descriptorHeapReservation)
+{
+    if(mDsvDescriptorHeapReservation.isValid())
+    {
+        DeviceContext::instance().getGraphicsContext().queueObjectForDestruction(
+            std::move(mDsvDescriptorHeapReservation), mLastUsedRenderFrameCode);
+    }
+
+    mDsvDescriptorHeapReservation = std::move(descriptorHeapReservation);
 }
 
 void TrackedShaderResource::markAsUsed(ID3D12CommandQueue* commandQueue)

@@ -72,12 +72,6 @@ public:
 
     explicit TrackedShaderResource(Microsoft::WRL::ComPtr<ID3D12Resource> resource): mResource(std::move(resource)) {}
 
-    explicit TrackedShaderResource(Microsoft::WRL::ComPtr<ID3D12Resource> resource,
-                                   FixedDescriptorHeapReservation&& descriptorHeapReservation)
-        : mResource(std::move(resource))
-        , mDescriptorHeapReservation(std::move(descriptorHeapReservation))
-    {}
-
     TrackedShaderResource(const TrackedShaderResource&) = delete;
     TrackedShaderResource(TrackedShaderResource&&) = default;
     ~TrackedShaderResource() { destroy(); }
@@ -91,8 +85,23 @@ public:
     explicit operator ID3D12Resource*() const { return mResource.Get(); }
     ID3D12Resource* getResource() const { return mResource.Get(); }
 
-    const FixedDescriptorHeapReservation& getDescriptorHeapReservation() const { return mDescriptorHeapReservation; }
-    void setDescriptorHeapReservation(FixedDescriptorHeapReservation&& descriptorHeapReservation);
+    const FixedDescriptorHeapReservation& getCbvSrvUavDescriptorHeapReservation() const
+    {
+        return mCbvSrvUavDescriptorHeapReservation;
+    }
+    void setCbvSrvUavDescriptorHeapReservation(FixedDescriptorHeapReservation&& descriptorHeapReservation);
+
+    const FixedDescriptorHeapReservation& getRtvDescriptorHeapReservation() const
+    {
+        return mRtvDescriptorHeapReservation;
+    }
+    void setRtvDescriptorHeapReservation(FixedDescriptorHeapReservation&& descriptorHeapReservation);
+
+    const FixedDescriptorHeapReservation& getDsvDescriptorHeapReservation() const
+    {
+        return mDsvDescriptorHeapReservation;
+    }
+    void setDsvDescriptorHeapReservation(FixedDescriptorHeapReservation&& descriptorHeapReservation);
 
     void markAsUsed(ID3D12CommandQueue* commandQueue);
     void markAsUsed(ID3D12CommandList* commandList);
@@ -111,7 +120,9 @@ protected:
     void destroy();
 
     Microsoft::WRL::ComPtr<ID3D12Resource> mResource;
-    FixedDescriptorHeapReservation mDescriptorHeapReservation;
+    FixedDescriptorHeapReservation mCbvSrvUavDescriptorHeapReservation;
+    FixedDescriptorHeapReservation mRtvDescriptorHeapReservation;
+    FixedDescriptorHeapReservation mDsvDescriptorHeapReservation;
     RenderFrameCode mLastUsedRenderFrameCode;
     CopyFrameCode mLastUsedCopyFrameCode;
 };

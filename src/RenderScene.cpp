@@ -127,6 +127,7 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
         spdlog::info("Created d3d12 root signature");
     }
 
+    createRenderTargets();
     createFrameConstantBuffer();
     createTriangle();
     createCube();
@@ -211,12 +212,39 @@ bool RenderScene::loadShaders()
             psoParams.primitiveTopologyType =
                 d3d12::TranslatePrimitiveTopologyType(mTriangleMesh.getPrimitiveTopology());
             psoParams.renderTargetFormats = {DXGI_FORMAT_R8G8B8A8_UNORM};
+            psoParams.depthStencilFormat = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
 
             mHelloCubePso = d3d12::DeviceContext::instance().createGraphicsPipelineState(std::move(psoParams));
         }
     }
 
     return true;
+}
+
+void RenderScene::createRenderTargets()
+{
+    // Currently using the swap chain as our render targets. Just need the depth/stencil buffer
+    d3d12::Texture::Params params = {};
+    params.format = gpufmt::Format::D32_SFLOAT_S8_UINT;
+    params.dimension = cputex::TextureDimension::Texture2D;
+    params.arraySize = 1;
+    params.extents = cputex::Extent(d3d12::DeviceContext::instance().frameSize(), 1);
+    params.mipCount = 1;
+    params.accessFlags = ResourceAccessFlags::None;
+    params.isRenderTarget = false;
+    params.name = "DepthStencilTarget";
+    params.depthClearValue = 1.0f;
+
+    auto depthStencilTexture = std::make_unique<d3d12::Texture>();
+    auto error = depthStencilTexture->initUninitialized(params);
+
+    if(error.has_value())
+    {
+        spdlog::critical("Failed to create depth stencil target for scene. {}", error.value());
+        return;
+    }
+
+    mDepthStencilTexture = std::move(depthStencilTexture);
 }
 
 void RenderScene::createFrameConstantBuffer()
@@ -503,11 +531,15 @@ void RenderScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12
         mCommandList.get()->ResourceBarrier(1, &renderTargetBarrier);
 
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = d3d12Context.getBackBufferRtv();
-        mCommandList.get()->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = mDepthStencilTexture->getDsvCpu();
+        mCommandList.get()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+
+        mDepthStencilTexture->markAsUsed(mCommandList.get());
 
         // Record commands.
         const float clearColor[] = {0.0f, 0.2f, 0.4f, 1.0f};
         mCommandList.get()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+        mCommandList.get()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
         std::array<TextureBindingDesc, 1> textureBindings = {
             TextureBindingDesc{std::hash<std::string_view>()("Texture"), mTexture.get()}};

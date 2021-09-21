@@ -13,6 +13,7 @@
 #include <dxgi1_3.h>
 #include <dxgi1_4.h>
 #include <dxgi1_6.h>
+#include <gpufmt/dxgi.h>
 #include <spdlog/spdlog.h>
 
 // These exports are needed for the DX12 Agility SDK. The agility sdk is a portable dx12 binary to be shipped with the
@@ -110,6 +111,8 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
         }
     }
 
+    collectFormatSupport();
+
     mGraphicsContext = std::make_unique<GraphicsContext>();
     mGraphicsContext->init();
 
@@ -153,30 +156,52 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
 
     { // Create descriptor heaps.
         // https://docs.microsoft.com/en-us/windows/win32/direct3d12/creating-descriptor-heaps
-        mRtvHeap = std::make_unique<d3d12::MonotonicDescriptorHeap_RTV>(*this, (uint32_t)d3d12::kFrameBufferCount);
-        if(!mRtvHeap->isValid())
+        mSwapChainRtvHeap = std::make_unique<MonotonicDescriptorHeap_RTV>(*this, (uint32_t)d3d12::kFrameBufferCount);
+        if(!mSwapChainRtvHeap->isValid())
         {
             spdlog::critical("Failed to create RTV descriptor heap");
             return;
         }
 
         spdlog::info("Created permanent RTV descriptor heap with {} descriptors. {} bytes",
-                     mRtvHeap->getDesctiptorCount(), mRtvHeap->getByteSize());
+                     mSwapChainRtvHeap->getDesctiptorCount(), mSwapChainRtvHeap->getByteSize());
 
-        // Describe and create a shader resource view (SRV) heap for the texture.
-        mCbvSrvUavHeap = std::make_unique<d3d12::FixedDescriptorHeap_CBV_SRV_UAV>(*this, 1024);
+        // Create a shader resource view (SRV) heap
+        mCbvSrvUavHeap = std::make_unique<FixedDescriptorHeap_CBV_SRV_UAV>(*this, 1024);
         if(!mCbvSrvUavHeap->isValid())
         {
-            spdlog::critical("Failed to create CBV/SRV/UAV descriptor heap");
+            spdlog::critical("Failed to create CBV/SRV/UAV descriptor heap.");
             return;
         }
 
         spdlog::info("Created fixed CBV/SRV/UAV descriptor heap with {} descriptors. {} bytes",
                      mCbvSrvUavHeap->getDesctiptorCount(), mCbvSrvUavHeap->getByteSize());
+
+        // Create a render target view (RTV) heap
+        mRtvHeap = std::make_unique<FixedDescriptorHeap_RTV>(*this, 16);
+        if(!mRtvHeap->isValid())
+        {
+            spdlog::critical("Failed to create RTV descriptor heap.");
+            return;
+        }
+
+        spdlog::info("Created fixed RTV descriptor heap with {} descriptors. {} bytes", mRtvHeap->getDesctiptorCount(),
+                     mRtvHeap->getByteSize());
+
+        // Create a depth stencil view (DSV) heap
+        mDsvHeap = std::make_unique<FixedDescriptorHeap_DSV>(*this, 16);
+        if(!mDsvHeap->isValid())
+        {
+            spdlog::critical("Failed to create DSV descriptor heap.");
+            return;
+        }
+
+        spdlog::info("Created fixed DSV descriptor heap with {} descriptors. {} bytes", mDsvHeap->getDesctiptorCount(),
+                     mDsvHeap->getByteSize());
     }
 
     { // Create frame resources.
-        auto rtvDescriptors = mRtvHeap->allocate(kFrameBufferCount);
+        auto rtvDescriptors = mSwapChainRtvHeap->allocate(kFrameBufferCount);
 
         if(!rtvDescriptors)
         {
@@ -194,8 +219,8 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
                 return;
             }
 
-            mRtvHeap->createRenderTargetView(*this, mSwapChainRtvs, frameIndex, mRenderTargets[frameIndex].Get(),
-                                             nullptr);
+            mSwapChainRtvHeap->createRenderTargetView(*this, mSwapChainRtvs, frameIndex,
+                                                      mRenderTargets[frameIndex].Get(), nullptr);
         }
 
         spdlog::info("Created render target views");
@@ -274,7 +299,7 @@ void DeviceContext::endFrame()
 
 std::shared_ptr<GraphicsPipelineState> DeviceContext::createGraphicsPipelineState(GraphicsPipelineStateParams&& params)
 {
-    auto pipelineState = std::make_shared<d3d12::GraphicsPipelineState>(std::move(params));
+    auto pipelineState = std::make_shared<GraphicsPipelineState>(std::move(params));
     // This is a really cheesy way to do multithreaded creation of pipeline states. In the future, I would like to make
     // some kind of task manager for handling async resource creation
     mFutures.emplace_back(std::async(std::launch::async, [pipelineState]() { pipelineState->create(); }));
@@ -415,6 +440,44 @@ HRESULT DeviceContext::createDevice(D3D_FEATURE_LEVEL featureLevel)
     spdlog::info("Create d3d12 device6");
 
     return S_OK;
+}
+
+void DeviceContext::collectFormatSupport()
+{
+    auto checkFormat = [&](uint32_t formatIndex) {
+        D3D12_FEATURE_DATA_FORMAT_SUPPORT featureSupport = {};
+        featureSupport.Format = static_cast<DXGI_FORMAT>(formatIndex);
+
+        if(FAILED(mDevice->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &featureSupport, sizeof(featureSupport))))
+        {
+            return;
+        }
+
+        if(featureSupport.Support1 & D3D12_FORMAT_SUPPORT1_RENDER_TARGET)
+        {
+            mRenderTargetFormatSupport.set(formatIndex);
+        }
+        if(featureSupport.Support1 & D3D12_FORMAT_SUPPORT1_DEPTH_STENCIL)
+        {
+            mDepthStencilFormatSupport.set(formatIndex);
+        }
+        if(featureSupport.Support1 & D3D12_FORMAT_SUPPORT1_IA_INDEX_BUFFER) { mIndexFormatSupport.set(formatIndex); }
+    };
+
+    for(uint32_t formatIndex = 0; formatIndex <= 115; ++formatIndex)
+    {
+        checkFormat(formatIndex);
+    }
+
+    for(uint32_t formatIndex = 130; formatIndex <= 132; ++formatIndex)
+    {
+        checkFormat(formatIndex);
+    }
+
+    for(uint32_t formatIndex = 189; formatIndex <= 190; ++formatIndex)
+    {
+        checkFormat(formatIndex);
+    }
 }
 } // namespace d3d12
 } // namespace scrap

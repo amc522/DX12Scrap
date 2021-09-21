@@ -67,6 +67,7 @@ private:
     };
 
     bool loadShaders();
+    void createRenderTargets();
     void createFrameConstantBuffer();
     void createTriangle();
     void createCube();
@@ -87,6 +88,7 @@ private:
     GpuMesh mTriangleMesh{PrimitiveTopology::TriangleList};
     GpuMesh mCubeMesh;
 
+    std::unique_ptr<d3d12::Texture> mDepthStencilTexture;
     std::unique_ptr<d3d12::Texture> mTexture;
     bool mInitialized = false;
 };

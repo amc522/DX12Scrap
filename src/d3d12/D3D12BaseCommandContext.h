@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <d3d12.h>
+#include <nonstd/span.hpp>
 #include <spdlog/spdlog.h>
 #include <wrl/client.h>
 
@@ -31,7 +32,7 @@ public:
 
     void queueObjectForDestruction(Microsoft::WRL::ComPtr<ID3D12DeviceChild> deviceChild, FrameCodeT lastUsedFrameCode)
     {
-        queueObjectForDestruction(std::move(deviceChild), {}, lastUsedFrameCode);
+        queueObjectForDestruction(std::move(deviceChild), FixedDescriptorHeapReservation{}, lastUsedFrameCode);
     }
 
     void queueObjectForDestruction(FixedDescriptorHeapReservation&& descriptors, FrameCodeT lastUsedFrameCode)
@@ -43,13 +44,28 @@ public:
                                    FixedDescriptorHeapReservation&& descriptors,
                                    FrameCodeT lastUsedFrameCode)
     {
-        if((deviceChild == nullptr && descriptors.isValid()) || lastUsedFrameCode <= mLastCompletedFrameCode)
+        if((deviceChild == nullptr && !descriptors.isValid()) || lastUsedFrameCode <= mLastCompletedFrameCode)
         {
             return;
         }
 
         std::lock_guard lockGuard(mPendingFreeListMutex);
         mPendingFreeList.emplace_back(std::move(deviceChild), std::move(descriptors), lastUsedFrameCode);
+    }
+
+    void queueObjectForDestruction(Microsoft::WRL::ComPtr<ID3D12DeviceChild> deviceChild,
+                                   nonstd::span<FixedDescriptorHeapReservation> descriptors,
+                                   FrameCodeT lastUsedFrameCode)
+    {
+        if((deviceChild == nullptr && descriptors.empty()) || lastUsedFrameCode <= mLastCompletedFrameCode) { return; }
+
+        std::lock_guard lockGuard(mPendingFreeListMutex);
+        mPendingFreeList.emplace_back(std::move(deviceChild), std::move(descriptors.front()), lastUsedFrameCode);
+
+        for(auto itr = descriptors.begin() + 1; itr != descriptors.end(); ++itr)
+        {
+            if(itr->isValid()) { mPendingFreeList.emplace_back(nullptr, std::move(*itr), lastUsedFrameCode); }
+        }
     }
 
     virtual void beginFrame()

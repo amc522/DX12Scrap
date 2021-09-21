@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RenderDefs.h"
+#include "StringUtils.h"
 #include "Utility.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
 #include "d3d12/D3D12FrameCodes.h"
@@ -14,7 +15,9 @@
 
 struct ID3D12Resource;
 
-namespace scrap::d3d12
+namespace scrap
+{
+namespace d3d12
 {
 class Texture
 {
@@ -23,7 +26,14 @@ public:
     {
         InvalidExtent,
         InvalidFormat,
-        InavlidArraySize,
+        InvalidArraySize,
+        NoValidDepthSrvFormat,
+        NoValidStencilSrvFormat,
+        NoValidDepthStencilTypelessFormat,
+        UavNotSupportForDepthStencil,
+        CannotUseDepthStencilFormatForRenderTarget,
+        InvalidDepthStencilFormat,
+        InvalidRenderTargetFormat,
         FailedToCreateResource,
         FailedToCreateUploadResource,
         InsufficientDescriptorHeapSpace,
@@ -36,8 +46,17 @@ public:
         cputex::Extent extents;
         uint32_t arraySize;
         uint8_t mipCount;
+
+        // accessFlags:
+        // For render targets and depth stencil targets, GpuRead and GpuWrite do not need to be specified. If GpuRead is
+        // specified, srvs are created for the render target or depth and stencil planes. For render targets, if
+        // GpuWrite is specified, a uav will be created. GpuWrite is not valid for depth stencil targets.
         ResourceAccessFlags accessFlags;
         std::string_view name;
+        glm::vec4 colorClearValue{0.0f, 0.0f, 0.0f, 1.0f};
+        float depthClearValue = 0.0f;
+        uint8_t stencilClearValue = 0;
+        bool isRenderTarget = false;
     };
 
     Texture() = default;
@@ -56,10 +75,17 @@ public:
 
     D3D12_CPU_DESCRIPTOR_HANDLE getSrvCpu() const;
     D3D12_GPU_DESCRIPTOR_HANDLE getSrvGpu() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE getRtvCpu() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE getDsvCpu() const;
 
     uint32_t getSrvDescriptorHeapIndex() const
     {
-        return mResource.getDescriptorHeapReservation().getStartHeapIndex() + mSrvIndex;
+        return mResource.getCbvSrvUavDescriptorHeapReservation().getStartHeapIndex() + mSrvIndex;
+    }
+
+    uint32_t getUavDescriptorHeapIndex() const
+    {
+        return mResource.getCbvSrvUavDescriptorHeapReservation().getStartHeapIndex() + mUavIndex;
     }
 
     ShaderResourceDimension getShaderResourceDimension() const { return mResourceDimension; }
@@ -83,9 +109,40 @@ private:
     TrackedGpuObject<ID3D12Resource> mUploadResource;
     uint32_t mSrvIndex = 0;
     uint32_t mUavIndex = 0;
+    uint32_t mRtvIndex = 0;
+    uint32_t mDsvIndex = 0;
+
     ShaderResourceDimension mResourceDimension = ShaderResourceDimension::Unknown;
 
     CopyFrameCode mInitFrameCode;
 };
+} // namespace d3d12
 
-} // namespace scrap::d3d12
+template<>
+constexpr std::string_view ToStringView(d3d12::Texture::Error error)
+{
+    switch(error)
+    {
+    case d3d12::Texture::Error::InvalidExtent: return "InvalidExtent";
+    case d3d12::Texture::Error::InvalidFormat: return "InvalidFormat";
+    case d3d12::Texture::Error::InvalidArraySize: return "InvalidArraySize";
+    case d3d12::Texture::Error::NoValidDepthSrvFormat: return "NoValidDepthSrvFormat";
+    case d3d12::Texture::Error::NoValidStencilSrvFormat: return "NoValidStencilSrvFormat";
+    case d3d12::Texture::Error::NoValidDepthStencilTypelessFormat: return "NoValidDepthStencilTypelessFormat";
+    case d3d12::Texture::Error::UavNotSupportForDepthStencil: return "UavNotSupportForDepthStencil";
+    case d3d12::Texture::Error::CannotUseDepthStencilFormatForRenderTarget:
+        return "CannotUseDepthStencilFormatForRenderTarget";
+    case d3d12::Texture::Error::InvalidDepthStencilFormat: return "InvalidDepthStencilFormat";
+    case d3d12::Texture::Error::InvalidRenderTargetFormat: return "InvalidRenderTargetFormat";
+    case d3d12::Texture::Error::FailedToCreateResource: return "FailedToCreateResource";
+    case d3d12::Texture::Error::FailedToCreateUploadResource: return "FailedToCreateUploadResource";
+    case d3d12::Texture::Error::InsufficientDescriptorHeapSpace: return "InsufficientDescriptorHeapSpace";
+    default: return "Unknown Texture::Error";
+    }
+}
+
+} // namespace scrap
+
+template<>
+struct fmt::formatter<scrap::d3d12::Texture::Error> : public scrap::ToStringViewFormatter<scrap::d3d12::Texture::Error>
+{};

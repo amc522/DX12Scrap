@@ -94,6 +94,7 @@ constexpr GraphicsShaderStageMask GraphicsShaderStageToMask(GraphicsShaderStage 
 
 enum class ResourceAccessFlags
 {
+    None = 0,
     CpuRead = 1 << 0,
     CpuWrite = 1 << 1,
     GpuRead = 1 << 2,

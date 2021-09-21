@@ -28,7 +28,8 @@ FixedDescriptorHeapAllocator::FixedDescriptorHeapAllocator(DeviceContext& contex
     }
 
     D3D12_DESCRIPTOR_HEAP_DESC gpuDesc = cpuDesc;
-    gpuDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    gpuDesc.Flags = (heapType == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE
+                                                                         : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
     hr = context.getDevice()->CreateDescriptorHeap(&gpuDesc, IID_PPV_ARGS(&mGpuHeap));
     if(FAILED(hr))

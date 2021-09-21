@@ -68,6 +68,52 @@ namespace scrap::d3d12
     }
 }
 
+[[nodiscard]] constexpr D3D12_DSV_DIMENSION
+TranslateDsvDimension(cputex::TextureDimension dimension, size_t arraySize, bool isMultisample)
+{
+    switch(dimension)
+    {
+    case cputex::TextureDimension::Texture1D:
+        return (arraySize > 1) ? D3D12_DSV_DIMENSION_TEXTURE1DARRAY : D3D12_DSV_DIMENSION_TEXTURE1D;
+    case cputex::TextureDimension::Texture2D:
+        if(!isMultisample)
+        {
+            return (arraySize > 1) ? D3D12_DSV_DIMENSION_TEXTURE2DARRAY : D3D12_DSV_DIMENSION_TEXTURE2D;
+        }
+        else
+        {
+            return (arraySize > 1) ? D3D12_DSV_DIMENSION_TEXTURE2DMSARRAY : D3D12_DSV_DIMENSION_TEXTURE2DMS;
+        }
+    case cputex::TextureDimension::TextureCube:
+        return (arraySize > 1) ? D3D12_DSV_DIMENSION_TEXTURE2DARRAY : D3D12_DSV_DIMENSION_TEXTURE2D;
+    case cputex::TextureDimension::Texture3D: return D3D12_DSV_DIMENSION_UNKNOWN;
+    default: return D3D12_DSV_DIMENSION_UNKNOWN;
+    }
+}
+
+[[nodiscard]] constexpr D3D12_RTV_DIMENSION
+TranslateRtvDimension(cputex::TextureDimension dimension, size_t arraySize, bool isMultisample)
+{
+    switch(dimension)
+    {
+    case cputex::TextureDimension::Texture1D:
+        return (arraySize > 1) ? D3D12_RTV_DIMENSION_TEXTURE1DARRAY : D3D12_RTV_DIMENSION_TEXTURE1D;
+    case cputex::TextureDimension::Texture2D:
+        if(!isMultisample)
+        {
+            return (arraySize > 1) ? D3D12_RTV_DIMENSION_TEXTURE2DARRAY : D3D12_RTV_DIMENSION_TEXTURE2D;
+        }
+        else
+        {
+            return (arraySize > 1) ? D3D12_RTV_DIMENSION_TEXTURE2DMSARRAY : D3D12_RTV_DIMENSION_TEXTURE2DMS;
+        }
+    case cputex::TextureDimension::TextureCube:
+        return (arraySize > 1) ? D3D12_RTV_DIMENSION_TEXTURE2DARRAY : D3D12_RTV_DIMENSION_TEXTURE2D;
+    case cputex::TextureDimension::Texture3D: return D3D12_RTV_DIMENSION_TEXTURE3D;
+    default: return D3D12_RTV_DIMENSION_UNKNOWN;
+    }
+}
+
 [[nodiscard]] constexpr D3D12_SRV_DIMENSION TranslateSrvDimension(cputex::TextureDimension dimension, size_t arraySize)
 {
     switch(dimension)
@@ -80,6 +126,20 @@ namespace scrap::d3d12
     case cputex::TextureDimension::TextureCube:
         return (arraySize > 1) ? D3D12_SRV_DIMENSION_TEXTURECUBEARRAY : D3D12_SRV_DIMENSION_TEXTURECUBE;
     default: return D3D12_SRV_DIMENSION_UNKNOWN;
+    }
+}
+
+[[nodiscard]] constexpr D3D12_UAV_DIMENSION TranslateUavDimension(cputex::TextureDimension dimension, size_t arraySize)
+{
+    switch(dimension)
+    {
+    case cputex::TextureDimension::Texture1D:
+        return (arraySize > 1) ? D3D12_UAV_DIMENSION_TEXTURE1DARRAY : D3D12_UAV_DIMENSION_TEXTURE1D;
+    case cputex::TextureDimension::Texture2D: [[fallthrough]];
+    case cputex::TextureDimension::TextureCube:
+        return (arraySize > 1) ? D3D12_UAV_DIMENSION_TEXTURE2DARRAY : D3D12_UAV_DIMENSION_TEXTURE2D;
+    case cputex::TextureDimension::Texture3D: return D3D12_UAV_DIMENSION_TEXTURE3D;
+    default: return D3D12_UAV_DIMENSION_UNKNOWN;
     }
 }
 } // namespace scrap::d3d12
