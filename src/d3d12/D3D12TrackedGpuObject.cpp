@@ -91,6 +91,8 @@ void TrackedShaderResource::destroy()
 
     DeviceContext& deviceContext = DeviceContext::instance();
 
+    deviceContext.getCopyContext().queueObjectForDestruction(mResource, mLastUsedCopyFrameCode);
+
     if(validDescriptorReservationCount > 0)
     {
         std::array<FixedDescriptorHeapReservation, 3> descriptorHeapReservations = {
