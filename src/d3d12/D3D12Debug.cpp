@@ -294,16 +294,6 @@ void Debug::init(DebugOptions) {}
 
 void Debug::setDevice(Microsoft::WRL::ComPtr<ID3D12Device>) {}
 
-std::wstring Debug::getLatestWinPixGpuCapturerPath()
-{
-    return {};
-}
-
-bool Debug::loadWinPixDll()
-{
-    return false;
-}
-
 void Debug::beginGpuEvent(ID3D12GraphicsCommandList*, std::string_view) {}
 
 void Debug::beginGpuEvent(ID3D12GraphicsCommandList*, std::wstring_view) {}
@@ -326,7 +316,7 @@ void Debug::setGpuMarker(ID3D12CommandQueue*, std::wstring_view) {}
 
 void Debug::beginCapture() {}
 
-void Debug::endCapture() {}
+void Debug::endCapture(bool discard) {}
 
 ScopedGpuEvent::ScopedGpuEvent(ID3D12GraphicsCommandList*, std::string_view) {}
 
