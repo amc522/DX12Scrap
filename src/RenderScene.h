@@ -66,6 +66,7 @@ private:
         d3d12::Texture* texture;
     };
 
+    bool createRootSignature();
     bool loadShaders();
     void createRenderTargets();
     void createFrameConstantBuffer();

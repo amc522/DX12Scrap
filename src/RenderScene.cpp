@@ -9,6 +9,7 @@
 #include "d3d12/D3D12Debug.h"
 #include "d3d12/D3D12GraphicsPipelineState.h"
 #include "d3d12/D3D12GraphicsShader.h"
+#include "d3d12/D3D12Strings.h"
 #include "d3d12/D3D12Texture.h"
 #include "d3d12/D3D12Translations.h"
 
@@ -26,108 +27,8 @@ namespace scrap
 RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
     : mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "RenderScene")
 {
-    // Create an empty root signature.
-    {
-        D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
-
-        // This is the highest version the sample supports. If CheckFeatureSupport succeeds, the HighestVersion returned
-        // will not be greater than this.
-        featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-
-        if(FAILED(d3d12Context.getDevice()->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData,
-                                                                sizeof(featureData))))
-        {
-            featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
-        }
-
-        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_root_parameter1
-        // The root parameter describes a parameter or argument being passed into the shader as described or declared by
-        // the root signautre. Here we are saying we have a constant buffer with 3 constants.
-        std::array<D3D12_ROOT_PARAMETER1, 3> rootParameters = {};
-
-        D3D12_ROOT_PARAMETER1& frameConstantBuffer = rootParameters[d3d12::RootParamIndex::kRootParamIndex_FrameCB];
-        frameConstantBuffer.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-        frameConstantBuffer.Descriptor.ShaderRegister = d3d12::reservedShaderRegister::kFrameCB.shaderRegister;
-        frameConstantBuffer.Descriptor.RegisterSpace = d3d12::reservedShaderRegister::kFrameCB.registerSpace;
-        frameConstantBuffer.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
-        frameConstantBuffer.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-        D3D12_ROOT_PARAMETER1& resourceRootConstants = rootParameters[d3d12::kRootParamIndex_ResourceIndices];
-        resourceRootConstants.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-        resourceRootConstants.Constants.Num32BitValues = d3d12::kMaxBindlessResources;
-        resourceRootConstants.Constants.ShaderRegister = d3d12::reservedShaderRegister::kResourceCB.shaderRegister;
-        resourceRootConstants.Constants.RegisterSpace = d3d12::reservedShaderRegister::kResourceCB.registerSpace;
-        resourceRootConstants.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-        D3D12_ROOT_PARAMETER1& vertexRootConstants = rootParameters[d3d12::kRootParamIndex_VertexIndices];
-        vertexRootConstants.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-        vertexRootConstants.Constants.Num32BitValues = d3d12::kMaxBindlessVertexBuffers;
-        vertexRootConstants.Constants.ShaderRegister = d3d12::reservedShaderRegister::kVertexCB.shaderRegister;
-        vertexRootConstants.Constants.RegisterSpace = d3d12::reservedShaderRegister::kVertexCB.registerSpace;
-        vertexRootConstants.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-
-        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_static_sampler_desc
-        // Static samplers are the same as normal samplers, except that they are not going to change after creating the
-        // root signature. Static samplers can be used to describe all the basic samplers that are used by most shaders
-        // in an engine; point, bilinear, trilinear, anisotropic 1-16, etc. Probably only some samplers used for shadows
-        // will need to be dynammic. There can be an unlimited number of static samplers in the root signature at no
-        // cost.
-        std::array<D3D12_STATIC_SAMPLER_DESC, 1> staticSamplers = {};
-        D3D12_STATIC_SAMPLER_DESC& sampler = staticSamplers[0];
-        sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        sampler.MipLODBias = 0;
-        sampler.MaxAnisotropy = 0;
-        sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-        sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-        sampler.MinLOD = 0.0f;
-        sampler.MaxLOD = D3D12_FLOAT32_MAX;
-        sampler.ShaderRegister = 0;
-        sampler.RegisterSpace = 0;
-        sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_versioned_root_signature_desc
-        D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
-        rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-        rootSignatureDesc.Desc_1_1.NumParameters = (UINT)rootParameters.size();
-        rootSignatureDesc.Desc_1_1.pParameters = rootParameters.data();
-        rootSignatureDesc.Desc_1_1.NumStaticSamplers = (UINT)staticSamplers.size();
-        rootSignatureDesc.Desc_1_1.pStaticSamplers = staticSamplers.data();
-        rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
-
-        ComPtr<ID3DBlob> signature;
-        ComPtr<ID3DBlob> error;
-        HRESULT hr =
-            D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error);
-        if(FAILED(hr))
-        {
-            if(error != nullptr)
-            {
-                spdlog::critical("Failed to serialize d3d12 root signature. {}",
-                                 std::string_view((const CHAR*)error->GetBufferPointer(), error->GetBufferSize()));
-            }
-            else
-            {
-                spdlog::critical("Failed to serialize d3d12 root signature");
-            }
-            return;
-        }
-
-        hr = d3d12Context.getDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(),
-                                                           IID_PPV_ARGS(&mRootSignature));
-
-        if(FAILED(hr))
-        {
-            spdlog::critical("Failed to create d3d12 root signature");
-            return;
-        }
-
-        spdlog::info("Created d3d12 root signature");
-    }
-
     createRenderTargets();
+    createRootSignature();
     createFrameConstantBuffer();
     createTriangle();
     createCube();
@@ -154,6 +55,99 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
 RenderScene::RenderScene(RenderScene&&) = default;
 
 RenderScene::~RenderScene() = default;
+
+bool RenderScene::createRootSignature()
+{
+    d3d12::DeviceContext& deviceContext = d3d12::DeviceContext::instance();
+
+    // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_root_parameter1
+    // The root parameter describes a parameter or argument being passed into the shader as described or declared by
+    // the root signautre. Here we are saying we have a constant buffer with 3 constants.
+    std::array<D3D12_ROOT_PARAMETER1, 3> rootParameters = {};
+
+    D3D12_ROOT_PARAMETER1& frameConstantBuffer = rootParameters[d3d12::RootParamIndex::kRootParamIndex_FrameCB];
+    frameConstantBuffer.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    frameConstantBuffer.Descriptor.ShaderRegister = d3d12::reservedShaderRegister::kFrameCB.shaderRegister;
+    frameConstantBuffer.Descriptor.RegisterSpace = d3d12::reservedShaderRegister::kFrameCB.registerSpace;
+    frameConstantBuffer.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
+    frameConstantBuffer.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    D3D12_ROOT_PARAMETER1& resourceRootConstants = rootParameters[d3d12::kRootParamIndex_ResourceIndices];
+    resourceRootConstants.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+    resourceRootConstants.Constants.Num32BitValues = d3d12::kMaxBindlessResources;
+    resourceRootConstants.Constants.ShaderRegister = d3d12::reservedShaderRegister::kResourceCB.shaderRegister;
+    resourceRootConstants.Constants.RegisterSpace = d3d12::reservedShaderRegister::kResourceCB.registerSpace;
+    resourceRootConstants.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    D3D12_ROOT_PARAMETER1& vertexRootConstants = rootParameters[d3d12::kRootParamIndex_VertexIndices];
+    vertexRootConstants.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+    vertexRootConstants.Constants.Num32BitValues = d3d12::kMaxBindlessVertexBuffers;
+    vertexRootConstants.Constants.ShaderRegister = d3d12::reservedShaderRegister::kVertexCB.shaderRegister;
+    vertexRootConstants.Constants.RegisterSpace = d3d12::reservedShaderRegister::kVertexCB.registerSpace;
+    vertexRootConstants.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+    // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_static_sampler_desc
+    // Static samplers are the same as normal samplers, except that they are not going to change after creating the
+    // root signature. Static samplers can be used to describe all the basic samplers that are used by most shaders
+    // in an engine; point, bilinear, trilinear, anisotropic 1-16, etc. Probably only some samplers used for shadows
+    // will need to be dynammic. There can be an unlimited number of static samplers in the root signature at no
+    // cost.
+    std::array<D3D12_STATIC_SAMPLER_DESC, 1> staticSamplers = {};
+    D3D12_STATIC_SAMPLER_DESC& sampler = staticSamplers[0];
+    sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+    sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler.MipLODBias = 0;
+    sampler.MaxAnisotropy = 0;
+    sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+    sampler.MinLOD = 0.0f;
+    sampler.MaxLOD = D3D12_FLOAT32_MAX;
+    sampler.ShaderRegister = 0;
+    sampler.RegisterSpace = 0;
+    sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_versioned_root_signature_desc
+    D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
+    rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
+    rootSignatureDesc.Desc_1_1.NumParameters = (UINT)rootParameters.size();
+    rootSignatureDesc.Desc_1_1.pParameters = rootParameters.data();
+    rootSignatureDesc.Desc_1_1.NumStaticSamplers = (UINT)staticSamplers.size();
+    rootSignatureDesc.Desc_1_1.pStaticSamplers = staticSamplers.data();
+    rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
+
+    ComPtr<ID3DBlob> signature;
+    ComPtr<ID3DBlob> error;
+    HRESULT hr = D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, deviceContext.getRootSignatureVersion(),
+                                                       &signature, &error);
+    if(FAILED(hr))
+    {
+        if(error != nullptr)
+        {
+            spdlog::critical("Failed to serialize d3d12 root signature. {}",
+                             std::string_view((const CHAR*)error->GetBufferPointer(), error->GetBufferSize()));
+        }
+        else
+        {
+            spdlog::critical("Failed to serialize d3d12 root signature");
+        }
+        return false;
+    }
+
+    hr = deviceContext.getDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(),
+                                                        IID_PPV_ARGS(&mRootSignature));
+
+    if(FAILED(hr))
+    {
+        spdlog::critical("Failed to create d3d12 root signature");
+        return false;
+    }
+
+    spdlog::info("Created d3d12 root signature");
+
+    return true;
+}
 
 bool RenderScene::loadShaders()
 {
@@ -228,7 +222,7 @@ void RenderScene::createRenderTargets()
     params.format = gpufmt::Format::D32_SFLOAT_S8_UINT;
     params.dimension = cputex::TextureDimension::Texture2D;
     params.arraySize = 1;
-    params.extents = cputex::Extent(d3d12::DeviceContext::instance().frameSize(), 1);
+    params.extents = cputex::Extent(d3d12::DeviceContext::instance().getFrameSize(), 1);
     params.mipCount = 1;
     params.accessFlags = ResourceAccessFlags::None;
     params.isRenderTarget = false;
@@ -498,8 +492,8 @@ void RenderScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12
         D3D12_VIEWPORT viewport{};
         viewport.TopLeftX = 0.0f;
         viewport.TopLeftY = 0.0f;
-        viewport.Width = static_cast<float>(d3d12Context.frameSize().x);
-        viewport.Height = static_cast<float>(d3d12Context.frameSize().y);
+        viewport.Width = static_cast<float>(d3d12Context.getFrameSize().x);
+        viewport.Height = static_cast<float>(d3d12Context.getFrameSize().y);
         viewport.MinDepth = 0.0f;
         viewport.MaxDepth = 1.0f;
 

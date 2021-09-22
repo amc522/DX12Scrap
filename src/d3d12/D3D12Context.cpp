@@ -87,42 +87,7 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
 
     mDebug.setDevice(mDevice);
 
-    { // check for hlsl dynamic resources support
-        // https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html
-        D3D12_FEATURE_DATA_D3D12_OPTIONS optionsData = {};
-        if(SUCCEEDED(mDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &optionsData, sizeof(optionsData))))
-        {
-            spdlog::info("{}", optionsData.ResourceBindingTier);
-        }
-
-        D3D12_FEATURE_DATA_SHADER_MODEL shaderModelData{D3D_SHADER_MODEL_6_6};
-        if(SUCCEEDED(
-               mDevice->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModelData, sizeof(shaderModelData))))
-        {
-            spdlog::info("{}", shaderModelData.HighestShaderModel);
-        }
-
-        if(optionsData.ResourceBindingTier < D3D12_RESOURCE_BINDING_TIER_3 ||
-           shaderModelData.HighestShaderModel < D3D_SHADER_MODEL_6_6)
-        {
-            spdlog::critical("D3D12 HLSL dynamic resources not supported");
-            // This feature isn't being used yet, so don't need to bail. But it will be used in the near future.
-            return;
-        }
-    }
-
-    { // check for ray tracing support
-        D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData = {};
-        if(SUCCEEDED(mDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData,
-                                                  sizeof(featureSupportData))))
-        {
-            spdlog::info("{}", featureSupportData.RaytracingTier);
-        }
-
-        mRaytracingSupported = featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
-    }
-
-    collectFormatSupport();
+    if(!checkFeatureSupport()) { return; }
 
     mGraphicsContext = std::make_unique<GraphicsContext>();
     mGraphicsContext->init();
@@ -451,6 +416,64 @@ HRESULT DeviceContext::createDevice(D3D_FEATURE_LEVEL featureLevel)
     spdlog::info("Create d3d12 device6");
 
     return S_OK;
+}
+
+bool DeviceContext::checkFeatureSupport()
+{
+    { // check for hlsl dynamic resources support
+        // https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html
+        D3D12_FEATURE_DATA_D3D12_OPTIONS optionsData = {};
+        if(SUCCEEDED(mDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &optionsData, sizeof(optionsData))))
+        {
+            spdlog::info("{}", optionsData.ResourceBindingTier);
+        }
+
+        D3D12_FEATURE_DATA_SHADER_MODEL shaderModelData{D3D_SHADER_MODEL_6_6};
+        if(SUCCEEDED(
+               mDevice->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModelData, sizeof(shaderModelData))))
+        {
+            spdlog::info("{}", shaderModelData.HighestShaderModel);
+        }
+
+        if(optionsData.ResourceBindingTier < D3D12_RESOURCE_BINDING_TIER_3 ||
+           shaderModelData.HighestShaderModel < D3D_SHADER_MODEL_6_6)
+        {
+            spdlog::critical("D3D12 HLSL dynamic resources not supported");
+            return false;
+        }
+    }
+
+    { // check for ray tracing support
+        D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData = {};
+        if(SUCCEEDED(mDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData,
+                                                  sizeof(featureSupportData))))
+        {
+            spdlog::info("{}", featureSupportData.RaytracingTier);
+        }
+
+        mRaytracingSupported = featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+    }
+
+    {
+        D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+
+        // This is the highest version the sample supports. If CheckFeatureSupport succeeds, the HighestVersion returned
+        // will not be greater than this.
+        featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+
+        if(FAILED(mDevice->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+        {
+            featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+        }
+
+        mRootSignatureVersion = featureData.HighestVersion;
+
+        spdlog::info("{}", featureData.HighestVersion);
+    }
+
+    collectFormatSupport();
+
+    return true;
 }
 
 void DeviceContext::collectFormatSupport()

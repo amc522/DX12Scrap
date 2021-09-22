@@ -30,7 +30,7 @@ Application::Application()
 
     mD3D12Context = std::make_unique<d3d12::DeviceContext>(*mMainWindow, GpuPreference::None);
 
-    if(!mD3D12Context->initialized()) { return; }
+    if(!mD3D12Context->isInitialized()) { return; }
 
     mRenderScene = std::make_unique<RenderScene>(*mD3D12Context);
 
@@ -117,17 +117,11 @@ void Application::update()
             break;
         case SDL_KEYDOWN:
             mKeyboard.handleEvent(event.key);
-            if(event.key.windowID == SDL_GetWindowID(mMainWindow->sdlWindow()))
-            {
-                mMainWindow->handleEvent(event.key);
-            }
+            if(event.key.windowID == SDL_GetWindowID(mMainWindow->sdlWindow())) { mMainWindow->handleEvent(event.key); }
             break;
         case SDL_KEYUP:
             mKeyboard.handleEvent(event.key);
-            if(event.key.windowID == SDL_GetWindowID(mMainWindow->sdlWindow()))
-            {
-                mMainWindow->handleEvent(event.key);
-            }
+            if(event.key.windowID == SDL_GetWindowID(mMainWindow->sdlWindow())) { mMainWindow->handleEvent(event.key); }
             break;
         case SDL_TEXTEDITING: spdlog::debug("Event SDL_TEXTEDITING"); break;
         case SDL_TEXTINPUT: spdlog::debug("Event SDL_TEXTINPUT"); break;

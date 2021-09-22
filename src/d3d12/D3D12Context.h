@@ -22,6 +22,7 @@
 #include <wrl/client.h>
 
 enum D3D_FEATURE_LEVEL;
+enum D3D_ROOT_SIGNATURE_VERSION;
 struct ID3D12CommandQueue;
 struct ID3D12DescriptorHeap;
 struct ID3D12Device;
@@ -65,32 +66,34 @@ public:
     DeviceContext& operator=(const DeviceContext&) = delete;
     DeviceContext& operator=(DeviceContext&&) = delete;
 
-    bool initialized() const { return mInitialized; }
+    [[nodiscard]] bool isInitialized() const { return mInitialized; }
 
-    ID3D12Device* getDevice() { return mDevice.Get(); }
-    ID3D12Device1* getDevice1() { return mDevice1.Get(); }
-    ID3D12Device2* getDevice2() { return mDevice2.Get(); }
-    ID3D12Device3* getDevice3() { return mDevice3.Get(); }
-    ID3D12Device4* getDevice4() { return mDevice4.Get(); }
-    ID3D12Device5* getDevice5() { return mDevice5.Get(); }
-    ID3D12Device6* getDevice6() { return mDevice6.Get(); }
+    [[nodiscard]] ID3D12Device* getDevice() { return mDevice.Get(); }
+    [[nodiscard]] ID3D12Device1* getDevice1() { return mDevice1.Get(); }
+    [[nodiscard]] ID3D12Device2* getDevice2() { return mDevice2.Get(); }
+    [[nodiscard]] ID3D12Device3* getDevice3() { return mDevice3.Get(); }
+    [[nodiscard]] ID3D12Device4* getDevice4() { return mDevice4.Get(); }
+    [[nodiscard]] ID3D12Device5* getDevice5() { return mDevice5.Get(); }
+    [[nodiscard]] ID3D12Device6* getDevice6() { return mDevice6.Get(); }
 
-    uint32_t getFrameIndex() const { return mFrameIndex; }
+    [[nodiscard]] uint32_t getFrameIndex() const { return mFrameIndex; }
 
-    ID3D12Resource* getBackBuffer() { return mRenderTargets[mFrameIndex].Get(); }
-    D3D12_CPU_DESCRIPTOR_HANDLE getBackBufferRtv() const;
+    [[nodiscard]] ID3D12Resource* getBackBuffer() { return mRenderTargets[mFrameIndex].Get(); }
+    [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE getBackBufferRtv() const;
 
-    GraphicsContext& getGraphicsContext() { return *mGraphicsContext; }
-    const GraphicsContext& getGraphicsContext() const { return *mGraphicsContext; }
+    [[nodiscard]] GraphicsContext& getGraphicsContext() { return *mGraphicsContext; }
+    [[nodiscard]] const GraphicsContext& getGraphicsContext() const { return *mGraphicsContext; }
 
-    CopyContext& getCopyContext() { return *mCopyContext; }
-    const CopyContext& getCopyContext() const { return *mCopyContext; }
+    [[nodiscard]] CopyContext& getCopyContext() { return *mCopyContext; }
+    [[nodiscard]] const CopyContext& getCopyContext() const { return *mCopyContext; }
 
-    d3d12::FixedDescriptorHeap_CBV_SRV_UAV& getCbvSrvUavHeap() { return *mCbvSrvUavHeap; }
-    d3d12::FixedDescriptorHeap_RTV& getRtvHeap() { return *mRtvHeap; }
-    d3d12::FixedDescriptorHeap_DSV& getDsvHeap() { return *mDsvHeap; }
+    [[nodiscard]] d3d12::FixedDescriptorHeap_CBV_SRV_UAV& getCbvSrvUavHeap() { return *mCbvSrvUavHeap; }
+    [[nodiscard]] d3d12::FixedDescriptorHeap_RTV& getRtvHeap() { return *mRtvHeap; }
+    [[nodiscard]] d3d12::FixedDescriptorHeap_DSV& getDsvHeap() { return *mDsvHeap; }
 
-    glm::i32vec2 frameSize() const { return mFrameBufferSize; }
+    [[nodiscard]] glm::i32vec2 getFrameSize() const { return mFrameBufferSize; }
+
+    [[nodiscard]] D3D_ROOT_SIGNATURE_VERSION getRootSignatureVersion() const { return mRootSignatureVersion; }
 
     [[nodiscard]] bool isRaytracingSupported() const { return mRaytracingSupported; }
 
@@ -107,11 +110,13 @@ public:
     void beginFrame();
     void endFrame();
 
-    std::shared_ptr<GraphicsPipelineState> createGraphicsPipelineState(GraphicsPipelineStateParams&& params);
+    [[nodiscard]] std::shared_ptr<GraphicsPipelineState>
+    createGraphicsPipelineState(GraphicsPipelineStateParams&& params);
 
 private:
     void getHardwareAdapter(GpuPreference gpuPreference, D3D_FEATURE_LEVEL featureLevel, IDXGIFactory4* dxgiFactory);
     HRESULT createDevice(D3D_FEATURE_LEVEL featureLevel);
+    bool checkFeatureSupport();
     void collectFormatSupport();
 
     // Debug needs to be the first member so it's the last one destroyed. Debug checks to see what
@@ -148,6 +153,8 @@ private:
 
     bool mInitialized = false;
 
+    // feature support
+    D3D_ROOT_SIGNATURE_VERSION mRootSignatureVersion;
     bool mRaytracingSupported = false;
 
     static constexpr size_t kDxgiFormatBounds = 191;
