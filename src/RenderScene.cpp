@@ -194,7 +194,7 @@ bool RenderScene::loadShaders()
         // Describe and create the graphics pipeline state object (PSO).
         {
             d3d12::GraphicsPipelineStateParams psoParams = {};
-            psoParams.rootSignature = mRootSignature.Get();
+            psoParams.rootSignature = mRootSignature;
             psoParams.shader = std::make_shared<d3d12::GraphicsShader>(std::move(shaderParams));
             psoParams.rasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
             psoParams.rasterizerState.FrontCounterClockwise = true;

@@ -17,7 +17,7 @@ class GraphicsShader;
 
 struct GraphicsPipelineStateParams
 {
-    ID3D12RootSignature* rootSignature;
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature;
     std::shared_ptr<GraphicsShader> shader;
     std::vector<DXGI_FORMAT> renderTargetFormats; // replace with a fixed vector at some point
     DXGI_FORMAT depthStencilFormat;

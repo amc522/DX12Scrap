@@ -30,7 +30,7 @@ void GraphicsPipelineState::create()
     if(mParams.shader->status() != GraphicsShaderState::Compiled) { return; }
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
-    desc.pRootSignature = mParams.rootSignature;
+    desc.pRootSignature = mParams.rootSignature.Get();
     desc.VS = mParams.shader->getShaderByteCode(GraphicsShaderStage::Vertex);
     desc.HS = mParams.shader->getShaderByteCode(GraphicsShaderStage::Hull);
     desc.DS = mParams.shader->getShaderByteCode(GraphicsShaderStage::Domain);
