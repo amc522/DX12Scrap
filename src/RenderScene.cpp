@@ -24,8 +24,10 @@ using namespace Microsoft::WRL;
 
 namespace scrap
 {
-RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
-    : mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "RenderScene")
+//=====================================
+// RasterScene
+//=====================================
+RasterScene::RasterScene(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "RasterScene Command List")
 {
     createRenderTargets();
     createRootSignature();
@@ -36,15 +38,17 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
 
     if(FAILED(mCommandList.close())) { spdlog::error("Failed to close graphics command list"); }
 
+    d3d12::DeviceContext& deviceContext = d3d12::DeviceContext::instance();
+
     // Execute the command list.
     std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.get()};
-    d3d12Context.getGraphicsContext().getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()),
-                                                                             commandLists.data());
+    deviceContext.getGraphicsContext().getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()),
+                                                                              commandLists.data());
 
     // Wait for the command list to execute; we are reusing the same command
     // list in our main loop but for now, we just want to wait for setup to
     // complete before continuing.
-    d3d12Context.getGraphicsContext().waitOnGpu();
+    deviceContext.getGraphicsContext().waitOnGpu();
 
     if(!loadShaders()) { return; }
 
@@ -52,11 +56,11 @@ RenderScene::RenderScene(d3d12::DeviceContext& d3d12Context)
     mInitialized = true;
 }
 
-RenderScene::RenderScene(RenderScene&&) = default;
+RasterScene::RasterScene(RasterScene&&) = default;
 
-RenderScene::~RenderScene() = default;
+RasterScene::~RasterScene() = default;
 
-bool RenderScene::createRootSignature()
+bool RasterScene::createRootSignature()
 {
     d3d12::DeviceContext& deviceContext = d3d12::DeviceContext::instance();
 
@@ -149,7 +153,7 @@ bool RenderScene::createRootSignature()
     return true;
 }
 
-bool RenderScene::loadShaders()
+bool RasterScene::loadShaders()
 {
     { // hello triangle
         d3d12::GraphicsShaderParams shaderParams;
@@ -215,7 +219,7 @@ bool RenderScene::loadShaders()
     return true;
 }
 
-void RenderScene::createRenderTargets()
+void RasterScene::createRenderTargets()
 {
     // Currently using the swap chain as our render targets. Just need the depth/stencil buffer
     d3d12::Texture::Params params = {};
@@ -241,7 +245,7 @@ void RenderScene::createRenderTargets()
     mDepthStencilTexture = std::move(depthStencilTexture);
 }
 
-void RenderScene::createFrameConstantBuffer()
+void RasterScene::createFrameConstantBuffer()
 {
     d3d12::Buffer::SimpleParams params;
     params.accessFlags = ResourceAccessFlags::CpuWrite | ResourceAccessFlags::GpuRead;
@@ -255,7 +259,7 @@ void RenderScene::createFrameConstantBuffer()
     mFrameConstantBuffer = std::move(constantBuffer);
 }
 
-void RenderScene::createTriangle()
+void RasterScene::createTriangle()
 {
     { // Positions
         d3d12::Buffer::FormattedParams params;
@@ -306,7 +310,7 @@ void RenderScene::createTriangle()
     }
 }
 
-void RenderScene::createTexture()
+void RasterScene::createTexture()
 {
     cputex::TextureParams textureParams;
     textureParams.dimension = cputex::TextureDimension::Texture2D;
@@ -362,7 +366,7 @@ void RenderScene::createTexture()
     mTexture = std::move(texture);
 }
 
-void RenderScene::createCube()
+void RasterScene::createCube()
 {
     constexpr uint32_t subdivisions = 1;
     MeshSizes meshSizes = CalculateCubeMeshSizes(CubeMeshTopologyType::Triangle, subdivisions);
@@ -386,9 +390,9 @@ void RenderScene::createCube()
     mCubeMesh = GpuMesh(cubeMesh, ResourceAccessFlags::GpuRead, "Cube");
 }
 
-RenderScene& RenderScene::operator=(RenderScene&&) = default;
+RasterScene& RasterScene::operator=(RasterScene&&) = default;
 
-void RenderScene::preRender(const FrameInfo& frameInfo)
+void RasterScene::preRender(const FrameInfo& frameInfo)
 {
     mCamera.update(frameInfo);
 
@@ -417,7 +421,7 @@ void RenderScene::preRender(const FrameInfo& frameInfo)
     }
 }
 
-void RenderScene::drawIndexed(d3d12::GraphicsPipelineState& pso,
+void RasterScene::drawIndexed(d3d12::GraphicsPipelineState& pso,
                               GpuMesh& mesh,
                               nonstd::span<TextureBindingDesc> textures)
 {
@@ -482,12 +486,12 @@ void RenderScene::drawIndexed(d3d12::GraphicsPipelineState& pso,
     mCommandList.get()->DrawIndexedInstanced(mesh.getIndexCount(), 1, 0, 0, 0);
 }
 
-void RenderScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context)
+void RasterScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context)
 {
     mCommandList.reset();
 
     {
-        d3d12::ScopedGpuEvent gpuEvent(mCommandList.get(), "RenderScene");
+        d3d12::ScopedGpuEvent gpuEvent(mCommandList.get(), "RasterScene");
 
         D3D12_VIEWPORT viewport{};
         viewport.TopLeftX = 0.0f;
@@ -560,6 +564,63 @@ void RenderScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12
                                                                              commandLists.data());
 }
 
-void RenderScene::endFrame() {}
+void RasterScene::endFrame() {}
 
+//=====================================
+// RayTraceScene
+//=====================================
+RaytraceScene::RaytraceScene(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "RaytraceScene Command List")
+{
+    mInitialized = true;
+}
+
+RaytraceScene::RaytraceScene(RaytraceScene&&) = default;
+RaytraceScene::~RaytraceScene() = default;
+RaytraceScene& RaytraceScene::operator=(RaytraceScene&&) = default;
+
+void RaytraceScene::preRender(const FrameInfo& frameInfo) {}
+
+void RaytraceScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context) {}
+
+void RaytraceScene::endFrame() {}
+
+//=====================================
+// RenderScene
+//=====================================
+
+RenderScene::RenderScene()
+{
+    d3d12::DeviceContext& deviceContext = d3d12::DeviceContext::instance();
+
+    mRasterScene = std::make_unique<RasterScene>();
+
+    if(deviceContext.isRaytracingSupported()) { mRaytraceScene = std::make_unique<RaytraceScene>(); }
+}
+
+void RenderScene::preRender(const FrameInfo& frameInfo)
+{
+    if(mActiveScene == Scene::Raster) { mRasterScene->preRender(frameInfo); }
+    else if(mRaytraceScene != nullptr && mActiveScene == Scene::Raytrace)
+    {
+        mRaytraceScene->preRender(frameInfo);
+    }
+}
+
+void RenderScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context)
+{
+    if(mActiveScene == Scene::Raster) { mRasterScene->render(frameInfo, d3d12Context); }
+    else if(mRaytraceScene != nullptr && mActiveScene == Scene::Raytrace)
+    {
+        mRaytraceScene->render(frameInfo, d3d12Context);
+    }
+}
+
+void RenderScene::endFrame()
+{
+    if(mActiveScene == Scene::Raster) { mRasterScene->endFrame(); }
+    else if(mRaytraceScene != nullptr && mActiveScene == Scene::Raytrace)
+    {
+        mRaytraceScene->endFrame();
+    }
+}
 } // namespace scrap

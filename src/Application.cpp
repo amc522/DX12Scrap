@@ -34,7 +34,7 @@ Application::Application()
 
     mRenderScene = std::make_unique<RenderScene>();
 
-    if(!mRenderScene->initialized()) { spdlog::critical("Failed to initialize RenderScene."); return; }
+    if(!mRenderScene->isInitialized()) { spdlog::critical("Failed to initialize RenderScene."); return; }
 
     spdlog::info("Application initialized");
     mRunning = true;

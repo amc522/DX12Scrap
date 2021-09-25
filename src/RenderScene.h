@@ -42,22 +42,28 @@ struct FrameConstantBuffer
     float frameTimeDelta;
 };
 
-class RenderScene
+enum class Scene
+{
+    Raster,
+    Raytrace
+};
+
+class RasterScene
 {
 public:
-    RenderScene(d3d12::DeviceContext& d3d12Context);
-    RenderScene(const RenderScene&) = delete;
-    RenderScene(RenderScene&&);
-    ~RenderScene();
+    RasterScene();
+    RasterScene(const RasterScene&) = delete;
+    RasterScene(RasterScene&&);
+    ~RasterScene();
 
-    RenderScene& operator=(const RenderScene&) = delete;
-    RenderScene& operator=(RenderScene&&);
+    RasterScene& operator=(const RasterScene&) = delete;
+    RasterScene& operator=(RasterScene&&);
 
     void preRender(const FrameInfo& frameInfo);
     void render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context);
     void endFrame();
 
-    bool initialized() { return mInitialized; }
+    bool isInitialized() { return mInitialized; }
 
 private:
     struct TextureBindingDesc
@@ -92,5 +98,53 @@ private:
     std::unique_ptr<d3d12::Texture> mDepthStencilTexture;
     std::unique_ptr<d3d12::Texture> mTexture;
     bool mInitialized = false;
+};
+
+class RaytraceScene
+{
+public:
+    RaytraceScene();
+    RaytraceScene(const RaytraceScene&) = delete;
+    RaytraceScene(RaytraceScene&&);
+    ~RaytraceScene();
+
+    RaytraceScene& operator=(const RaytraceScene&) = delete;
+    RaytraceScene& operator=(RaytraceScene&&);
+
+    void preRender(const FrameInfo& frameInfo);
+    void render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context);
+    void endFrame();
+
+    bool isInitialized() { return mInitialized; }
+
+private:
+    Camera mCamera;
+
+    d3d12::GraphicsCommandList mCommandList;
+
+    std::shared_ptr<d3d12::Buffer> mFrameConstantBuffer;
+
+    std::unique_ptr<d3d12::Texture> mDepthStencilTexture;
+    bool mInitialized = false;
+};
+
+class RenderScene
+{
+public:
+    RenderScene();
+
+    [[nodiscard]] bool isInitialized() const
+    {
+        return mRasterScene->isInitialized() && (mRaytraceScene == nullptr || mRaytraceScene->isInitialized());
+    }
+
+    void preRender(const FrameInfo& frameInfo);
+    void render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context);
+    void endFrame();
+
+private:
+    std::unique_ptr<RasterScene> mRasterScene;
+    std::unique_ptr<RaytraceScene> mRaytraceScene;
+    Scene mActiveScene = Scene::Raster;
 };
 } // namespace scrap
