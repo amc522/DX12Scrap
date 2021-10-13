@@ -17,8 +17,13 @@ GpuMesh::GpuMesh(const CpuMesh& cpuMesh, ResourceAccessFlags accessFlags, std::s
     {
         fmt::format_to(std::back_inserter(bufferName), "{}_Indices", name);
 
-        initIndices(cpuMesh.getIndexBuffer().format, (uint32_t)cpuMesh.getIndices().elementCount(), accessFlags,
-                    bufferName, cpuMesh.getIndices().buffer);
+        IndexBufferParams indexParams;
+        indexParams.accessFlags = accessFlags;
+        indexParams.format = cpuMesh.getIndexBuffer().format;
+        indexParams.name = bufferName;
+        indexParams.numIndices = (uint32_t)cpuMesh.getIndices().elementCount();
+
+        initIndices(indexParams, cpuMesh.getIndices().buffer);
     }
 
     nonstd::span vertexElements = cpuMesh.getVertexElements();
@@ -39,39 +44,37 @@ GpuMesh::GpuMesh(const CpuMesh& cpuMesh, ResourceAccessFlags accessFlags, std::s
     }
 }
 
-void GpuMesh::initIndices(IndexBufferFormat format,
-                          uint32_t elementCount,
-                          ResourceAccessFlags accessFlags,
-                          std::string_view name)
+void GpuMesh::initIndices(const IndexBufferParams& params)
 {
-    d3d12::Buffer::FormattedParams params;
-    params.accessFlags = accessFlags;
-    params.format = TranslateIndexBufferFormat(format);
-    params.numElements = elementCount;
-    params.name = name;
+    d3d12::Buffer::FormattedParams bufferParams;
+    bufferParams.accessFlags = params.accessFlags;
+    bufferParams.flags = params.flags | d3d12::BufferFlags::IndexBuffer;
+    bufferParams.format = TranslateIndexBufferFormat(params.format);
+    bufferParams.numElements = params.numIndices;
+    bufferParams.name = params.name;
+    bufferParams.initialResourceState = params.initialResourceState;
 
     mIndexBuffer = std::make_shared<d3d12::Buffer>();
-    mIndexBuffer->init(params);
+    mIndexBuffer->init(bufferParams);
 
-    mIndexCount = elementCount;
+    mIndexCount = params.numIndices;
 }
 
-void GpuMesh::initIndices(IndexBufferFormat format,
-                          uint32_t elementCount,
-                          ResourceAccessFlags accessFlags,
-                          std::string_view name,
+void GpuMesh::initIndices(const IndexBufferParams& params,
                           nonstd::span<const std::byte> data)
 {
-    d3d12::Buffer::FormattedParams params;
-    params.accessFlags = accessFlags;
-    params.format = TranslateIndexBufferFormat(format);
-    params.numElements = elementCount;
-    params.name = name;
+    d3d12::Buffer::FormattedParams bufferParams;
+    bufferParams.accessFlags = params.accessFlags;
+    bufferParams.flags = params.flags | d3d12::BufferFlags::IndexBuffer;
+    bufferParams.format = TranslateIndexBufferFormat(params.format);
+    bufferParams.numElements = params.numIndices;
+    bufferParams.name = params.name;
+    bufferParams.initialResourceState = params.initialResourceState;
 
     mIndexBuffer = std::make_shared<d3d12::Buffer>();
-    mIndexBuffer->init(params, data);
+    mIndexBuffer->init(bufferParams, data);
 
-    mIndexCount = elementCount;
+    mIndexCount = params.numIndices;
 }
 
 void GpuMesh::createVertexElement(ShaderVertexSemantic semantic,

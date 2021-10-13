@@ -251,7 +251,7 @@ void RasterScene::createFrameConstantBuffer()
     d3d12::Buffer::SimpleParams params;
     params.accessFlags = ResourceAccessFlags::CpuWrite | ResourceAccessFlags::GpuRead;
     params.byteSize = sizeof(FrameConstantBuffer);
-    params.isConstantBuffer = true;
+    params.flags = d3d12::BufferFlags::ConstantBuffer;
     params.name = "Frame Constant Buffer";
 
     auto constantBuffer = std::make_unique<d3d12::Buffer>();
@@ -299,15 +299,15 @@ void RasterScene::createTriangle()
     }
 
     { // Indices
-        d3d12::Buffer::FormattedParams params;
-        params.format = gpufmt::Format::R16_UINT;
-        params.numElements = 3;
+        GpuMesh::IndexBufferParams params;
+        params.format = IndexBufferFormat::UInt16;
+        params.numIndices = 3;
         params.accessFlags = ResourceAccessFlags::GpuRead;
-        params.name = "Index Buffer";
+        params.initialResourceState = D3D12_RESOURCE_STATE_COMMON;
+        params.name = "Triangle Index Buffer";
 
         std::array<uint16_t, 3> indices{0, 1, 2};
-        mTriangleMesh.initIndices(IndexBufferFormat::UInt16, 3, ResourceAccessFlags::GpuRead, "Index Buffer",
-                                  nonstd::as_bytes(nonstd::span(indices)));
+        mTriangleMesh.initIndices(params, nonstd::as_bytes(nonstd::span(indices)));
     }
 }
 

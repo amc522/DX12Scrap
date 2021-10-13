@@ -68,7 +68,7 @@ D3D12_INDEX_BUFFER_VIEW Buffer::getIndexView(DXGI_FORMAT format) const
     D3D12_INDEX_BUFFER_VIEW ibv;
     ibv.BufferLocation = mResource.getResource()->GetGPUVirtualAddress();
     ibv.Format = format;
-    ibv.SizeInBytes = mParams.byteSize;
+    ibv.SizeInBytes = (uint32_t)mParams.byteSize;
     return ibv;
 }
 
@@ -117,6 +117,11 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
     DeviceContext& deviceContext = DeviceContext::instance();
     HRESULT hr;
 
+    const bool isConstantBuffer = (params.flags & BufferFlags::ConstantBuffer) == BufferFlags::ConstantBuffer;
+    const bool isIndexBuffer = (params.flags & BufferFlags::IndexBuffer) == BufferFlags::IndexBuffer;
+    const bool isAccelerationStructure =
+        (params.flags & BufferFlags::AccelerationStructure) == BufferFlags::AccelerationStructure;
+
     if(params.type == Type::Formatted)
     {
         const auto formatTranslation = gpufmt::dxgi::translateFormat(params.format);
@@ -124,15 +129,15 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
         params.dxgiFormat = formatTranslation.exact.value();
 
         const auto& formatInfo = gpufmt::formatInfo(params.format);
-        params.byteSize = formatInfo.blockByteSize * params.numElements;
+        params.byteSize = (uint64_t)formatInfo.blockByteSize * (uint64_t)params.numElements;
         params.elementByteSize = formatInfo.blockByteSize;
     }
     else if(params.type == Type::Structured)
     {
         params.dxgiFormat = DXGI_FORMAT_UNKNOWN;
-        params.byteSize = params.numElements * params.elementByteSize;
+        params.byteSize = (uint64_t)params.numElements * (uint64_t)params.elementByteSize;
     }
-    else if(params.isConstantBuffer)
+    else if(isConstantBuffer)
     {
         // Got a d3d12 debug layer error when creating a constant buffer view that wasn't a multiple of 256. Don't know
         // if this is device specific or if it's queriable. Tested on an NVIDIA GeForce GTX 970M and an Intel HD
@@ -142,7 +147,13 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
         // SizeInBytes be a multiple of 256. [ STATE_CREATION ERROR #650: CREATE_CONSTANT_BUFFER_VIEW_INVALID_DESC]
 
         params.dxgiFormat = DXGI_FORMAT_UNKNOWN;
-        params.byteSize = AlignInteger(params.byteSize, 256u);
+        params.byteSize = AlignInteger(params.byteSize, 256ull);
+    }
+    else if(isAccelerationStructure)
+    {
+        params.dxgiFormat = DXGI_FORMAT_UNKNOWN;
+        params.byteSize =
+            AlignInteger(params.byteSize, uint64_t(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT));
     }
     else
     {
@@ -167,11 +178,13 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
     bufferDesc.SampleDesc.Quality = 0;
     bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-    if((params.accessFlags & ResourceAccessFlags::GpuRead) != ResourceAccessFlags::GpuRead)
+    if((params.accessFlags & ResourceAccessFlags::GpuRead) != ResourceAccessFlags::GpuRead &&
+       !isAccelerationStructure && !isConstantBuffer)
     {
         bufferDesc.Flags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
     }
-    if((params.accessFlags & ResourceAccessFlags::GpuWrite) == ResourceAccessFlags::GpuWrite)
+    if((params.accessFlags & ResourceAccessFlags::GpuWrite) == ResourceAccessFlags::GpuWrite ||
+       (params.flags & BufferFlags::UavEnabled) == BufferFlags::UavEnabled || isAccelerationStructure)
     {
         bufferDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
     }
@@ -182,6 +195,15 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getresourceallocationinfo
     allocInfo = deviceContext.getDevice()->GetResourceAllocationInfo(0, 1, &bufferDesc);
     bufferDesc.Alignment = allocInfo.Alignment;
+
+    D3D12_RESOURCE_STATES initialResourceState = params.initialResourceState.value_or(D3D12_RESOURCE_STATE_COMMON);
+    D3D12_RESOURCE_STATES postCopyState = D3D12_RESOURCE_STATE_COMMON;
+    
+    if(!buffer.empty())
+    {
+        postCopyState = initialResourceState;
+        initialResourceState = D3D12_RESOURCE_STATE_COPY_DEST;
+    }
 
     // The destination heap of the buffer. This is the heap where the buffer will be for its lifetime on the
     // gpu.
@@ -195,9 +217,9 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
     {
         ComPtr<ID3D12Resource> resource;
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommittedresource
-        hr = deviceContext.getDevice()->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc,
-                                                                D3D12_RESOURCE_STATE_COMMON, nullptr,
-                                                                IID_PPV_ARGS(&resource));
+        hr =
+            deviceContext.getDevice()->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc,
+                                                               initialResourceState, nullptr, IID_PPV_ARGS(&resource));
 
         if(FAILED(hr)) { return Error::FailedToCreateGpuResource; }
 
@@ -269,6 +291,19 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
         UpdateSubresources<1>(deviceContext.getCopyContext().getCommandList(), mResource.getResource(),
                               mUploadResource.get(), 0, 0, 1, &subresourceData);
 
+        if(initialResourceState != postCopyState)
+        {
+            D3D12_RESOURCE_BARRIER barrier;
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Transition.pResource = mResource.getResource();
+            barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+            barrier.Transition.StateAfter = postCopyState;
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+
+            deviceContext.getCopyContext().getCommandList()->ResourceBarrier(1, &barrier);
+        }
+
         mResource.markAsUsed(deviceContext.getCopyContext().getCommandList());
         mUploadResource.markAsUsed(deviceContext.getCopyContext().getCommandList());
         mInitFrameCode = deviceContext.getCopyContext().getCurrentFrameCode();
@@ -281,10 +316,11 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
     }
 
     uint32_t descriptorCount = 0;
+
     const bool needsSrv =
-        (params.accessFlags & ResourceAccessFlags::GpuRead) == ResourceAccessFlags::GpuRead && !params.isConstantBuffer;
+        (params.accessFlags & ResourceAccessFlags::GpuRead) == ResourceAccessFlags::GpuRead && !isConstantBuffer;
     const bool needsUav = (params.accessFlags & ResourceAccessFlags::GpuWrite) == ResourceAccessFlags::GpuWrite;
-    const bool needsCbv = params.isConstantBuffer;
+    const bool needsCbv = isConstantBuffer;
 
     if(needsSrv) { ++descriptorCount; }
     if(needsUav) { ++descriptorCount; }
@@ -307,7 +343,10 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
         srvDesc.Buffer.FirstElement = 0;
         srvDesc.Buffer.NumElements = params.numElements;
         srvDesc.Buffer.StructureByteStride = (params.type == Type::Structured) ? params.elementByteSize : 0;
-        srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+
+        D3D12_BUFFER_SRV_FLAGS flags = D3D12_BUFFER_SRV_FLAG_NONE;
+        if((params.flags & BufferFlags::Raw) == BufferFlags::Raw) { flags |= D3D12_BUFFER_SRV_FLAG_RAW; }
+        srvDesc.Buffer.Flags = flags;
 
         deviceContext.getCbvSrvUavHeap().createShaderResourceView(deviceContext,
                                                                   mResource.getCbvSrvUavDescriptorHeapReservation(),
@@ -324,7 +363,10 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
         uavDesc.Buffer.FirstElement = 0;
         uavDesc.Buffer.CounterOffsetInBytes = 0;
         uavDesc.Buffer.StructureByteStride = (params.type == Type::Structured) ? params.elementByteSize : 0;
-        uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+
+        D3D12_BUFFER_UAV_FLAGS flags = D3D12_BUFFER_UAV_FLAG_NONE;
+        if((params.flags & BufferFlags::Raw) == BufferFlags::Raw) { flags |= D3D12_BUFFER_UAV_FLAG_RAW; }
+        uavDesc.Buffer.Flags = flags;
 
         deviceContext.getCbvSrvUavHeap().createUnorderedAccessView(
             deviceContext, mResource.getCbvSrvUavDescriptorHeapReservation(), mUavIndex, mResource.getResource(),
@@ -336,7 +378,7 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
         mCbvIndex = nextDescriptorIndex++;
         D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
         cbvDesc.BufferLocation = mResource.getResource()->GetGPUVirtualAddress();
-        cbvDesc.SizeInBytes = params.byteSize;
+        cbvDesc.SizeInBytes = (uint32_t)params.byteSize;
 
         deviceContext.getCbvSrvUavHeap().createConstantBufferView(
             deviceContext, mResource.getCbvSrvUavDescriptorHeapReservation(), mCbvIndex, cbvDesc);

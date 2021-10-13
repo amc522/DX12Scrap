@@ -12,12 +12,50 @@
 #include <nonstd/span.hpp>
 #include <wrl/client.h>
 
-struct D3D12_INDEX_BUFFER_VIEW;
-struct ID3D12GraphicsCommandList;
-struct ID3D12Resource;
-
 namespace scrap::d3d12
 {
+enum class BufferFlags
+{
+    None = 0,
+    ConstantBuffer = 1 << 0,
+    IndexBuffer = 1 << 1,
+    AccelerationStructure = 1 << 2,
+    UavEnabled = 1 << 3,
+    Raw = 1 << 4,
+};
+DEFINE_ENUM_BITWISE_OPERATORS(BufferFlags);
+
+namespace detail
+{
+struct BufferCommonParams
+{
+    ResourceAccessFlags accessFlags = ResourceAccessFlags::None;
+    BufferFlags flags = BufferFlags::None;
+    std::optional<D3D12_RESOURCE_STATES> initialResourceState;
+    std::string_view name;
+};
+
+struct BufferElementParams
+{
+    uint32_t numElements = 0;
+};
+
+struct BufferByteParams
+{
+    uint64_t byteSize = 0;
+};
+
+struct BufferFormattedSpecificParams
+{
+    gpufmt::Format format = gpufmt::Format::UNDEFINED;
+};
+
+struct BufferStructuredSpecificParams
+{
+    uint32_t elementByteSize = 0;
+};
+} // namespace detail
+
 class Buffer
 {
 public:
@@ -29,38 +67,17 @@ public:
         InsufficientDescriptorHeapSpace
     };
 
-    struct CommonParams
-    {
-        ResourceAccessFlags accessFlags;
-        std::string_view name;
-    };
-
-    struct ElementBased
-    {
-        uint32_t numElements = 0;
-    };
-
-    struct ByteBased
-    {
-        uint32_t byteSize = 0;
-        bool isConstantBuffer = false;
-    };
-
-    struct FormattedSpecificParams
-    {
-        gpufmt::Format format = gpufmt::Format::UNDEFINED;
-    };
-
-    struct StructuredSpecificParams
-    {
-        uint32_t elementByteSize = 0;
-    };
-
-    struct SimpleParams : CommonParams, ByteBased
+    struct SimpleParams : detail::BufferCommonParams, detail::BufferByteParams
     {};
-    struct FormattedParams : CommonParams, ElementBased, FormattedSpecificParams
+
+    struct FormattedParams : detail::BufferCommonParams,
+                             detail::BufferElementParams,
+                             detail::BufferFormattedSpecificParams
     {};
-    struct StructuredParams : CommonParams, ElementBased, StructuredSpecificParams
+
+    struct StructuredParams : detail::BufferCommonParams,
+                              detail::BufferElementParams,
+                              detail::BufferStructuredSpecificParams
     {};
 
     Buffer() = default;
@@ -100,6 +117,11 @@ public:
     D3D12_INDEX_BUFFER_VIEW getIndexView() const;
     D3D12_INDEX_BUFFER_VIEW getIndexView(DXGI_FORMAT format) const;
 
+    uint64_t getByteSize() const { return mParams.byteSize; }
+    uint64_t getElementByteSize() const { return mParams.elementByteSize; }
+    uint64_t getElementCount() const { return mParams.byteSize / mParams.elementByteSize; }
+    DXGI_FORMAT getFormat() const { return mParams.dxgiFormat; }
+
     bool isReady() const;
     void markAsUsed(ID3D12CommandQueue* commandQueue);
     void markAsUsed(ID3D12CommandList* commandList);
@@ -126,22 +148,30 @@ private:
         Structured
     };
 
-    struct Params : CommonParams, ByteBased, ElementBased, FormattedSpecificParams, StructuredSpecificParams
+    struct Params : detail::BufferCommonParams,
+                    detail::BufferByteParams,
+                    detail::BufferElementParams,
+                    detail::BufferFormattedSpecificParams,
+                    detail::BufferStructuredSpecificParams
     {
         Params() = default;
-        Params(const SimpleParams& params): CommonParams(params), ByteBased(params), type(Type::Simple) {}
+        Params(const SimpleParams& params)
+            : detail::BufferCommonParams(params)
+            , detail::BufferByteParams(params)
+            , type(Type::Simple)
+        {}
 
         Params(const FormattedParams& params)
-            : CommonParams(params)
-            , ElementBased(params)
-            , FormattedSpecificParams(params)
+            : detail::BufferCommonParams(params)
+            , detail::BufferElementParams(params)
+            , detail::BufferFormattedSpecificParams(params)
             , type(Type::Formatted)
         {}
 
         Params(const StructuredParams& params)
-            : CommonParams(params)
-            , ElementBased(params)
-            , StructuredSpecificParams(params)
+            : detail::BufferCommonParams(params)
+            , detail::BufferElementParams(params)
+            , detail::BufferStructuredSpecificParams(params)
             , type(Type::Structured)
         {}
 

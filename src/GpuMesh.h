@@ -16,6 +16,16 @@ class CpuMesh;
 class GpuMesh
 {
 public:
+    struct IndexBufferParams
+    {
+        ResourceAccessFlags accessFlags = ResourceAccessFlags::None;
+        d3d12::BufferFlags flags = d3d12::BufferFlags::None;
+        std::optional<D3D12_RESOURCE_STATES> initialResourceState;
+        std::string_view name;
+        IndexBufferFormat format = IndexBufferFormat::UInt32;
+        uint32_t numIndices = 0;
+    };
+
     struct VertexElement
     {
         ShaderVertexSemantic semantic;
@@ -29,15 +39,8 @@ public:
 
     [[nodiscard]] PrimitiveTopology getPrimitiveTopology() const { return mPrimitiveTopology; }
 
-    void initIndices(IndexBufferFormat format,
-                     uint32_t elementCount,
-                     ResourceAccessFlags accessFlags,
-                     std::string_view name);
-    void initIndices(IndexBufferFormat format,
-                     uint32_t elementCount,
-                     ResourceAccessFlags accessFlags,
-                     std::string_view name,
-                     nonstd::span<const std::byte> data);
+    void initIndices(const IndexBufferParams& params);
+    void initIndices(const IndexBufferParams& params, nonstd::span<const std::byte> data);
 
     [[nodiscard]] const std::shared_ptr<d3d12::Buffer> getIndexBuffer() const { return mIndexBuffer; }
 
