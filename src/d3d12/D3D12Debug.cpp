@@ -3,6 +3,7 @@
 #include <cassert>
 
 #include <d3d12.h>
+#include <d3d12/D3D12Strings.h>
 
 #ifdef _DEBUG
 #    include <filesystem>
@@ -221,17 +222,36 @@ void Debug::setGpuMarker(ID3D12CommandQueue* commandQueue, std::wstring_view lab
     PIXSetMarker(commandQueue, PIX_COLOR_DEFAULT, label.data());
 }
 
-void Debug::beginCapture()
+bool Debug::beginCapture()
 {
-    PIXCaptureParameters params;
-    params.GpuCaptureParameters.FileName = L"pix_capture";
-    params.TimingCaptureParameters = {};
-    PIXBeginCapture(PIX_CAPTURE_GPU, &params);
+    return beginCapture(L"pix_capture.wpix");
 }
 
-void Debug::endCapture(bool discard)
+bool Debug::beginCapture(const std::filesystem::path& captureFilePath)
 {
-    PIXEndCapture(discard);
+    PIXCaptureParameters params;
+    params.GpuCaptureParameters.FileName = captureFilePath.c_str();
+
+    HRESULT hr = PIXBeginCapture(PIX_CAPTURE_GPU, &params);
+    if(FAILED(hr))
+    {
+        spdlog::error("Failed to begin programmatic PIX capture: {}", HRESULT_t(hr));
+        return false;
+    }
+
+    return true;
+}
+
+bool Debug::endCapture(bool discard)
+{
+    HRESULT hr = PIXEndCapture(discard);
+    if(FAILED(hr))
+    {
+        spdlog::error("Failed to end programmatic PIX capture: {}", HRESULT_t(hr));
+        return false;
+    }
+
+    return true;
 }
 
 ScopedGpuEvent::ScopedGpuEvent(ID3D12GraphicsCommandList* commandList, std::string_view label)

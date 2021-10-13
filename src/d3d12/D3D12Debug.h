@@ -2,6 +2,7 @@
 
 #include "Utility.h"
 
+#include <filesystem>
 #include <string>
 #include <string_view>
 
@@ -127,10 +128,11 @@ public:
     void setGpuMarker(ID3D12CommandQueue* commandQueue, std::string_view label);
     void setGpuMarker(ID3D12CommandQueue* commandQueue, std::wstring_view label);
 
-    void beginCapture();
-    void endCapture(bool discard = false);
+    bool beginCapture();
+    bool beginCapture(const std::filesystem::path& captureFilePath);
+    bool endCapture(bool discard = false);
 
-    bool isPixAttached() const { return mIsPixAttached; }
+    [[nodiscard]] bool isPixAttached() const { return mIsPixAttached; }
 
 private:
     static Debug* sInstance;
