@@ -25,11 +25,16 @@ constexpr ShaderRegisterSlot kFrameCB{1};
 constexpr ShaderRegisterSlot kResourceCB{2};
 } // namespace reservedShaderRegister
 
-enum RootParamIndex : uint32_t
+namespace RasterRootParamSlot
 {
-    kRootParamIndex_FrameCB = 0,
-    kRootParamIndex_ResourceIndices,
-    kRootParamIndex_VertexIndices
+enum Value
+{
+    FrameCB = 0,
+    ResourceIndices,
+    VertexIndices,
+    Count
+};
+}
 };
 
 } // namespace scrap::d3d12

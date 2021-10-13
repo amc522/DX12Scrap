@@ -24,6 +24,43 @@ using namespace Microsoft::WRL;
 
 namespace scrap
 {
+tl::expected<ComPtr<ID3D12RootSignature>, HRESULT>
+SerializeAndCreateRootSignature(const D3D12_VERSIONED_ROOT_SIGNATURE_DESC& desc)
+{
+    d3d12::DeviceContext& deviceContext = d3d12::DeviceContext::instance();
+
+    ComPtr<ID3DBlob> signature;
+    ComPtr<ID3DBlob> error;
+    HRESULT hr =
+        D3DX12SerializeVersionedRootSignature(&desc, deviceContext.getRootSignatureVersion(), &signature, &error);
+    if(FAILED(hr))
+    {
+        if(error != nullptr)
+        {
+            spdlog::critical("Failed to serialize d3d12 root signature. {}",
+                             std::string_view((const CHAR*)error->GetBufferPointer(), error->GetBufferSize()));
+        }
+        else
+        {
+            spdlog::critical("Failed to serialize d3d12 root signature");
+        }
+
+        return tl::make_unexpected(hr);
+    }
+
+    ComPtr<ID3D12RootSignature> rootSignature;
+    hr = deviceContext.getDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(),
+                                                        IID_PPV_ARGS(&rootSignature));
+
+    if(FAILED(hr))
+    {
+        spdlog::critical("Failed to create d3d12 root signature");
+        return tl::make_unexpected(hr);
+    }
+
+    return rootSignature;
+}
+
 //=====================================
 // RasterScene
 //=====================================
@@ -67,23 +104,23 @@ bool RasterScene::createRootSignature()
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_root_parameter1
     // The root parameter describes a parameter or argument being passed into the shader as described or declared by
     // the root signautre. Here we are saying we have a constant buffer with 3 constants.
-    std::array<D3D12_ROOT_PARAMETER1, 3> rootParameters = {};
+    std::array<D3D12_ROOT_PARAMETER1, d3d12::RasterRootParamSlot::Count> rootParameters = {};
 
-    D3D12_ROOT_PARAMETER1& frameConstantBuffer = rootParameters[d3d12::RootParamIndex::kRootParamIndex_FrameCB];
+    D3D12_ROOT_PARAMETER1& frameConstantBuffer = rootParameters[d3d12::RasterRootParamSlot::FrameCB];
     frameConstantBuffer.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     frameConstantBuffer.Descriptor.ShaderRegister = d3d12::reservedShaderRegister::kFrameCB.shaderRegister;
     frameConstantBuffer.Descriptor.RegisterSpace = d3d12::reservedShaderRegister::kFrameCB.registerSpace;
     frameConstantBuffer.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
     frameConstantBuffer.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-    D3D12_ROOT_PARAMETER1& resourceRootConstants = rootParameters[d3d12::kRootParamIndex_ResourceIndices];
+    D3D12_ROOT_PARAMETER1& resourceRootConstants = rootParameters[d3d12::RasterRootParamSlot::ResourceIndices];
     resourceRootConstants.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
     resourceRootConstants.Constants.Num32BitValues = d3d12::kMaxBindlessResources;
     resourceRootConstants.Constants.ShaderRegister = d3d12::reservedShaderRegister::kResourceCB.shaderRegister;
     resourceRootConstants.Constants.RegisterSpace = d3d12::reservedShaderRegister::kResourceCB.registerSpace;
     resourceRootConstants.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-    D3D12_ROOT_PARAMETER1& vertexRootConstants = rootParameters[d3d12::kRootParamIndex_VertexIndices];
+    D3D12_ROOT_PARAMETER1& vertexRootConstants = rootParameters[d3d12::RasterRootParamSlot::VertexIndices];
     vertexRootConstants.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
     vertexRootConstants.Constants.Num32BitValues = d3d12::kMaxBindlessVertexBuffers;
     vertexRootConstants.Constants.ShaderRegister = d3d12::reservedShaderRegister::kVertexCB.shaderRegister;
@@ -121,34 +158,15 @@ bool RasterScene::createRootSignature()
     rootSignatureDesc.Desc_1_1.pStaticSamplers = staticSamplers.data();
     rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
 
-    ComPtr<ID3DBlob> signature;
-    ComPtr<ID3DBlob> error;
-    HRESULT hr = D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, deviceContext.getRootSignatureVersion(),
-                                                       &signature, &error);
-    if(FAILED(hr))
+    auto rootSigResult = SerializeAndCreateRootSignature(rootSignatureDesc);
+    if(!rootSigResult)
     {
-        if(error != nullptr)
-        {
-            spdlog::critical("Failed to serialize d3d12 root signature. {}",
-                             std::string_view((const CHAR*)error->GetBufferPointer(), error->GetBufferSize()));
-        }
-        else
-        {
-            spdlog::critical("Failed to serialize d3d12 root signature");
-        }
+        spdlog::critical("Failed to create raster root signature. {}", HRESULT_t(rootSigResult.error()));
         return false;
     }
 
-    hr = deviceContext.getDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(),
-                                                        IID_PPV_ARGS(&mRootSignature));
-
-    if(FAILED(hr))
-    {
-        spdlog::critical("Failed to create d3d12 root signature");
-        return false;
-    }
-
-    spdlog::info("Created d3d12 root signature");
+    mRootSignature = std::move(rootSigResult.value());
+    spdlog::info("Created raster root signature");
 
     return true;
 }
@@ -450,7 +468,7 @@ void RasterScene::drawIndexed(d3d12::GraphicsPipelineState& pso,
         }
 
         mCommandList.get()->SetGraphicsRoot32BitConstants(
-            (UINT)d3d12::kRootParamIndex_VertexIndices,
+            d3d12::RasterRootParamSlot::VertexIndices,
             std::min(d3d12::kMaxBindlessVertexBuffers, (uint32_t)shader.getShaderInputs().vertexElements.size()),
             vertexBufferDescriptorIndices.data(), 0);
     }
@@ -469,7 +487,7 @@ void RasterScene::drawIndexed(d3d12::GraphicsPipelineState& pso,
         }
 
         mCommandList.get()->SetGraphicsRoot32BitConstants(
-            d3d12::kRootParamIndex_ResourceIndices,
+            d3d12::RasterRootParamSlot::ResourceIndices,
             std::min(d3d12::kMaxBindlessResources, (uint32_t)shader.getShaderInputs().resources.size()),
             resourceIndices.data(), 0);
     }
