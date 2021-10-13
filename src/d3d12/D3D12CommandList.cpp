@@ -26,15 +26,15 @@ GraphicsCommandList::GraphicsCommandList(D3D12_COMMAND_LIST_TYPE type, std::stri
 
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandlist
     mFrameIndex = deviceContext.getFrameIndex();
-    HRESULT hr = device->CreateCommandList(0, type, mCommandAllocators[mFrameIndex].front().get(),
-                                           nullptr, IID_PPV_ARGS(&mCommandList));
+    HRESULT hr = device->CreateCommandList(0, type, mCommandAllocators[mFrameIndex].front().get(), nullptr,
+                                           IID_PPV_ARGS(&mCommandList));
 
     if(FAILED(hr))
     {
         spdlog::critical("Failed to create d3d12 command list");
         return;
     }
-    
+
     mCommandAllocators[mFrameIndex].front().markAsUsed(mCommandList.Get());
 
     mCommandList->SetName(mDebugNameBase.c_str());

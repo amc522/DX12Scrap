@@ -984,8 +984,8 @@ bool RaytracingScene::buildGeometry()
     //    params.accessFlags = ResourceAccessFlags::GpuRead;
     //    params.name = "Triangle TexCoords Buffer";
 
-    //    std::array<glm::vec4, 3> vertices{{{1.0f, 0.0, 0.0, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
-    //    mTriangleMesh.createVertexElement(ShaderVertexSemantic::Color, 0, params,
+    //    std::array<glm::vec4, 3> vertices{{{1.0f, 0.0, 0.0, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f,
+    //    0.0f, 1.0f, 1.0f}}}; mTriangleMesh.createVertexElement(ShaderVertexSemantic::Color, 0, params,
     //                                      nonstd::as_bytes(nonstd::span(vertices)));
     //}
 

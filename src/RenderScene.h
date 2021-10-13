@@ -33,6 +33,20 @@ class GraphicsPipelineState;
 class Texture;
 } // namespace d3d12
 
+struct Viewport
+{
+    float left;
+    float top;
+    float right;
+    float bottom;
+};
+
+struct RayGenConstantBuffer
+{
+    Viewport viewport;
+    Viewport stencil;
+};
+
 struct FrameConstantBuffer
 {
     glm::mat4x4 worldToView;
@@ -45,7 +59,7 @@ struct FrameConstantBuffer
 enum class Scene
 {
     Raster,
-    Raytrace
+    Raytracing
 };
 
 class RasterScene
@@ -100,16 +114,16 @@ private:
     bool mInitialized = false;
 };
 
-class RaytraceScene
+class RaytracingScene
 {
 public:
-    RaytraceScene();
-    RaytraceScene(const RaytraceScene&) = delete;
-    RaytraceScene(RaytraceScene&&);
-    ~RaytraceScene();
+    RaytracingScene();
+    RaytracingScene(const RaytracingScene&) = delete;
+    RaytracingScene(RaytracingScene&&);
+    ~RaytracingScene();
 
-    RaytraceScene& operator=(const RaytraceScene&) = delete;
-    RaytraceScene& operator=(RaytraceScene&&);
+    RaytracingScene& operator=(const RaytracingScene&) = delete;
+    RaytracingScene& operator=(RaytracingScene&&);
 
     void preRender(const FrameInfo& frameInfo);
     void render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context);
@@ -118,13 +132,39 @@ public:
     bool isInitialized() { return mInitialized; }
 
 private:
+    bool createRenderTargets();
+    bool createRootSignatures();
+    bool createPipelineState();
+    bool buildGeometry();
+    bool buildAccelerationStructures();
+    bool buildShaderTables();
+
+    static constexpr std::wstring_view kRaygenShaderName = L"MyRaygenShader";
+    static constexpr std::wstring_view kClosestHitShaderName = L"MyClosestHitShader";
+    static constexpr std::wstring_view kMissShaderName = L"MyMissShader";
+    static constexpr std::wstring_view kHitGroupName = L"MyHitGroup";
+
     Camera mCamera;
 
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> mGlobalRootSignature;
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> mLocalRootSignature;
     d3d12::GraphicsCommandList mCommandList;
 
+    std::unique_ptr<d3d12::Texture> mRenderTarget;
+    GpuMesh mTriangleMesh;
+
+    std::unique_ptr<d3d12::Buffer> mTlas;
+    std::unique_ptr<d3d12::Buffer> mBlas;
+
+    Microsoft::WRL::ComPtr<ID3D12StateObject> mRaytracingStateObject;
+
+    std::unique_ptr<d3d12::Buffer> mRayGenShaderTable;
+    std::unique_ptr<d3d12::Buffer> mMissShaderTable;
+    std::unique_ptr<d3d12::Buffer> mHitGroupShaderTable;
+
+    RayGenConstantBuffer mRayGenCpuConstantBuffer;
     std::shared_ptr<d3d12::Buffer> mFrameConstantBuffer;
 
-    std::unique_ptr<d3d12::Texture> mDepthStencilTexture;
     bool mInitialized = false;
 };
 
@@ -144,7 +184,7 @@ public:
 
 private:
     std::unique_ptr<RasterScene> mRasterScene;
-    std::unique_ptr<RaytraceScene> mRaytraceScene;
-    Scene mActiveScene = Scene::Raster;
+    std::unique_ptr<RaytracingScene> mRaytraceScene;
+    Scene mActiveScene = Scene::Raytracing;
 };
 } // namespace scrap

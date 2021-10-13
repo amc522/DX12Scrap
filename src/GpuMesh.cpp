@@ -60,8 +60,7 @@ void GpuMesh::initIndices(const IndexBufferParams& params)
     mIndexCount = params.numIndices;
 }
 
-void GpuMesh::initIndices(const IndexBufferParams& params,
-                          nonstd::span<const std::byte> data)
+void GpuMesh::initIndices(const IndexBufferParams& params, nonstd::span<const std::byte> data)
 {
     d3d12::Buffer::FormattedParams bufferParams;
     bufferParams.accessFlags = params.accessFlags;

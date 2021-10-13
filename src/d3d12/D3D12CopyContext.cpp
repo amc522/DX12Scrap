@@ -10,11 +10,7 @@ using namespace Microsoft::WRL;
 
 namespace scrap::d3d12
 {
-
-CopyContext::CopyContext()
-    : BaseCommandContext<CopyFrameCode>("Copy")
-{
-}
+CopyContext::CopyContext(): BaseCommandContext<CopyFrameCode>("Copy") {}
 
 HRESULT CopyContext::init()
 {
@@ -47,7 +43,7 @@ void CopyContext::releaseResources()
 void CopyContext::beginFrame()
 {
     BaseCommandContext<CopyFrameCode>::beginFrame();
-    
+
     mCommandList->beginRecording();
 }
 

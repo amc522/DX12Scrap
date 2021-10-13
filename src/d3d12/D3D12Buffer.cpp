@@ -198,7 +198,7 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
 
     D3D12_RESOURCE_STATES initialResourceState = params.initialResourceState.value_or(D3D12_RESOURCE_STATE_COMMON);
     D3D12_RESOURCE_STATES postCopyState = D3D12_RESOURCE_STATE_COMMON;
-    
+
     if(!buffer.empty())
     {
         postCopyState = initialResourceState;
@@ -217,9 +217,8 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
     {
         ComPtr<ID3D12Resource> resource;
         // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommittedresource
-        hr =
-            deviceContext.getDevice()->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc,
-                                                               initialResourceState, nullptr, IID_PPV_ARGS(&resource));
+        hr = deviceContext.getDevice()->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc,
+                                                                initialResourceState, nullptr, IID_PPV_ARGS(&resource));
 
         if(FAILED(hr)) { return Error::FailedToCreateGpuResource; }
 
