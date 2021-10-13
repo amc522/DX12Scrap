@@ -232,6 +232,7 @@ void RasterScene::createRenderTargets()
     params.isRenderTarget = false;
     params.name = "DepthStencilTarget";
     params.depthClearValue = 1.0f;
+    params.initialResourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
     auto depthStencilTexture = std::make_unique<d3d12::Texture>();
     auto error = depthStencilTexture->initUninitialized(params);

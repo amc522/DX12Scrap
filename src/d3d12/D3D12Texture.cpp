@@ -49,9 +49,29 @@ D3D12_CPU_DESCRIPTOR_HANDLE Texture::getRtvCpu() const
     return mResource.getRtvDescriptorHeapReservation().getCpuHandle(mRtvIndex);
 }
 
+D3D12_GPU_DESCRIPTOR_HANDLE Texture::getRtvGpu() const
+{
+    return mResource.getRtvDescriptorHeapReservation().getGpuHandle(mRtvIndex);
+}
+
 D3D12_CPU_DESCRIPTOR_HANDLE Texture::getDsvCpu() const
 {
     return mResource.getDsvDescriptorHeapReservation().getCpuHandle(mDsvIndex);
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE Texture::getDsvGpu() const
+{
+    return mResource.getDsvDescriptorHeapReservation().getGpuHandle(mDsvIndex);
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE Texture::getUavCpu() const
+{
+    return mResource.getCbvSrvUavDescriptorHeapReservation().getCpuHandle(mUavIndex);
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE Texture::getUavGpu() const
+{
+    return mResource.getCbvSrvUavDescriptorHeapReservation().getGpuHandle(mUavIndex);
 }
 
 bool Texture::isReady() const
@@ -211,19 +231,13 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
     defaultHeapProps.VisibleNodeMask = 0;
 
     // Maybe use D3D12_RESOURCE_STATE_COMMON when not copying the texture???
-    D3D12_RESOURCE_STATES initialResourceState;
-    if(texture != nullptr) { initialResourceState = D3D12_RESOURCE_STATE_COPY_DEST; }
-    else if(params.isRenderTarget)
+    D3D12_RESOURCE_STATES initialResourceState = params.initialResourceState.value_or(D3D12_RESOURCE_STATE_COMMON);
+    D3D12_RESOURCE_STATES postCopyResourceState = D3D12_RESOURCE_STATE_COMMON;
+
+    if(texture != nullptr)
     {
-        initialResourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    }
-    else if(isDepthStencil)
-    {
-        initialResourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-    }
-    else
-    {
-        initialResourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        postCopyResourceState = initialResourceState;
+        initialResourceState = D3D12_RESOURCE_STATE_COPY_DEST;
     }
 
     {
@@ -355,6 +369,13 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
                                                     firstSubresource, subresourceCount, subresources.data());
         }
 
+        if(initialResourceState != postCopyResourceState)
+        {
+            auto transition = CD3DX12_RESOURCE_BARRIER::Transition(mResource.getResource(), initialResourceState,
+                                                                   postCopyResourceState);
+            commandList->ResourceBarrier(1, &transition);
+        }
+
         mResource.markAsUsed(commandList);
         mUploadResource.markAsUsed(commandList);
         mInitFrameCode = deviceContext.getCopyContext().getCurrentFrameCode();
@@ -447,6 +468,8 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
 
         if(needsUav)
         {
+            mUavIndex = nextCbvSrvUavDescriptorIndex++;
+
             D3D12_UNORDERED_ACCESS_VIEW_DESC desc;
             desc.ViewDimension = TranslateUavDimension(params.dimension, params.arraySize);
             desc.Format = uavFormatPlane0;

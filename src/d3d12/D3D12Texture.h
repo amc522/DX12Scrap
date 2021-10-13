@@ -10,10 +10,9 @@
 #include <array>
 
 #include <cputex/unique_texture.h>
+#include <d3d12.h>
 #include <tl/expected.hpp>
 #include <wrl/client.h>
-
-struct ID3D12Resource;
 
 namespace scrap
 {
@@ -52,6 +51,7 @@ public:
         // specified, srvs are created for the render target or depth and stencil planes. For render targets, if
         // GpuWrite is specified, a uav will be created. GpuWrite is not valid for depth stencil targets.
         ResourceAccessFlags accessFlags;
+        std::optional<D3D12_RESOURCE_STATES> initialResourceState;
         std::string_view name;
         glm::vec4 colorClearValue{0.0f, 0.0f, 0.0f, 1.0f};
         float depthClearValue = 0.0f;
@@ -76,7 +76,11 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE getSrvCpu() const;
     D3D12_GPU_DESCRIPTOR_HANDLE getSrvGpu() const;
     D3D12_CPU_DESCRIPTOR_HANDLE getRtvCpu() const;
+    D3D12_GPU_DESCRIPTOR_HANDLE getRtvGpu() const;
     D3D12_CPU_DESCRIPTOR_HANDLE getDsvCpu() const;
+    D3D12_GPU_DESCRIPTOR_HANDLE getDsvGpu() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE getUavCpu() const;
+    D3D12_GPU_DESCRIPTOR_HANDLE getUavGpu() const;
 
     uint32_t getSrvDescriptorHeapIndex() const
     {
@@ -107,10 +111,10 @@ private:
     // Specifically look at the descriptions for 'D3D12_HEAP_TYPE_UPLOAD' and 'D3D12_HEAP_TYPE_DEFAULT'.
     TrackedShaderResource mResource;
     TrackedGpuObject<ID3D12Resource> mUploadResource;
-    uint32_t mSrvIndex = 0;
-    uint32_t mUavIndex = 0;
-    uint32_t mRtvIndex = 0;
-    uint32_t mDsvIndex = 0;
+    uint32_t mSrvIndex = std::numeric_limits<uint32_t>::max();
+    uint32_t mUavIndex = std::numeric_limits<uint32_t>::max();
+    uint32_t mRtvIndex = std::numeric_limits<uint32_t>::max();
+    uint32_t mDsvIndex = std::numeric_limits<uint32_t>::max();
 
     ShaderResourceDimension mResourceDimension = ShaderResourceDimension::Unknown;
 
