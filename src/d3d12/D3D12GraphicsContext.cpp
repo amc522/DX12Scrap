@@ -26,6 +26,8 @@ HRESULT GraphicsContext::init()
         return hr;
     }
 
+    mCommandQueue->SetName(L"Render Command Queue");
+
     spdlog::info("Created d3d12 direct command queue");
 
     return S_OK;

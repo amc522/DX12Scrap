@@ -66,6 +66,8 @@ SerializeAndCreateRootSignature(const D3D12_VERSIONED_ROOT_SIGNATURE_DESC& desc)
 //=====================================
 RasterScene::RasterScene(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "RasterScene Command List")
 {
+    mCommandList.beginRecording();
+
     createRenderTargets();
     createRootSignature();
     createFrameConstantBuffer();
@@ -73,19 +75,10 @@ RasterScene::RasterScene(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "Raster
     createCube();
     createTexture();
 
-    if(FAILED(mCommandList.close())) { spdlog::error("Failed to close graphics command list"); }
-
     d3d12::DeviceContext& deviceContext = d3d12::DeviceContext::instance();
+    deviceContext.getCopyContext().execute();
 
-    // Execute the command list.
-    std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.get()};
-    deviceContext.getGraphicsContext().getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()),
-                                                                              commandLists.data());
-
-    // Wait for the command list to execute; we are reusing the same command
-    // list in our main loop but for now, we just want to wait for setup to
-    // complete before continuing.
-    deviceContext.getGraphicsContext().waitOnGpu();
+    mCommandList.execute(deviceContext.getGraphicsContext().getCommandQueue());
 
     if(!loadShaders()) { return; }
 
@@ -507,8 +500,6 @@ void RasterScene::drawIndexed(d3d12::GraphicsPipelineState& pso,
 
 void RasterScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context)
 {
-    mCommandList.reset();
-
     {
         d3d12::ScopedGpuEvent gpuEvent(mCommandList.get(), "RasterScene");
 
@@ -533,8 +524,7 @@ void RasterScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12
         mCommandList.get()->SetGraphicsRootSignature(mRootSignature.Get());
 
         mCommandList.get()->SetGraphicsRootConstantBufferView(
-            d3d12::RootParamIndex::kRootParamIndex_FrameCB,
-            mFrameConstantBuffer->getResource()->GetGPUVirtualAddress());
+            d3d12::RasterRootParamSlot::FrameCB, mFrameConstantBuffer->getResource()->GetGPUVirtualAddress());
 
         mFrameConstantBuffer->markAsUsed(mCommandList.get());
 
@@ -571,16 +561,7 @@ void RasterScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12
         mCommandList.get()->ResourceBarrier(1, &renderTargetBarrier);
     }
 
-    if(FAILED(mCommandList.close()))
-    {
-        spdlog::error("Failed to close d3d12 command list");
-        return;
-    }
-
-    // Execute the command list.
-    std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.get()};
-    d3d12Context.getGraphicsContext().getCommandQueue()->ExecuteCommandLists(static_cast<UINT>(commandLists.size()),
-                                                                             commandLists.data());
+    mCommandList.execute(d3d12Context.getGraphicsContext().getCommandQueue());
 }
 
 void RasterScene::endFrame() {}
@@ -588,20 +569,678 @@ void RasterScene::endFrame() {}
 //=====================================
 // RayTraceScene
 //=====================================
-RaytraceScene::RaytraceScene(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "RaytraceScene Command List")
+RaytracingScene::RaytracingScene(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "RaytracingScene Command List")
 {
+    mRayGenCpuConstantBuffer.viewport = {-1.0f, 1.0f, 1.0f, -1.0f};
+
+    constexpr float border = 0.1f;
+    auto frameSize = d3d12::DeviceContext::instance().getFrameSize();
+    const float aspectRatio = (float)frameSize.x / (float)frameSize.y;
+
+    if(frameSize.x <= frameSize.y)
+    {
+        mRayGenCpuConstantBuffer.stencil = {-1 + border, -1 + border * aspectRatio, 1.0f - border,
+                                            1 - border * aspectRatio};
+    }
+    else
+    {
+        mRayGenCpuConstantBuffer.stencil = {-1 + border / aspectRatio, -1 + border, 1 - border / aspectRatio,
+                                            1.0f - border};
+    }
+
+    mCommandList.beginRecording();
+
+    if(!createRenderTargets())
+    {
+        spdlog::critical("Failed to create raytracing render target.");
+        return;
+    }
+
+    if(!createRootSignatures())
+    {
+        spdlog::critical("Failed to create raytracing root signatures.");
+        return;
+    }
+
+    if(!createPipelineState())
+    {
+        spdlog::critical("Failed to create raytracing pipeline state.");
+        return;
+    }
+
+    if(!buildGeometry())
+    {
+        spdlog::critical("Failed to create raytracing geometry.");
+        return;
+    }
+
+    if(!buildAccelerationStructures())
+    {
+        spdlog::critical("Failed to create raytracing acceleration structures.");
+        return;
+    }
+
+    if(!buildShaderTables())
+    {
+        spdlog::critical("Failed to create raytracing shader tables.");
+        return;
+    }
+
+    d3d12::DeviceContext::instance().getCopyContext().execute();
+    d3d12::DeviceContext::instance().getCopyContext().waitOnGpu();
+
+    mCommandList.execute(d3d12::DeviceContext::instance().getGraphicsContext().getCommandQueue());
+
     mInitialized = true;
 }
 
-RaytraceScene::RaytraceScene(RaytraceScene&&) = default;
-RaytraceScene::~RaytraceScene() = default;
-RaytraceScene& RaytraceScene::operator=(RaytraceScene&&) = default;
+RaytracingScene::RaytracingScene(RaytracingScene&&) = default;
+RaytracingScene::~RaytracingScene() = default;
+RaytracingScene& RaytracingScene::operator=(RaytracingScene&&) = default;
 
-void RaytraceScene::preRender(const FrameInfo& frameInfo) {}
+void RaytracingScene::preRender(const FrameInfo& frameInfo) {}
 
-void RaytraceScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context) {}
+void RaytracingScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context)
+{
+    mCommandList.beginRecording();
 
-void RaytraceScene::endFrame() {}
+    auto DispatchRays = [&](ID3D12GraphicsCommandList4* commandList, auto* stateObject, auto* dispatchDesc) {
+        // Since each shader table has only one shader record, the stride is same as the size.
+        dispatchDesc->HitGroupTable.StartAddress = mHitGroupShaderTable->getResource()->GetGPUVirtualAddress();
+        dispatchDesc->HitGroupTable.SizeInBytes = mHitGroupShaderTable->getByteSize();
+        dispatchDesc->HitGroupTable.StrideInBytes = dispatchDesc->HitGroupTable.SizeInBytes;
+        dispatchDesc->MissShaderTable.StartAddress = mMissShaderTable->getResource()->GetGPUVirtualAddress();
+        dispatchDesc->MissShaderTable.SizeInBytes = mMissShaderTable->getByteSize();
+        dispatchDesc->MissShaderTable.StrideInBytes = dispatchDesc->MissShaderTable.SizeInBytes;
+        dispatchDesc->RayGenerationShaderRecord.StartAddress =
+            mRayGenShaderTable->getResource()->GetGPUVirtualAddress();
+        dispatchDesc->RayGenerationShaderRecord.SizeInBytes = mRayGenShaderTable->getByteSize();
+        dispatchDesc->Width = frameInfo.mainWindow->getSize().x;
+        dispatchDesc->Height = frameInfo.mainWindow->getSize().y;
+        dispatchDesc->Depth = 1;
+        commandList->SetPipelineState1(stateObject);
+        commandList->DispatchRays(dispatchDesc);
+    };
+
+    mCommandList.get()->SetComputeRootSignature(mGlobalRootSignature.Get());
+
+    // Bind the heaps, acceleration structure and dispatch rays.
+    D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
+    std::array<ID3D12DescriptorHeap*, 1> descriptorHeaps = {d3d12Context.getCbvSrvUavHeap().getGpuDescriptorHeap()};
+    mCommandList.get()->SetDescriptorHeaps((uint32_t)descriptorHeaps.size(), descriptorHeaps.data());
+    mCommandList.get()->SetComputeRootDescriptorTable(d3d12::RaytracingGlobalRootParamSlot::OutputView,
+                                                      mRenderTarget->getUavGpu());
+    mCommandList.get()->SetComputeRootShaderResourceView(d3d12::RaytracingGlobalRootParamSlot::AccelerationStructure,
+                                                         mTlas->getResource()->GetGPUVirtualAddress());
+    DispatchRays(mCommandList.get4(), mRaytracingStateObject.Get(), &dispatchDesc);
+
+    D3D12_RESOURCE_BARRIER preCopyBarriers[2];
+    preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(
+        d3d12Context.getBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST);
+    preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(
+        mRenderTarget->getResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    mCommandList.get()->ResourceBarrier(ARRAYSIZE(preCopyBarriers), preCopyBarriers);
+
+    mCommandList.get()->CopyResource(d3d12Context.getBackBuffer(), mRenderTarget->getResource());
+
+    D3D12_RESOURCE_BARRIER postCopyBarriers[2];
+    postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(
+        d3d12Context.getBackBuffer(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+    postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(
+        mRenderTarget->getResource(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+    mCommandList.get()->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
+
+    mCommandList.execute(d3d12::DeviceContext::instance().getGraphicsContext().getCommandQueue());
+}
+
+void RaytracingScene::endFrame() {}
+
+bool RaytracingScene::createRenderTargets()
+{
+    d3d12::DeviceContext& deviceContext = d3d12::DeviceContext::instance();
+
+    d3d12::Texture::Params textureParams = {};
+    textureParams.format = gpufmt::Format::R8G8B8A8_UNORM;
+    textureParams.dimension = cputex::TextureDimension::Texture2D;
+    textureParams.extents = cputex::Extent(deviceContext.getFrameSize(), 1);
+    textureParams.arraySize = 1;
+    textureParams.mipCount = 1;
+    textureParams.colorClearValue = {0.0f, 0.0f, 0.0f, 1.0f};
+    textureParams.isRenderTarget = false;
+    textureParams.accessFlags = ResourceAccessFlags::GpuRW;
+    textureParams.initialResourceState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    textureParams.name = "Raytracing Render Target";
+
+    auto renderTarget = std::make_unique<d3d12::Texture>();
+    auto error = renderTarget->initUninitialized(textureParams);
+
+    if(error)
+    {
+        spdlog::critical("Failed to create render target. {}"), error.value();
+        return false;
+    }
+
+    mRenderTarget = std::move(renderTarget);
+
+    return true;
+}
+
+bool RaytracingScene::createRootSignatures()
+{
+    d3d12::DeviceContext& deviceContext = d3d12::DeviceContext::instance();
+
+    // Global Root Signature
+    // This is a root signature that is shared across all raytracing shaders invoked during a DispatchRays() call.
+    {
+        std::array<D3D12_ROOT_PARAMETER1, d3d12::RaytracingGlobalRootParamSlot::Count> rootParams = {};
+
+        D3D12_DESCRIPTOR_RANGE1 descriptorRange = {};
+        descriptorRange.NumDescriptors = 1;
+        descriptorRange.OffsetInDescriptorsFromTableStart = 0;
+        descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+        descriptorRange.BaseShaderRegister = d3d12::reservedShaderRegister::kOutputBuffer.shaderRegister;
+        descriptorRange.RegisterSpace = d3d12::reservedShaderRegister::kOutputBuffer.registerSpace;
+        descriptorRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
+
+        D3D12_ROOT_PARAMETER1& uavRootParam = rootParams[d3d12::RaytracingGlobalRootParamSlot::OutputView];
+        uavRootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        uavRootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        uavRootParam.DescriptorTable.NumDescriptorRanges = 1;
+        uavRootParam.DescriptorTable.pDescriptorRanges = &descriptorRange;
+
+        // tlas = top level acceleration structure
+        D3D12_ROOT_PARAMETER1& tlasRootParam = rootParams[d3d12::RaytracingGlobalRootParamSlot::AccelerationStructure];
+        tlasRootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+        tlasRootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        tlasRootParam.Descriptor.ShaderRegister = d3d12::reservedShaderRegister::kAccelerationStructure.shaderRegister;
+        tlasRootParam.Descriptor.RegisterSpace = d3d12::reservedShaderRegister::kAccelerationStructure.registerSpace;
+        tlasRootParam.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+
+        D3D12_VERSIONED_ROOT_SIGNATURE_DESC globalDesc = {};
+        globalDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+        globalDesc.Desc_1_1.NumParameters = (uint32_t)rootParams.size();
+        globalDesc.Desc_1_1.pParameters = rootParams.data();
+        globalDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
+
+        auto rootSigResult = SerializeAndCreateRootSignature(globalDesc);
+        if(!rootSigResult)
+        {
+            spdlog::critical("Failed to create raytracing global root signature. {}", HRESULT_t(rootSigResult.error()));
+            return false;
+        }
+
+        mGlobalRootSignature = std::move(rootSigResult.value());
+        spdlog::info("Created raytracing global root signature.");
+    }
+
+    // Local Root Signature
+    // This is a root signature that enables a shader to have unique arguments that come from shader tables.
+    {
+        std::array<D3D12_ROOT_PARAMETER1, d3d12::RaytracingLocalRootParamSlot::Count> rootParams = {};
+        auto& raygenCbParam = rootParams[d3d12::RaytracingLocalRootParamSlot::ViewportCB];
+        raygenCbParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        raygenCbParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        raygenCbParam.Constants.Num32BitValues = sizeof(RayGenConstantBuffer) / sizeof(uint32_t);
+        raygenCbParam.Constants.ShaderRegister = d3d12::reservedShaderRegister::kRaygenCB.shaderRegister;
+        raygenCbParam.Constants.RegisterSpace = d3d12::reservedShaderRegister::kRaygenCB.registerSpace;
+
+        D3D12_VERSIONED_ROOT_SIGNATURE_DESC desc = {};
+        desc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
+        desc.Desc_1_1.NumParameters = (uint32_t)rootParams.size();
+        desc.Desc_1_1.pParameters = rootParams.data();
+        desc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+
+        auto rootSigResult = SerializeAndCreateRootSignature(desc);
+        if(!rootSigResult)
+        {
+            spdlog::critical("Failed to create raytracing local root signature. {}", HRESULT_t(rootSigResult.error()));
+            return false;
+        }
+
+        mLocalRootSignature = std::move(rootSigResult.value());
+        spdlog::info("Created raytracing local root signature.");
+    }
+
+    return true;
+}
+
+bool RaytracingScene::createPipelineState()
+{
+    d3d12::RaytracingShaderParams shaderParams;
+    shaderParams.filepath = "assets/hello_raytracing.hlsl";
+    shaderParams.stages = RaytracingShaderStageMask::RgChMs;
+
+#ifdef _DEBUG
+    shaderParams.debug = true;
+#endif
+    d3d12::RaytracingShader shader(std::move(shaderParams));
+    shader.create();
+
+    if(shader.status() == d3d12::RaytracingShaderState::Failed)
+    {
+        spdlog::critical("Failed to create raytracing shader.");
+        return false;
+    }
+
+    // Create 7 subobjects that combine into a RTPSO:
+    // Subobjects need to be associated with DXIL exports (i.e. shaders) either by way of default or explicit
+    // associations. Default association applies to every exported shader entrypoint that doesn't have any of the
+    // same type of subobject associated with it. This simple sample utilizes default shader association except for
+    // local root signature subobject which has an explicit association specified purely for demonstration purposes.
+    //   1 - DXIL library
+    //   1 - Triangle hit group
+    //   1 - Shader config
+    //   2 - Local root signature and association
+    //   1 - Global root signature
+    //   1 - Pipeline config
+
+    std::array<D3D12_STATE_SUBOBJECT, 7> subObjects = {};
+
+    // DXIL library
+    // This contains the shaders and their entrypoints for the state object.
+    // Since shaders are not considered a subobject, they need to be passed in via DXIL library subobjects.
+    std::array<D3D12_EXPORT_DESC, 3> exports = {};
+    exports[0].Name = kRaygenShaderName.data();
+    exports[1].Name = kClosestHitShaderName.data();
+    exports[2].Name = kMissShaderName.data();
+
+    D3D12_DXIL_LIBRARY_DESC libDesc = {};
+    libDesc.DXILLibrary = shader.getShaderByteCode();
+    libDesc.NumExports = (uint32_t)exports.size();
+    libDesc.pExports = exports.data();
+
+    {
+        D3D12_STATE_SUBOBJECT& subOject = subObjects[0];
+        subOject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
+        subOject.pDesc = &libDesc;
+    }
+
+    // Triangle hit group
+    // A hit group specifies closest hit, any hit and intersection shaders to be executed when a ray intersects the
+    // geometry's triangle/AABB. In this sample, we only use triangle geometry with a closest hit shader, so others are
+    // not set.
+
+    D3D12_HIT_GROUP_DESC hitGroupDesc = {};
+    hitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
+    hitGroupDesc.ClosestHitShaderImport = kClosestHitShaderName.data();
+    hitGroupDesc.HitGroupExport = kHitGroupName.data();
+
+    {
+        D3D12_STATE_SUBOBJECT& subObject = subObjects[1];
+        subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+        subObject.pDesc = &hitGroupDesc;
+    }
+
+    // Shader config
+    // Defines the maximum sizes in bytes for the ray payload and attribute structure.
+    D3D12_RAYTRACING_SHADER_CONFIG shaderConfig = {};
+    shaderConfig.MaxPayloadSizeInBytes = 4 * sizeof(float);   // float4 color
+    shaderConfig.MaxAttributeSizeInBytes = 2 * sizeof(float); // float2 barycentrics
+
+    {
+        D3D12_STATE_SUBOBJECT& subObject = subObjects[2];
+        subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
+        subObject.pDesc = &shaderConfig;
+    }
+
+    D3D12_STATE_OBJECT_DESC raytracingPipeline = {};
+    raytracingPipeline.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
+    raytracingPipeline.NumSubobjects = (uint32_t)subObjects.size();
+    raytracingPipeline.pSubobjects = subObjects.data();
+
+    // Local root signature to be used in a ray gen shader.
+    // This is a root signature that enables a shader to have unique arguments that come from shader tables.
+    D3D12_LOCAL_ROOT_SIGNATURE localRootSignature = {};
+    localRootSignature.pLocalRootSignature = mLocalRootSignature.Get();
+
+    {
+        D3D12_STATE_SUBOBJECT& subObject = subObjects[3];
+        subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
+        subObject.pDesc = &localRootSignature;
+    }
+
+    std::array<const wchar_t*, 1> localRootSigExports = {kRaygenShaderName.data()};
+    D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION exportsAssociation;
+    exportsAssociation.pSubobjectToAssociate = &subObjects[3];
+    exportsAssociation.NumExports = 1;
+    exportsAssociation.pExports = localRootSigExports.data();
+
+    {
+        D3D12_STATE_SUBOBJECT& subObject = subObjects[4];
+        subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
+        subObject.pDesc = &exportsAssociation;
+    }
+
+    // Global root signature
+    // This is a root signature that is shared across all raytracing shaders invoked during a DispatchRays() call.
+    D3D12_GLOBAL_ROOT_SIGNATURE globalRootSignature = {};
+    globalRootSignature.pGlobalRootSignature = mGlobalRootSignature.Get();
+
+    {
+        D3D12_STATE_SUBOBJECT& subObject = subObjects[5];
+        subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
+        subObject.pDesc = &globalRootSignature;
+    }
+
+    // Pipeline config
+    // Defines the maximum TraceRay() recursion depth.
+    D3D12_RAYTRACING_PIPELINE_CONFIG1 raytracingPipelineConfig = {};
+    // PERFOMANCE TIP: Set max recursion depth as low as needed
+    // as drivers may apply optimization strategies for low recursion depths.
+    raytracingPipelineConfig.MaxTraceRecursionDepth = 1;
+    raytracingPipelineConfig.Flags = D3D12_RAYTRACING_PIPELINE_FLAG_NONE;
+
+    {
+        D3D12_STATE_SUBOBJECT& subObject = subObjects[6];
+        subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG1;
+        subObject.pDesc = &raytracingPipelineConfig;
+    }
+
+    HRESULT hr = d3d12::DeviceContext::instance().getDevice5()->CreateStateObject(
+        &raytracingPipeline, IID_PPV_ARGS(&mRaytracingStateObject));
+    if(FAILED(hr))
+    {
+        spdlog::critical("Failed to create raytracing pipeline state. {}", HRESULT_t(hr));
+        return false;
+    }
+
+    return true;
+}
+
+bool RaytracingScene::buildGeometry()
+{
+    { // Positions
+        d3d12::Buffer::FormattedParams params;
+        params.format = gpufmt::Format::R32G32B32_SFLOAT;
+        params.numElements = 3;
+        params.accessFlags = ResourceAccessFlags::GpuRead;
+        params.name = "Triangle Positions Buffer";
+
+        const float depth = 1.0f;
+
+        std::array<glm::vec3, 3> vertices{{{0.0f, 0.7f, 1.0f}, {0.7f, -0.7f, 1.0f}, {-0.7f, -0.7f, 1.0f}}};
+        mTriangleMesh.createVertexElement(ShaderVertexSemantic::Position, 0, params,
+                                          nonstd::as_bytes(nonstd::span(vertices)));
+    }
+
+    //{ // UVs
+    //    d3d12::Buffer::FormattedParams params;
+    //    params.format = gpufmt::Format::R32G32_SFLOAT;
+    //    params.numElements = 3;
+    //    params.accessFlags = ResourceAccessFlags::GpuRead;
+    //    params.name = "Triangle TexCoords Buffer";
+
+    //    std::array<glm::vec2, 3> vertices{{{0.0f, 1.0f}, {1.0f, 1.0f}, {0.5f, 0.0f}}};
+    //    mTriangleMesh.createVertexElement(ShaderVertexSemantic::TexCoord, 0, params,
+    //                                      nonstd::as_bytes(nonstd::span(vertices)));
+    //}
+
+    //{ // Colors
+    //    d3d12::Buffer::FormattedParams params;
+    //    params.format = gpufmt::Format::R32G32B32A32_SFLOAT;
+    //    params.numElements = 3;
+    //    params.accessFlags = ResourceAccessFlags::GpuRead;
+    //    params.name = "Triangle TexCoords Buffer";
+
+    //    std::array<glm::vec4, 3> vertices{{{1.0f, 0.0, 0.0, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
+    //    mTriangleMesh.createVertexElement(ShaderVertexSemantic::Color, 0, params,
+    //                                      nonstd::as_bytes(nonstd::span(vertices)));
+    //}
+
+    { // Indices
+        GpuMesh::IndexBufferParams params;
+        params.format = IndexBufferFormat::UInt16;
+        params.numIndices = 3;
+        params.accessFlags = ResourceAccessFlags::GpuRead;
+        params.initialResourceState = D3D12_RESOURCE_STATE_COMMON;
+        params.name = "Triangle Index Buffer";
+
+        std::array<uint16_t, 3> indices{0, 1, 2};
+        mTriangleMesh.initIndices(params, nonstd::as_bytes(nonstd::span(indices)));
+    }
+
+    return true;
+}
+
+bool RaytracingScene::buildAccelerationStructures()
+{
+    auto device = d3d12::DeviceContext::instance().getDevice5();
+    auto commandList = mCommandList.get4();
+    auto commandQueue = d3d12::DeviceContext::instance().getGraphicsContext().getCommandQueue();
+
+    std::shared_ptr<d3d12::Buffer> vertexBuffer = mTriangleMesh.getVertexBuffer(ShaderVertexSemantic::Position, 0);
+
+    D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
+    geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+    geometryDesc.Triangles.IndexBuffer = mTriangleMesh.getIndexBuffer()->getResource()->GetGPUVirtualAddress();
+    geometryDesc.Triangles.IndexCount = mTriangleMesh.getIndexCount();
+    geometryDesc.Triangles.IndexFormat = mTriangleMesh.getIndexBuffer()->getIndexView().Format;
+    geometryDesc.Triangles.Transform3x4 = 0;
+    geometryDesc.Triangles.VertexFormat = vertexBuffer->getFormat();
+    geometryDesc.Triangles.VertexCount = (uint32_t)vertexBuffer->getElementCount();
+    geometryDesc.Triangles.VertexBuffer.StartAddress = vertexBuffer->getResource()->GetGPUVirtualAddress();
+    geometryDesc.Triangles.VertexBuffer.StrideInBytes = vertexBuffer->getElementByteSize();
+
+    // Mark the geometry as opaque.
+    // PERFORMANCE TIP: mark geometry as opaque whenever applicable as it can enable important ray processing
+    // optimizations. Note: When rays encounter opaque geometry an any hit shader will not be executed whether it is
+    // present or not.
+    geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+
+    // Get required sizes for an acceleration structure.
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags =
+        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs = {};
+    topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+    topLevelInputs.Flags = buildFlags;
+    topLevelInputs.NumDescs = 1;
+    topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
+    device->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
+    if(topLevelPrebuildInfo.ResultDataMaxSizeInBytes == 0) { return false; }
+
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs = topLevelInputs;
+    bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+    bottomLevelInputs.NumDescs = 1;
+    bottomLevelInputs.pGeometryDescs = &geometryDesc;
+
+    device->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
+    if(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes == 0) { return false; }
+
+    d3d12::Buffer::SimpleParams scratchBufferParams;
+    scratchBufferParams.accessFlags = ResourceAccessFlags::None;
+    scratchBufferParams.byteSize =
+        std::max(topLevelPrebuildInfo.ScratchDataSizeInBytes, bottomLevelPrebuildInfo.ScratchDataSizeInBytes);
+    scratchBufferParams.flags = d3d12::BufferFlags::UavEnabled;
+    scratchBufferParams.name = "Scratch Resource";
+
+    d3d12::Buffer scratchBuffer;
+    scratchBuffer.init(scratchBufferParams);
+
+    // Allocate resources for acceleration structures.
+    // Acceleration structures can only be placed in resources that are created in the default heap (or custom heap
+    // equivalent). Default heap is OK since the application doesn’t need CPU read/write access to them. The resources
+    // that will contain acceleration structures must be created in the state
+    // D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, and must have resource flag
+    // D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS. The ALLOW_UNORDERED_ACCESS requirement simply acknowledges both:
+    //  - the system will be doing this type of access in its implementation of acceleration structure builds behind the
+    //  scenes.
+    //  - from the app point of view, synchronization of writes/reads to acceleration structures is accomplished using
+    //  UAV barriers.
+    {
+        d3d12::Buffer::SimpleParams blasParams;
+        blasParams.accessFlags = ResourceAccessFlags::None;
+        blasParams.byteSize = bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes;
+        blasParams.flags = d3d12::BufferFlags::AccelerationStructure;
+        blasParams.initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+        blasParams.name = "BLAS";
+
+        mBlas = std::make_unique<d3d12::Buffer>();
+        mBlas->init(blasParams);
+
+        d3d12::Buffer::SimpleParams tlasParams = blasParams;
+        tlasParams.byteSize = topLevelPrebuildInfo.ResultDataMaxSizeInBytes;
+        tlasParams.name = "TLAS";
+
+        mTlas = std::make_unique<d3d12::Buffer>();
+        mTlas->init(tlasParams);
+    }
+
+    //// Create an instance desc for the bottom-level acceleration structure.
+    D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
+    instanceDesc.Transform[0][0] = instanceDesc.Transform[1][1] = instanceDesc.Transform[2][2] = 1;
+    instanceDesc.InstanceMask = 1;
+    instanceDesc.AccelerationStructure = mBlas->getResource()->GetGPUVirtualAddress();
+
+    d3d12::Buffer::SimpleParams params;
+    params.accessFlags = ResourceAccessFlags::None;
+    params.byteSize = sizeof(instanceDesc);
+    params.name = "BLAS Instance Descs";
+
+    d3d12::Buffer instanceDescs;
+    instanceDescs.init(params, nonstd::as_bytes(nonstd::span(&instanceDesc, 1)));
+
+    //// Bottom Level Acceleration Structure desc
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
+    {
+        bottomLevelBuildDesc.Inputs = bottomLevelInputs;
+        bottomLevelBuildDesc.ScratchAccelerationStructureData = scratchBuffer.getResource()->GetGPUVirtualAddress();
+        bottomLevelBuildDesc.DestAccelerationStructureData = mBlas->getResource()->GetGPUVirtualAddress();
+    }
+
+    //// Top Level Acceleration Structure desc
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
+    {
+        topLevelInputs.InstanceDescs = instanceDescs.getResource()->GetGPUVirtualAddress();
+        topLevelBuildDesc.Inputs = topLevelInputs;
+        topLevelBuildDesc.DestAccelerationStructureData = mTlas->getResource()->GetGPUVirtualAddress();
+        topLevelBuildDesc.ScratchAccelerationStructureData = scratchBuffer.getResource()->GetGPUVirtualAddress();
+    }
+
+    scratchBuffer.markAsUsed(mCommandList.get());
+
+    //// Build acceleration structure.
+    mCommandList.get4()->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+    D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(mBlas->getResource());
+    commandList->ResourceBarrier(1, &barrier);
+    mCommandList.get4()->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
+
+    instanceDescs.markAsUsed(commandList);
+    mBlas->markAsUsed(commandList);
+    mTlas->markAsUsed(commandList);
+
+    return true;
+}
+
+template<typename T>
+constexpr nonstd::span<const std::byte> AsBytes(const T& value)
+{
+    return nonstd::span<const std::byte>(reinterpret_cast<const std::byte*>(&value), sizeof(T));
+}
+
+bool RaytracingScene::buildShaderTables()
+{
+    auto device = d3d12::DeviceContext::instance().getDevice5();
+
+    static constexpr uint32_t kShaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    static constexpr std::array<std::byte, kShaderIdentifierSize> kEmptyShaderIdentifierArray = {};
+    using ShaderIdentifier = nonstd::span<const std::byte, kShaderIdentifierSize>;
+    static constexpr ShaderIdentifier kEmptyShaderIdentifier(kEmptyShaderIdentifierArray);
+    ShaderIdentifier rayGenShaderIdentifier = kEmptyShaderIdentifier;
+    ShaderIdentifier missShaderIdentifier = kEmptyShaderIdentifier;
+    ShaderIdentifier hitGroupShaderIdentifier = kEmptyShaderIdentifier;
+
+    // Get shader identifiers.
+    {
+        ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
+        if(FAILED(mRaytracingStateObject.As(&stateObjectProperties))) { return false; }
+
+        auto GetShaderIdentifier = [](ID3D12StateObjectProperties* stateObjectProperties,
+                                      std::wstring_view shaderName) {
+            return ShaderIdentifier(
+                reinterpret_cast<std::byte*>(stateObjectProperties->GetShaderIdentifier(shaderName.data())),
+                D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+        };
+
+        rayGenShaderIdentifier = GetShaderIdentifier(stateObjectProperties.Get(), kRaygenShaderName);
+        missShaderIdentifier = GetShaderIdentifier(stateObjectProperties.Get(), kMissShaderName);
+        hitGroupShaderIdentifier = GetShaderIdentifier(stateObjectProperties.Get(), kHitGroupName);
+    }
+
+    //// Ray gen shader table
+    struct ShaderRecord
+    {
+        ShaderIdentifier shaderIdentifier;
+        nonstd::span<const std::byte> localRootArguments;
+    };
+
+    auto MakeShaderTable = [](ID3D12GraphicsCommandList* commandList, nonstd::span<const ShaderRecord> shaderRecords,
+                              uint32_t shaderRecordSize, std::string_view name) {
+        shaderRecordSize = AlignInteger(shaderRecordSize, uint32_t(D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT));
+        d3d12::Buffer::SimpleParams params;
+        params.accessFlags = ResourceAccessFlags::CpuWrite;
+        params.flags = d3d12::BufferFlags::None;
+        params.byteSize = shaderRecordSize * shaderRecords.size();
+        params.initialResourceState = D3D12_RESOURCE_STATE_COMMON;
+        params.name = name;
+
+        auto gpuBuffer = std::make_unique<d3d12::Buffer>();
+        gpuBuffer->init(params);
+
+        {
+            d3d12::GpuBufferWriteGuard writeGuard(*gpuBuffer.get(), commandList);
+            nonstd::span<std::byte> writeBuffer = writeGuard.getWriteBuffer();
+            auto itr = writeBuffer.begin();
+
+            for(const ShaderRecord& shaderRecord : shaderRecords)
+            {
+                itr = std::copy(shaderRecord.shaderIdentifier.begin(), shaderRecord.shaderIdentifier.end(), itr);
+                itr = std::copy(shaderRecord.localRootArguments.begin(), shaderRecord.localRootArguments.end(), itr);
+            }
+        }
+
+        auto resourceBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+            gpuBuffer->getResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
+        commandList->ResourceBarrier(1, &resourceBarrier);
+        return gpuBuffer;
+    };
+
+    {
+        struct RootArguments
+        {
+            RayGenConstantBuffer cb;
+        } rootArguments;
+        rootArguments.cb = mRayGenCpuConstantBuffer;
+
+        const std::array<ShaderRecord, 1> shaderRecords = {
+            ShaderRecord{rayGenShaderIdentifier, AsBytes(rootArguments)}};
+
+        const UINT shaderRecordSize = kShaderIdentifierSize + sizeof(rootArguments);
+        mRayGenShaderTable =
+            MakeShaderTable(mCommandList.get(), shaderRecords, shaderRecordSize, "RayGen Shader Table");
+    }
+
+    // Miss shader table
+    {
+        std::array<ShaderRecord, 1> shaderRecords = {ShaderRecord{missShaderIdentifier}};
+
+        const UINT shaderRecordSize = kShaderIdentifierSize;
+        mMissShaderTable = MakeShaderTable(mCommandList.get(), shaderRecords, shaderRecordSize, "Miss Shader Table");
+    }
+
+    // Hit group shader table
+    {
+        std::array<ShaderRecord, 1> shaderRecords = {ShaderRecord{hitGroupShaderIdentifier}};
+        const UINT shaderRecordSize = kShaderIdentifierSize;
+        mHitGroupShaderTable =
+            MakeShaderTable(mCommandList.get(), shaderRecords, shaderRecordSize, "Hit Group Shader Table");
+    }
+
+    return true;
+}
 
 //=====================================
 // RenderScene

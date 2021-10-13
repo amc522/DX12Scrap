@@ -10,6 +10,12 @@ using namespace Microsoft::WRL;
 
 namespace scrap::d3d12
 {
+
+CopyContext::CopyContext()
+    : BaseCommandContext<CopyFrameCode>("Copy")
+{
+}
+
 HRESULT CopyContext::init()
 {
     DeviceContext& deviceContext = DeviceContext::instance();
@@ -26,49 +32,36 @@ HRESULT CopyContext::init()
         return hr;
     }
 
-    for(ComPtr<ID3D12CommandAllocator>& commandAllocator : mCommandAllocators)
-    {
-        hr = deviceContext.getDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY,
-                                                               IID_PPV_ARGS(&commandAllocator));
-        if(FAILED(hr)) { spdlog::error("Failed to create copy command allocators"); }
-    }
+    mCommandQueue->SetName(L"Copy Command Queue");
 
-    hr = deviceContext.getDevice()->CreateCommandList(
-        0, D3D12_COMMAND_LIST_TYPE_COPY, mCommandAllocators[mFrameIndex].Get(), nullptr, IID_PPV_ARGS(&mCommandList));
-
-    if(FAILED(hr))
-    {
-        spdlog::error("Failed to create copy command list");
-        return hr;
-    }
-
-    hr = mCommandList->Close();
-    if(FAILED(hr))
-    {
-        spdlog::error("Failed to close copy command list");
-        return hr;
-    }
+    mCommandList = std::make_unique<GraphicsCommandList>(D3D12_COMMAND_LIST_TYPE_COPY, "Copy Command List");
 
     return S_OK;
+}
+
+void CopyContext::releaseResources()
+{
+    mCommandList = nullptr;
 }
 
 void CopyContext::beginFrame()
 {
     BaseCommandContext<CopyFrameCode>::beginFrame();
-
-    ID3D12CommandAllocator* currentCommandAllocator = mCommandAllocators[mFrameIndex].Get();
-    currentCommandAllocator->Reset();
-    mCommandList->Reset(currentCommandAllocator, nullptr);
+    
+    mCommandList->beginRecording();
 }
 
 void CopyContext::endFrame()
 {
-    mCommandList->Close();
-
-    const std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.Get()};
-    mCommandQueue->ExecuteCommandLists(static_cast<UINT>(commandLists.size()), commandLists.data());
+    mCommandList->execute(mCommandQueue.Get());
 
     BaseCommandContext<CopyFrameCode>::endFrame();
+}
+
+void CopyContext::execute()
+{
+    mCommandList->execute(mCommandQueue.Get());
+    mCommandList->beginRecording();
 }
 
 } // namespace scrap::d3d12

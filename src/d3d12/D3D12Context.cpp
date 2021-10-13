@@ -220,6 +220,11 @@ DeviceContext::~DeviceContext()
     }
     mFutures.clear();
 
+    if(mCopyContext != nullptr)
+    {
+        mCopyContext->releaseResources();
+    }
+
     assert(sInstance != nullptr);
     sInstance = nullptr;
 }

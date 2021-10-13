@@ -1,6 +1,7 @@
 #pragma once
 
 #include "d3d12/D3D12BaseCommandContext.h"
+#include "d3d12/D3D12CommandList.h"
 #include "d3d12/D3D12Config.h"
 #include "d3d12/D3D12FrameCodes.h"
 
@@ -22,7 +23,7 @@ class DeviceContext;
 class CopyContext : public BaseCommandContext<CopyFrameCode>
 {
 public:
-    CopyContext(): BaseCommandContext<CopyFrameCode>("Copy") {}
+    CopyContext();
 
     CopyContext(const CopyContext&) = delete;
     CopyContext(CopyContext&&) = default;
@@ -32,14 +33,16 @@ public:
     CopyContext& operator=(CopyContext&& other) = delete;
 
     HRESULT init();
+    void releaseResources();
 
-    ID3D12GraphicsCommandList* getCommandList() const { return mCommandList.Get(); }
+    ID3D12GraphicsCommandList* getCommandList() const { return mCommandList->get(); }
 
     void beginFrame() final;
     void endFrame() final;
 
+    void execute();
+
 private:
-    std::array<Microsoft::WRL::ComPtr<ID3D12CommandAllocator>, kFrameBufferCount> mCommandAllocators;
-    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> mCommandList;
+    std::unique_ptr<GraphicsCommandList> mCommandList;
 };
 } // namespace scrap::d3d12

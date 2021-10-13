@@ -36,6 +36,9 @@ Application::Application()
 
     if(!mRenderScene->isInitialized()) { spdlog::critical("Failed to initialize RenderScene."); return; }
 
+    mD3D12Context->getCopyContext().endFrame();
+    mD3D12Context->getCopyContext().beginFrame();
+
     spdlog::info("Application initialized");
     mRunning = true;
 }

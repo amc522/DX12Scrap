@@ -9,80 +9,114 @@ using namespace Microsoft::WRL;
 namespace scrap::d3d12
 {
 GraphicsCommandList::GraphicsCommandList(D3D12_COMMAND_LIST_TYPE type, std::string_view debugName)
+    : mCommandListType(type)
 {
-    std::wstring wideName;
     int wideStrSize = MultiByteToWideChar(CP_UTF8, 0u, debugName.data(), (int)debugName.size(), nullptr, 0);
-    wideName.resize(wideStrSize);
-    MultiByteToWideChar(CP_UTF8, 0u, debugName.data(), (int)debugName.size(), wideName.data(), (int)wideName.size());
+    mDebugNameBase.resize(wideStrSize);
+    MultiByteToWideChar(CP_UTF8, 0u, debugName.data(), (int)debugName.size(), mDebugNameBase.data(),
+                        (int)mDebugNameBase.size());
 
     DeviceContext& deviceContext = DeviceContext::instance();
     ID3D12Device* device = deviceContext.getDevice();
 
-    for(size_t frameIndex = 0; frameIndex < d3d12::kFrameBufferCount; ++frameIndex)
+    for(uint32_t frameIndex = 0; frameIndex < d3d12::kFrameBufferCount; ++frameIndex)
     {
-        ComPtr<ID3D12CommandAllocator> commandAllocator;
-        // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandallocator
-        if(FAILED(device->CreateCommandAllocator(type, IID_PPV_ARGS(&commandAllocator))))
-        {
-            spdlog::critical("Failed to create d3d12 command allocator");
-            return;
-        }
-
-        commandAllocator->SetName(wideName.c_str());
-        mCommandAllocators[frameIndex] = TrackedGpuObject(std::move(commandAllocator));
+        appendNewAllocator(frameIndex);
     }
 
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandlist
-    HRESULT hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                           mCommandAllocators[deviceContext.getFrameIndex()].get(), nullptr,
-                                           IID_PPV_ARGS(&mCommandList));
+    mFrameIndex = deviceContext.getFrameIndex();
+    HRESULT hr = device->CreateCommandList(0, type, mCommandAllocators[mFrameIndex].front().get(),
+                                           nullptr, IID_PPV_ARGS(&mCommandList));
 
     if(FAILED(hr))
     {
         spdlog::critical("Failed to create d3d12 command list");
         return;
     }
+    
+    mCommandAllocators[mFrameIndex].front().markAsUsed(mCommandList.Get());
 
-    mCommandList->SetName(wideName.c_str());
+    mCommandList->SetName(mDebugNameBase.c_str());
+
+    hr = mCommandList->QueryInterface(IID_PPV_ARGS(&mCommandList4));
+
+    mCommandList->Close();
 }
 
-HRESULT GraphicsCommandList::reset()
+HRESULT GraphicsCommandList::beginRecording()
 {
-    mFrameIndex = (mFrameIndex + 1) % kFrameBufferCount;
+    auto& currentCommandAllocatorArray = mCommandAllocators[mFrameIndex];
 
-    auto& currentCommandAllocator = mCommandAllocators[mFrameIndex];
-
-    if(currentCommandAllocator.isInUse(mCommandList.Get()))
+    TrackedGpuObject<ID3D12CommandAllocator>* currentCommandAllocator = nullptr;
+    for(TrackedGpuObject<ID3D12CommandAllocator>& commandAllocator : currentCommandAllocatorArray)
     {
-        assert(false);
-        return E_NOT_VALID_STATE;
+        if(commandAllocator.isInUse(mCommandList.Get())) { continue; }
+
+        currentCommandAllocator = &commandAllocator;
+    }
+
+    if(currentCommandAllocator == nullptr)
+    {
+        appendNewAllocator(mFrameIndex);
+        currentCommandAllocator = &currentCommandAllocatorArray.back();
     }
 
     // Command list allocators can only be reset when the associated
     // command lists have finished execution on the GPU; apps should use
     // fences to determine GPU execution progress.
-    HRESULT hr = currentCommandAllocator->Reset();
-    if(FAILED(hr))
-    {
-        return hr;
-    }
+    HRESULT hr = (*currentCommandAllocator)->Reset();
+    if(FAILED(hr)) { return hr; }
 
-    currentCommandAllocator.markAsUsed(mCommandList.Get());
+    currentCommandAllocator->markAsUsed(mCommandList.Get());
 
     // However, when ExecuteCommandList() is called on a particular command
     // list, that command list can then be reset at any time and must be before
     // re-recording.
-    hr = mCommandList->Reset(currentCommandAllocator.get(), nullptr);
-    if(FAILED(hr))
-    {
-        return hr;
-    }
+    hr = mCommandList->Reset(currentCommandAllocator->get(), nullptr);
+    if(FAILED(hr)) { return hr; }
 
     return S_OK;
 }
 
-HRESULT GraphicsCommandList::close()
+HRESULT GraphicsCommandList::execute(ID3D12CommandQueue* commandQueue)
 {
-    return mCommandList->Close();
+    HRESULT hr = mCommandList->Close();
+    if(FAILED(hr)) { return hr; }
+
+    std::array<ID3D12CommandList*, 1> commandLists = {mCommandList.Get()};
+    commandQueue->ExecuteCommandLists((UINT)commandLists.size(), commandLists.data());
+
+    return S_OK;
+}
+
+void GraphicsCommandList::endFrame()
+{
+    mFrameIndex = (mFrameIndex + 1) % kFrameBufferCount;
+}
+
+HRESULT GraphicsCommandList::appendNewAllocator(uint32_t frameIndex)
+{
+    DeviceContext& deviceContext = DeviceContext::instance();
+    ID3D12Device* device = deviceContext.getDevice();
+
+    ComPtr<ID3D12CommandAllocator> commandAllocator;
+    HRESULT hr = device->CreateCommandAllocator(mCommandListType, IID_PPV_ARGS(&commandAllocator));
+
+    // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createcommandallocator
+    if(FAILED(hr))
+    {
+        spdlog::critical("Failed to create d3d12 command allocator");
+        return hr;
+    }
+
+    mDebugNameBuffer.clear();
+    fmt::format_to(std::back_inserter(mDebugNameBuffer), L"{} allocator {}[{}]", mDebugNameBase, frameIndex,
+                   mCommandAllocators[frameIndex].size());
+    commandAllocator->SetName(mDebugNameBuffer.c_str());
+
+    mCommandAllocators[frameIndex].emplace_back(std::move(commandAllocator));
+
+    return S_OK;
 }
 } // namespace scrap::d3d12

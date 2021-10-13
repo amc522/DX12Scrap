@@ -10,6 +10,7 @@
 enum D3D12_COMMAND_LIST_TYPE;
 struct ID3D12CommandAllocator;
 struct ID3D12GraphicsCommandList;
+struct ID3D12GraphicsCommandList4;
 struct ID3D12CommandQueue;
 
 namespace scrap::d3d12
@@ -26,15 +27,22 @@ public:
     GraphicsCommandList& operator=(GraphicsCommandList&&) = default;
 
     ID3D12GraphicsCommandList* get() const { return mCommandList.Get(); }
+    ID3D12GraphicsCommandList4* get4() const { return mCommandList4.Get(); }
 
-    HRESULT reset();
-    HRESULT close();
+    HRESULT beginRecording();
+    HRESULT execute(ID3D12CommandQueue* commandQueue);
 
-    void markAsUsed(ID3D12CommandQueue* commandQueue) { mCommandAllocators[mFrameIndex].markAsUsed(commandQueue); }
+    void endFrame();
 
 private:
+    HRESULT appendNewAllocator(uint32_t frameIndex);
+
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> mCommandList;
-    std::array<TrackedGpuObject<ID3D12CommandAllocator>, kFrameBufferCount> mCommandAllocators;
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> mCommandList4;
+    std::array<std::vector<TrackedGpuObject<ID3D12CommandAllocator>>, kFrameBufferCount> mCommandAllocators;
+    D3D12_COMMAND_LIST_TYPE mCommandListType;
     uint32_t mFrameIndex = 0;
+    std::wstring mDebugNameBase;
+    std::wstring mDebugNameBuffer;
 };
 } // namespace scrap::d3d12
