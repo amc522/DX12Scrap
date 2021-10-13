@@ -9,6 +9,7 @@
 #include "d3d12/D3D12Debug.h"
 #include "d3d12/D3D12GraphicsPipelineState.h"
 #include "d3d12/D3D12GraphicsShader.h"
+#include "d3d12/D3D12RaytracingShader.h"
 #include "d3d12/D3D12Strings.h"
 #include "d3d12/D3D12Texture.h"
 #include "d3d12/D3D12Translations.h"
@@ -1252,13 +1253,13 @@ RenderScene::RenderScene()
 
     mRasterScene = std::make_unique<RasterScene>();
 
-    if(deviceContext.isRaytracingSupported()) { mRaytraceScene = std::make_unique<RaytraceScene>(); }
+    if(deviceContext.isRaytracingSupported()) { mRaytraceScene = std::make_unique<RaytracingScene>(); }
 }
 
 void RenderScene::preRender(const FrameInfo& frameInfo)
 {
     if(mActiveScene == Scene::Raster) { mRasterScene->preRender(frameInfo); }
-    else if(mRaytraceScene != nullptr && mActiveScene == Scene::Raytrace)
+    else if(mRaytraceScene != nullptr && mActiveScene == Scene::Raytracing)
     {
         mRaytraceScene->preRender(frameInfo);
     }
@@ -1267,7 +1268,7 @@ void RenderScene::preRender(const FrameInfo& frameInfo)
 void RenderScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context)
 {
     if(mActiveScene == Scene::Raster) { mRasterScene->render(frameInfo, d3d12Context); }
-    else if(mRaytraceScene != nullptr && mActiveScene == Scene::Raytrace)
+    else if(mRaytraceScene != nullptr && mActiveScene == Scene::Raytracing)
     {
         mRaytraceScene->render(frameInfo, d3d12Context);
     }
@@ -1276,7 +1277,7 @@ void RenderScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12
 void RenderScene::endFrame()
 {
     if(mActiveScene == Scene::Raster) { mRasterScene->endFrame(); }
-    else if(mRaytraceScene != nullptr && mActiveScene == Scene::Raytrace)
+    else if(mRaytraceScene != nullptr && mActiveScene == Scene::Raytracing)
     {
         mRaytraceScene->endFrame();
     }

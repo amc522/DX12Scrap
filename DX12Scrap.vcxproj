@@ -31,6 +31,7 @@
     <ClCompile Include="src\d3d12\D3D12GraphicsContext.cpp" />
     <ClCompile Include="src\d3d12\D3D12MonotonicDescriptorHeap.cpp" />
     <ClCompile Include="src\d3d12\D3D12GraphicsPipelineState.cpp" />
+    <ClCompile Include="src\d3d12\D3D12RaytracingShader.cpp" />
     <ClCompile Include="src\d3d12\D3D12Texture.cpp" />
     <ClCompile Include="src\d3d12\D3D12GraphicsShader.cpp" />
     <ClCompile Include="src\d3d12\D3D12TrackedGpuObject.cpp" />
@@ -60,6 +61,7 @@
     <ClInclude Include="src\d3d12\D3D12GraphicsContext.h" />
     <ClInclude Include="src\d3d12\D3D12MonotonicDescriptorHeap.h" />
     <ClInclude Include="src\d3d12\D3D12GraphicsPipelineState.h" />
+    <ClInclude Include="src\d3d12\D3D12RaytracingShader.h" />
     <ClInclude Include="src\d3d12\D3D12Strings.h" />
     <ClInclude Include="src\d3d12\D3D12Texture.h" />
     <ClInclude Include="src\d3d12\D3D12FrameCodes.h" />

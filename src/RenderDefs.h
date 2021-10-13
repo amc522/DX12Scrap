@@ -92,6 +92,66 @@ constexpr GraphicsShaderStageMask GraphicsShaderStageToMask(GraphicsShaderStage 
     }
 }
 
+enum class RaytracingShaderStage
+{
+    RayGen,
+    Intersection,
+    AnyHit,
+    ClosestHit,
+    Miss,
+    Count,
+    First = RayGen,
+    Last = Miss,
+    None,
+};
+
+constexpr std::string_view ToStringView(RaytracingShaderStage stage)
+{
+    switch(stage)
+    {
+    case scrap::RaytracingShaderStage::RayGen:
+        return "RayGen";
+    case scrap::RaytracingShaderStage::Intersection:
+        return "Intersection";
+    case scrap::RaytracingShaderStage::AnyHit:
+        return "AnyHit";
+    case scrap::RaytracingShaderStage::ClosestHit:
+        return "ClosestHit";
+    case scrap::RaytracingShaderStage::Miss:
+        return "Miss";
+    case scrap::RaytracingShaderStage::None:
+        return "None";
+    default:
+        return "Unknown RaytracingShaderStage";
+    }
+}
+
+enum class RaytracingShaderStageMask
+{
+    None = 0,
+    RayGen = 1 << 0,
+    Intersection = 1 << 1,
+    AnyHit = 1 << 2,
+    ClosestHit = 1 << 3,
+    Miss = 1 << 4,
+    RgChMs = RayGen | ClosestHit | Miss,
+    RgIsAhChMs = RayGen | Intersection | AnyHit | ClosestHit | Miss,
+};
+DEFINE_ENUM_BITWISE_OPERATORS(RaytracingShaderStageMask);
+
+constexpr RaytracingShaderStageMask RaytracingShaderStageToMask(RaytracingShaderStage stage)
+{
+    switch(stage)
+    {
+    case scrap::RaytracingShaderStage::RayGen: return RaytracingShaderStageMask::RayGen;
+    case scrap::RaytracingShaderStage::Intersection: return RaytracingShaderStageMask::Intersection;
+    case scrap::RaytracingShaderStage::AnyHit: return RaytracingShaderStageMask::AnyHit;
+    case scrap::RaytracingShaderStage::ClosestHit: return RaytracingShaderStageMask::ClosestHit;
+    case scrap::RaytracingShaderStage::Miss: return RaytracingShaderStageMask::Miss;
+    default: return RaytracingShaderStageMask::None;
+    }
+}
+
 enum class ResourceAccessFlags
 {
     None = 0,
