@@ -228,6 +228,8 @@ public:
         other.mCommandList = nullptr;
 
         mWriteBuffer = std::move(other.mWriteBuffer);
+
+        return *this;
     }
 
     nonstd::span<std::byte> getWriteBuffer() { return mWriteBuffer; }

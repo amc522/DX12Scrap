@@ -27,10 +27,12 @@ struct FrameInfo;
 
 namespace d3d12
 {
+class BLAccelerationStructure;
 class Buffer;
 class DeviceContext;
 class GraphicsPipelineState;
 class Texture;
+class TLAccelerationStructure;
 } // namespace d3d12
 
 struct Viewport
@@ -153,8 +155,8 @@ private:
     std::unique_ptr<d3d12::Texture> mRenderTarget;
     GpuMesh mTriangleMesh;
 
-    std::unique_ptr<d3d12::Buffer> mTlas;
-    std::unique_ptr<d3d12::Buffer> mBlas;
+    std::unique_ptr<d3d12::TLAccelerationStructure> mTlas;
+    std::shared_ptr<d3d12::BLAccelerationStructure> mBlas;
 
     Microsoft::WRL::ComPtr<ID3D12StateObject> mRaytracingStateObject;
 

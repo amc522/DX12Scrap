@@ -4,6 +4,7 @@
 #include "FrameInfo.h"
 #include "PrimitiveMesh.h"
 #include "Window.h"
+#include "d3d12/D3D12BLAccelerationStructure.h"
 #include "d3d12/D3D12Buffer.h"
 #include "d3d12/D3D12Context.h"
 #include "d3d12/D3D12Debug.h"
@@ -11,6 +12,7 @@
 #include "d3d12/D3D12GraphicsShader.h"
 #include "d3d12/D3D12RaytracingShader.h"
 #include "d3d12/D3D12Strings.h"
+#include "d3d12/D3D12TLAccelerationStructure.h"
 #include "d3d12/D3D12Texture.h"
 #include "d3d12/D3D12Translations.h"
 
@@ -671,8 +673,9 @@ void RaytracingScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d
     mCommandList.get()->SetDescriptorHeaps((uint32_t)descriptorHeaps.size(), descriptorHeaps.data());
     mCommandList.get()->SetComputeRootDescriptorTable(d3d12::RaytracingGlobalRootParamSlot::OutputView,
                                                       mRenderTarget->getUavGpu());
-    mCommandList.get()->SetComputeRootShaderResourceView(d3d12::RaytracingGlobalRootParamSlot::AccelerationStructure,
-                                                         mTlas->getResource()->GetGPUVirtualAddress());
+    mCommandList.get()->SetComputeRootShaderResourceView(
+        d3d12::RaytracingGlobalRootParamSlot::AccelerationStructure,
+        mTlas->getAccelerationStructureBuffer().getResource()->GetGPUVirtualAddress());
     DispatchRays(mCommandList.get4(), mRaytracingStateObject.Get(), &dispatchDesc);
 
     D3D12_RESOURCE_BARRIER preCopyBarriers[2];
@@ -1006,132 +1009,46 @@ bool RaytracingScene::buildGeometry()
 
 bool RaytracingScene::buildAccelerationStructures()
 {
-    auto device = d3d12::DeviceContext::instance().getDevice5();
-    auto commandList = mCommandList.get4();
-    auto commandQueue = d3d12::DeviceContext::instance().getGraphicsContext().getCommandQueue();
-
-    std::shared_ptr<d3d12::Buffer> vertexBuffer = mTriangleMesh.getVertexBuffer(ShaderVertexSemantic::Position, 0);
-
-    D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
-    geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-    geometryDesc.Triangles.IndexBuffer = mTriangleMesh.getIndexBuffer()->getResource()->GetGPUVirtualAddress();
-    geometryDesc.Triangles.IndexCount = mTriangleMesh.getIndexCount();
-    geometryDesc.Triangles.IndexFormat = mTriangleMesh.getIndexBuffer()->getIndexView().Format;
-    geometryDesc.Triangles.Transform3x4 = 0;
-    geometryDesc.Triangles.VertexFormat = vertexBuffer->getFormat();
-    geometryDesc.Triangles.VertexCount = (uint32_t)vertexBuffer->getElementCount();
-    geometryDesc.Triangles.VertexBuffer.StartAddress = vertexBuffer->getResource()->GetGPUVirtualAddress();
-    geometryDesc.Triangles.VertexBuffer.StrideInBytes = vertexBuffer->getElementByteSize();
-
-    // Mark the geometry as opaque.
-    // PERFORMANCE TIP: mark geometry as opaque whenever applicable as it can enable important ray processing
-    // optimizations. Note: When rays encounter opaque geometry an any hit shader will not be executed whether it is
-    // present or not.
-    geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-
-    // Get required sizes for an acceleration structure.
-    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags =
-        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs = {};
-    topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-    topLevelInputs.Flags = buildFlags;
-    topLevelInputs.NumDescs = 1;
-    topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
-
-    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
-    device->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
-    if(topLevelPrebuildInfo.ResultDataMaxSizeInBytes == 0) { return false; }
-
-    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs = topLevelInputs;
-    bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-    bottomLevelInputs.NumDescs = 1;
-    bottomLevelInputs.pGeometryDescs = &geometryDesc;
-
-    device->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
-    if(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes == 0) { return false; }
-
-    d3d12::Buffer::SimpleParams scratchBufferParams;
-    scratchBufferParams.accessFlags = ResourceAccessFlags::None;
-    scratchBufferParams.byteSize =
-        std::max(topLevelPrebuildInfo.ScratchDataSizeInBytes, bottomLevelPrebuildInfo.ScratchDataSizeInBytes);
-    scratchBufferParams.flags = d3d12::BufferFlags::UavEnabled;
-    scratchBufferParams.name = "Scratch Resource";
-
-    d3d12::Buffer scratchBuffer;
-    scratchBuffer.init(scratchBufferParams);
-
-    // Allocate resources for acceleration structures.
-    // Acceleration structures can only be placed in resources that are created in the default heap (or custom heap
-    // equivalent). Default heap is OK since the application doesn’t need CPU read/write access to them. The resources
-    // that will contain acceleration structures must be created in the state
-    // D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, and must have resource flag
-    // D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS. The ALLOW_UNORDERED_ACCESS requirement simply acknowledges both:
-    //  - the system will be doing this type of access in its implementation of acceleration structure builds behind the
-    //  scenes.
-    //  - from the app point of view, synchronization of writes/reads to acceleration structures is accomplished using
-    //  UAV barriers.
     {
-        d3d12::Buffer::SimpleParams blasParams;
-        blasParams.accessFlags = ResourceAccessFlags::None;
-        blasParams.byteSize = bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes;
-        blasParams.flags = d3d12::BufferFlags::AccelerationStructure;
-        blasParams.initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+        d3d12::BLAccelerationStructureParams blasParams;
+        blasParams.initialReservedObjects = 1;
+        blasParams.buildOption = d3d12::AccelerationStructureBuildOption::FastTrace;
+        blasParams.flags = d3d12::AccelerationStructureFlags::None;
         blasParams.name = "BLAS";
 
-        mBlas = std::make_unique<d3d12::Buffer>();
-        mBlas->init(blasParams);
+        mBlas = std::make_shared<d3d12::BLAccelerationStructure>(blasParams);
 
-        d3d12::Buffer::SimpleParams tlasParams = blasParams;
-        tlasParams.byteSize = topLevelPrebuildInfo.ResultDataMaxSizeInBytes;
+        d3d12::BLAccelerationStructure::GeometryParams geomParams;
+        geomParams.flags = d3d12::RaytracingGeometryFlags::None;
+        geomParams.indexBuffer = mTriangleMesh.getIndexBuffer();
+        geomParams.vertexBuffer = mTriangleMesh.getVertexBuffer(ShaderVertexSemantic::Position, 0);
+
+        mBlas->addMesh(geomParams);
+        mBlas->build(mCommandList);
+    }
+
+    {
+        d3d12::TLAccelerationStructureParams tlasParams;
+        tlasParams.initialReservedObjects = 1;
+        tlasParams.buildOption = d3d12::AccelerationStructureBuildOption::FastTrace;
+        tlasParams.flags = d3d12::AccelerationStructureFlags::None;
+        tlasParams.instanceDescs.accessFlags = ResourceAccessFlags::None;
+        tlasParams.instanceDescs.bufferFlags = d3d12::BufferFlags::None;
         tlasParams.name = "TLAS";
 
-        mTlas = std::make_unique<d3d12::Buffer>();
-        mTlas->init(tlasParams);
+        mTlas = std::make_unique<d3d12::TLAccelerationStructure>(tlasParams);
+
+        d3d12::TLAccelerationStructure::InstanceParams instanceParams;
+        instanceParams.accelerationStructure = mBlas;
+        instanceParams.flags = 0;
+        instanceParams.instanceContributionToHitGroupIndex = 0;
+        instanceParams.instanceId = 0;
+        instanceParams.instanceMask = 1;
+        instanceParams.transform = glm::identity<glm::mat4x3>();
+
+        mTlas->setInstance(instanceParams, 0);
+        mTlas->build(mCommandList);
     }
-
-    //// Create an instance desc for the bottom-level acceleration structure.
-    D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
-    instanceDesc.Transform[0][0] = instanceDesc.Transform[1][1] = instanceDesc.Transform[2][2] = 1;
-    instanceDesc.InstanceMask = 1;
-    instanceDesc.AccelerationStructure = mBlas->getResource()->GetGPUVirtualAddress();
-
-    d3d12::Buffer::SimpleParams params;
-    params.accessFlags = ResourceAccessFlags::None;
-    params.byteSize = sizeof(instanceDesc);
-    params.name = "BLAS Instance Descs";
-
-    d3d12::Buffer instanceDescs;
-    instanceDescs.init(params, nonstd::as_bytes(nonstd::span(&instanceDesc, 1)));
-
-    //// Bottom Level Acceleration Structure desc
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
-    {
-        bottomLevelBuildDesc.Inputs = bottomLevelInputs;
-        bottomLevelBuildDesc.ScratchAccelerationStructureData = scratchBuffer.getResource()->GetGPUVirtualAddress();
-        bottomLevelBuildDesc.DestAccelerationStructureData = mBlas->getResource()->GetGPUVirtualAddress();
-    }
-
-    //// Top Level Acceleration Structure desc
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
-    {
-        topLevelInputs.InstanceDescs = instanceDescs.getResource()->GetGPUVirtualAddress();
-        topLevelBuildDesc.Inputs = topLevelInputs;
-        topLevelBuildDesc.DestAccelerationStructureData = mTlas->getResource()->GetGPUVirtualAddress();
-        topLevelBuildDesc.ScratchAccelerationStructureData = scratchBuffer.getResource()->GetGPUVirtualAddress();
-    }
-
-    scratchBuffer.markAsUsed(mCommandList.get());
-
-    //// Build acceleration structure.
-    mCommandList.get4()->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-    D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(mBlas->getResource());
-    commandList->ResourceBarrier(1, &barrier);
-    mCommandList.get4()->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
-
-    instanceDescs.markAsUsed(commandList);
-    mBlas->markAsUsed(commandList);
-    mTlas->markAsUsed(commandList);
 
     return true;
 }

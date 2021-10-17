@@ -22,6 +22,8 @@
   <ItemGroup>
     <ClCompile Include="src\Application.cpp" />
     <ClCompile Include="src\Camera.cpp" />
+    <ClCompile Include="src\d3d12\D3D12AccelerationStructureCommon.cpp" />
+    <ClCompile Include="src\d3d12\D3D12BLAccelerationStructure.cpp" />
     <ClCompile Include="src\d3d12\D3D12Buffer.cpp" />
     <ClCompile Include="src\d3d12\D3D12CommandList.cpp" />
     <ClCompile Include="src\d3d12\D3D12Context.cpp" />
@@ -34,6 +36,7 @@
     <ClCompile Include="src\d3d12\D3D12RaytracingShader.cpp" />
     <ClCompile Include="src\d3d12\D3D12Texture.cpp" />
     <ClCompile Include="src\d3d12\D3D12GraphicsShader.cpp" />
+    <ClCompile Include="src\d3d12\D3D12TLAccelerationStructure.cpp" />
     <ClCompile Include="src\d3d12\D3D12TrackedGpuObject.cpp" />
     <ClCompile Include="src\FormattedBuffer.cpp" />
     <ClCompile Include="src\FreeBlockTracker.cpp" />
@@ -50,7 +53,9 @@
     <ClInclude Include="src\AABB.h" />
     <ClInclude Include="src\Application.h" />
     <ClInclude Include="src\Camera.h" />
+    <ClInclude Include="src\d3d12\D3D12AccelerationStructureCommon.h" />
     <ClInclude Include="src\d3d12\D3D12BaseCommandContext.h" />
+    <ClInclude Include="src\d3d12\D3D12BLAccelerationStructure.h" />
     <ClInclude Include="src\d3d12\D3D12Buffer.h" />
     <ClInclude Include="src\d3d12\D3D12CommandList.h" />
     <ClInclude Include="src\d3d12\D3D12CopyContext.h" />
@@ -66,6 +71,7 @@
     <ClInclude Include="src\d3d12\D3D12Texture.h" />
     <ClInclude Include="src\d3d12\D3D12FrameCodes.h" />
     <ClInclude Include="src\d3d12\D3D12GraphicsShader.h" />
+    <ClInclude Include="src\d3d12\D3D12TLAccelerationStructure.h" />
     <ClInclude Include="src\d3d12\D3D12TrackedGpuObject.h" />
     <ClInclude Include="src\d3d12\D3D12Translations.h" />
     <ClInclude Include="src\FormattedBuffer.h" />
