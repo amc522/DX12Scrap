@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <string_view>
 
 #include <fmt/format.h>
@@ -35,4 +36,6 @@ public:
         return fmt::formatter<std::string_view>::format(scrap::ToStringView(value), ctx);
     }
 };
+
+std::wstring Utf8ToWideString(std::string_view utf8String);
 } // namespace scrap

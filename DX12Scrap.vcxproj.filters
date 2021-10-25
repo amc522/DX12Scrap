@@ -97,6 +97,9 @@
     <ClCompile Include="src\d3d12\D3D12AccelerationStructureCommon.cpp">
       <Filter>Source Files\d3d12</Filter>
     </ClCompile>
+    <ClCompile Include="src\StringUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application.h">
@@ -213,6 +216,12 @@
     <ClInclude Include="src\d3d12\D3D12TLAccelerationStructure.h">
       <Filter>Source Files\d3d12</Filter>
     </ClInclude>
+    <ClInclude Include="src\SharedString.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\StringHash.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -222,6 +231,9 @@
       <Filter>misc</Filter>
     </Natvis>
     <Natvis Include="external\span\nonstd_span.natvis">
+      <Filter>misc</Filter>
+    </Natvis>
+    <Natvis Include="dx12scrap.natvis">
       <Filter>misc</Filter>
     </Natvis>
     <Natvis Include="external\EASTL\doc\EASTL.natvis">

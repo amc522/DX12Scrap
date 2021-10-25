@@ -3,6 +3,7 @@
   "name": "dx12scrap",
   "version": "20211022",
   "dependencies": [
+    "cityhash",
     "d3dx12",
     "eastl",
     "fmt",

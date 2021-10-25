@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="scrap::BasicSharedString&lt;*,*&gt;>">
+    <DisplayString>{($T1*)(mData + sizeof(Header))}</DisplayString>
+    <Expand>
+      <Item Name="[size]">mLength</Item>
+      <Item Name="[references]">((Header*)mData)->refCount</Item>
+      <Item Name="[hash]">((Header*)mData)->hash</Item>
+      <ArrayItems>
+        <Size>mLength + 1</Size>
+        <ValuePointer>($T1*)(mData + sizeof(Header))</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+</AutoVisualizer>
