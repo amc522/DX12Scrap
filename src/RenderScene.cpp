@@ -10,6 +10,7 @@
 #include "d3d12/D3D12Debug.h"
 #include "d3d12/D3D12GraphicsPipelineState.h"
 #include "d3d12/D3D12GraphicsShader.h"
+#include "d3d12/D3D12RaytracingPipelineState.h"
 #include "d3d12/D3D12RaytracingShader.h"
 #include "d3d12/D3D12Strings.h"
 #include "d3d12/D3D12TLAccelerationStructure.h"
@@ -567,7 +568,10 @@ void RasterScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12
     mCommandList.execute(d3d12Context.getGraphicsContext().getCommandQueue());
 }
 
-void RasterScene::endFrame() {}
+void RasterScene::endFrame()
+{
+    mCommandList.endFrame();
+}
 
 //=====================================
 // RayTraceScene
@@ -676,7 +680,9 @@ void RaytracingScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d
     mCommandList.get()->SetComputeRootShaderResourceView(
         d3d12::RaytracingGlobalRootParamSlot::AccelerationStructure,
         mTlas->getAccelerationStructureBuffer().getResource()->GetGPUVirtualAddress());
-    DispatchRays(mCommandList.get4(), mRaytracingStateObject.Get(), &dispatchDesc);
+
+    mPipelineState->markAsUsed(mCommandList.get());
+    DispatchRays(mCommandList.get4(), mPipelineState->getPipelineState(), &dispatchDesc);
 
     D3D12_RESOURCE_BARRIER preCopyBarriers[2];
     preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(
@@ -698,7 +704,10 @@ void RaytracingScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d
     mCommandList.execute(d3d12::DeviceContext::instance().getGraphicsContext().getCommandQueue());
 }
 
-void RaytracingScene::endFrame() {}
+void RaytracingScene::endFrame()
+{
+    mCommandList.endFrame();
+}
 
 bool RaytracingScene::createRenderTargets()
 {
@@ -811,143 +820,45 @@ bool RaytracingScene::createRootSignatures()
 
 bool RaytracingScene::createPipelineState()
 {
+    std::array<d3d12::RaytracingFixedStageShaderEntryPoint, 3> fixedStageShaderEntryPoints = {
+        d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::RayGen, SharedString("MyRaygenShader")},
+        d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::ClosestHit,
+                                                    SharedString("MyClosestHitShader")},
+        d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::Miss, SharedString("MyMissShader")}};
+
     d3d12::RaytracingShaderParams shaderParams;
     shaderParams.filepath = "assets/hello_raytracing.hlsl";
-    shaderParams.stages = RaytracingShaderStageMask::RgChMs;
+    shaderParams.fixedStageEntryPoints = fixedStageShaderEntryPoints;
 
 #ifdef _DEBUG
     shaderParams.debug = true;
 #endif
-    d3d12::RaytracingShader shader(std::move(shaderParams));
-    shader.create();
+    mShader = std::make_shared<d3d12::RaytracingShader>(std::move(shaderParams));
 
-    if(shader.status() == d3d12::RaytracingShaderState::Failed)
-    {
-        spdlog::critical("Failed to create raytracing shader.");
-        return false;
-    }
+    std::array localRootSignatures = {mLocalRootSignature};
+    d3d12::RaytracingPipelineStateParams pipelineStateParams;
+    pipelineStateParams.globalRootSignature = mGlobalRootSignature;
+    pipelineStateParams.localRootSignatures = localRootSignatures;
+    pipelineStateParams.shaders = nonstd::span(&mShader, 1);
 
-    // Create 7 subobjects that combine into a RTPSO:
-    // Subobjects need to be associated with DXIL exports (i.e. shaders) either by way of default or explicit
-    // associations. Default association applies to every exported shader entrypoint that doesn't have any of the
-    // same type of subobject associated with it. This simple sample utilizes default shader association except for
-    // local root signature subobject which has an explicit association specified purely for demonstration purposes.
-    //   1 - DXIL library
-    //   1 - Triangle hit group
-    //   1 - Shader config
-    //   2 - Local root signature and association
-    //   1 - Global root signature
-    //   1 - Pipeline config
+    pipelineStateParams.fixedStages.raygen.shaderIndex = 0;
+    pipelineStateParams.fixedStages.raygen.shaderEntryPointIndex = 0;
+    pipelineStateParams.fixedStages.raygen.localRootSignatureIndex = 0;
+   
+    pipelineStateParams.fixedStages.closestHit.shaderIndex = 0;
+    pipelineStateParams.fixedStages.closestHit.shaderEntryPointIndex = 1;
+   
+    pipelineStateParams.fixedStages.miss.shaderIndex = 0;
+    pipelineStateParams.fixedStages.miss.shaderEntryPointIndex = 2;
 
-    std::array<D3D12_STATE_SUBOBJECT, 7> subObjects = {};
+    pipelineStateParams.hitGroupName = "MyHitGroup";
+    pipelineStateParams.primitiveType = d3d12::RaytracingPipelineStatePrimitiveType::Triangles;
+    pipelineStateParams.maxAttributeByteSize = 2 * sizeof(float); // float2 barycentrics
+    pipelineStateParams.maxPayloadByteSize = 4 * sizeof(float);   // float4 color
+    pipelineStateParams.maxRecursionDepth = 1;
 
-    // DXIL library
-    // This contains the shaders and their entrypoints for the state object.
-    // Since shaders are not considered a subobject, they need to be passed in via DXIL library subobjects.
-    std::array<D3D12_EXPORT_DESC, 3> exports = {};
-    exports[0].Name = kRaygenShaderName.data();
-    exports[1].Name = kClosestHitShaderName.data();
-    exports[2].Name = kMissShaderName.data();
-
-    D3D12_DXIL_LIBRARY_DESC libDesc = {};
-    libDesc.DXILLibrary = shader.getShaderByteCode();
-    libDesc.NumExports = (uint32_t)exports.size();
-    libDesc.pExports = exports.data();
-
-    {
-        D3D12_STATE_SUBOBJECT& subOject = subObjects[0];
-        subOject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
-        subOject.pDesc = &libDesc;
-    }
-
-    // Triangle hit group
-    // A hit group specifies closest hit, any hit and intersection shaders to be executed when a ray intersects the
-    // geometry's triangle/AABB. In this sample, we only use triangle geometry with a closest hit shader, so others are
-    // not set.
-
-    D3D12_HIT_GROUP_DESC hitGroupDesc = {};
-    hitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
-    hitGroupDesc.ClosestHitShaderImport = kClosestHitShaderName.data();
-    hitGroupDesc.HitGroupExport = kHitGroupName.data();
-
-    {
-        D3D12_STATE_SUBOBJECT& subObject = subObjects[1];
-        subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
-        subObject.pDesc = &hitGroupDesc;
-    }
-
-    // Shader config
-    // Defines the maximum sizes in bytes for the ray payload and attribute structure.
-    D3D12_RAYTRACING_SHADER_CONFIG shaderConfig = {};
-    shaderConfig.MaxPayloadSizeInBytes = 4 * sizeof(float);   // float4 color
-    shaderConfig.MaxAttributeSizeInBytes = 2 * sizeof(float); // float2 barycentrics
-
-    {
-        D3D12_STATE_SUBOBJECT& subObject = subObjects[2];
-        subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
-        subObject.pDesc = &shaderConfig;
-    }
-
-    D3D12_STATE_OBJECT_DESC raytracingPipeline = {};
-    raytracingPipeline.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
-    raytracingPipeline.NumSubobjects = (uint32_t)subObjects.size();
-    raytracingPipeline.pSubobjects = subObjects.data();
-
-    // Local root signature to be used in a ray gen shader.
-    // This is a root signature that enables a shader to have unique arguments that come from shader tables.
-    D3D12_LOCAL_ROOT_SIGNATURE localRootSignature = {};
-    localRootSignature.pLocalRootSignature = mLocalRootSignature.Get();
-
-    {
-        D3D12_STATE_SUBOBJECT& subObject = subObjects[3];
-        subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
-        subObject.pDesc = &localRootSignature;
-    }
-
-    std::array<const wchar_t*, 1> localRootSigExports = {kRaygenShaderName.data()};
-    D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION exportsAssociation;
-    exportsAssociation.pSubobjectToAssociate = &subObjects[3];
-    exportsAssociation.NumExports = 1;
-    exportsAssociation.pExports = localRootSigExports.data();
-
-    {
-        D3D12_STATE_SUBOBJECT& subObject = subObjects[4];
-        subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
-        subObject.pDesc = &exportsAssociation;
-    }
-
-    // Global root signature
-    // This is a root signature that is shared across all raytracing shaders invoked during a DispatchRays() call.
-    D3D12_GLOBAL_ROOT_SIGNATURE globalRootSignature = {};
-    globalRootSignature.pGlobalRootSignature = mGlobalRootSignature.Get();
-
-    {
-        D3D12_STATE_SUBOBJECT& subObject = subObjects[5];
-        subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
-        subObject.pDesc = &globalRootSignature;
-    }
-
-    // Pipeline config
-    // Defines the maximum TraceRay() recursion depth.
-    D3D12_RAYTRACING_PIPELINE_CONFIG1 raytracingPipelineConfig = {};
-    // PERFOMANCE TIP: Set max recursion depth as low as needed
-    // as drivers may apply optimization strategies for low recursion depths.
-    raytracingPipelineConfig.MaxTraceRecursionDepth = 1;
-    raytracingPipelineConfig.Flags = D3D12_RAYTRACING_PIPELINE_FLAG_NONE;
-
-    {
-        D3D12_STATE_SUBOBJECT& subObject = subObjects[6];
-        subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG1;
-        subObject.pDesc = &raytracingPipelineConfig;
-    }
-
-    HRESULT hr = d3d12::DeviceContext::instance().getDevice5()->CreateStateObject(
-        &raytracingPipeline, IID_PPV_ARGS(&mRaytracingStateObject));
-    if(FAILED(hr))
-    {
-        spdlog::critical("Failed to create raytracing pipeline state. {}", HRESULT_t(hr));
-        return false;
-    }
+    mPipelineState = std::make_shared<d3d12::RaytracingPipelineState>(std::move(pipelineStateParams));
+    mPipelineState->create();
 
     return true;
 }
@@ -1074,7 +985,7 @@ bool RaytracingScene::buildShaderTables()
     // Get shader identifiers.
     {
         ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
-        if(FAILED(mRaytracingStateObject.As(&stateObjectProperties))) { return false; }
+        if(FAILED(mPipelineState->getPipelineState()->QueryInterface(IID_PPV_ARGS(&stateObjectProperties)))) { return false; }
 
         auto GetShaderIdentifier = [](ID3D12StateObjectProperties* stateObjectProperties,
                                       std::wstring_view shaderName) {

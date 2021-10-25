@@ -97,6 +97,9 @@
     <ClCompile Include="src\d3d12\D3D12AccelerationStructureCommon.cpp">
       <Filter>Source Files\d3d12</Filter>
     </ClCompile>
+    <ClCompile Include="src\d3d12\D3D12RaytracingPipelineState.cpp">
+      <Filter>Source Files\d3d12</Filter>
+    </ClCompile>
     <ClCompile Include="src\StringUtils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -214,6 +217,9 @@
       <Filter>Source Files\d3d12</Filter>
     </ClInclude>
     <ClInclude Include="src\d3d12\D3D12TLAccelerationStructure.h">
+      <Filter>Source Files\d3d12</Filter>
+    </ClInclude>
+    <ClInclude Include="src\d3d12\D3D12RaytracingPipelineState.h">
       <Filter>Source Files\d3d12</Filter>
     </ClInclude>
     <ClInclude Include="src\SharedString.h">

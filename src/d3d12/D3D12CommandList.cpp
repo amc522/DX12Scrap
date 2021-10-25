@@ -35,8 +35,6 @@ GraphicsCommandList::GraphicsCommandList(D3D12_COMMAND_LIST_TYPE type, std::stri
         return;
     }
 
-    mCommandAllocators[mFrameIndex].front().markAsUsed(mCommandList.Get());
-
     mCommandList->SetName(mDebugNameBase.c_str());
 
     hr = mCommandList->QueryInterface(IID_PPV_ARGS(&mCommandList4));

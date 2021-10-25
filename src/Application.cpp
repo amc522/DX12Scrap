@@ -214,6 +214,7 @@ void Application::update()
     mRenderScene->preRender(frameInfo);
     mD3D12Context->beginFrame();
     mRenderScene->render(frameInfo, *mD3D12Context);
+    mRenderScene->endFrame();
     mD3D12Context->endFrame();
 }
 

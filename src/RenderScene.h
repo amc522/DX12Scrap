@@ -31,6 +31,8 @@ class BLAccelerationStructure;
 class Buffer;
 class DeviceContext;
 class GraphicsPipelineState;
+class RaytracingPipelineState;
+class RaytracingShader;
 class Texture;
 class TLAccelerationStructure;
 } // namespace d3d12
@@ -158,7 +160,8 @@ private:
     std::unique_ptr<d3d12::TLAccelerationStructure> mTlas;
     std::shared_ptr<d3d12::BLAccelerationStructure> mBlas;
 
-    Microsoft::WRL::ComPtr<ID3D12StateObject> mRaytracingStateObject;
+    std::shared_ptr<d3d12::RaytracingShader> mShader;
+    std::shared_ptr<d3d12::RaytracingPipelineState> mPipelineState;
 
     std::unique_ptr<d3d12::Buffer> mRayGenShaderTable;
     std::unique_ptr<d3d12::Buffer> mMissShaderTable;

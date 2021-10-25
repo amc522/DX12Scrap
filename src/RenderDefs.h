@@ -42,8 +42,8 @@ enum class GraphicsShaderStage
     Geometry,
     Pixel,
     Count,
-    First = Vertex,
-    Last = Pixel,
+    First = 0,
+    Last = Count - 1,
     None,
 };
 
@@ -64,11 +64,11 @@ constexpr std::string_view ToStringView(GraphicsShaderStage shaderStage)
 enum class GraphicsShaderStageMask
 {
     None = 0,
-    Vertex = 1 << 0,
-    Hull = 1 << 1,
-    Domain = 1 << 2,
-    Geometry = 1 << 3,
-    Pixel = 1 << 4,
+    Vertex = 1 << (size_t)GraphicsShaderStage::Vertex,
+    Hull = 1 << (size_t)GraphicsShaderStage::Hull,
+    Domain = 1 << (size_t)GraphicsShaderStage::Domain,
+    Geometry = 1 << (size_t)GraphicsShaderStage::Geometry,
+    Pixel = 1 << (size_t)GraphicsShaderStage::Pixel,
     VsGs = Vertex | Geometry,
     VsHsDs = Vertex | Hull | Domain,
     VsHsDsGs = Vertex | Hull | Domain | Geometry,
@@ -100,8 +100,8 @@ enum class RaytracingShaderStage
     ClosestHit,
     Miss,
     Count,
-    First = RayGen,
-    Last = Miss,
+    First = 0,
+    Last = Count - 1,
     None,
 };
 
@@ -129,11 +129,11 @@ constexpr std::string_view ToStringView(RaytracingShaderStage stage)
 enum class RaytracingShaderStageMask
 {
     None = 0,
-    RayGen = 1 << 0,
-    Intersection = 1 << 1,
-    AnyHit = 1 << 2,
-    ClosestHit = 1 << 3,
-    Miss = 1 << 4,
+    RayGen = 1 << (uint32_t)RaytracingShaderStage::RayGen,
+    Intersection = 1 << (uint32_t)RaytracingShaderStage::Intersection,
+    AnyHit = 1 << (uint32_t)RaytracingShaderStage::AnyHit,
+    ClosestHit = 1 << (uint32_t)RaytracingShaderStage::ClosestHit,
+    Miss = 1 << (uint32_t)RaytracingShaderStage::Miss,
     RgChMs = RayGen | ClosestHit | Miss,
     RgIsAhChMs = RayGen | Intersection | AnyHit | ClosestHit | Miss,
 };
@@ -151,6 +151,13 @@ constexpr RaytracingShaderStageMask RaytracingShaderStageToMask(RaytracingShader
     default: return RaytracingShaderStageMask::None;
     }
 }
+
+enum class RaytracingShaderType
+{
+    FixedStage,
+    Callable,
+    Unknown,
+};
 
 enum class ResourceAccessFlags
 {

@@ -1,12 +1,13 @@
 #pragma once
 
 #include "RenderDefs.h"
+#include "SharedString.h"
 
-#include <array>
 #include <filesystem>
 #include <mutex>
-#include <optional>
 
+#include <EASTL/fixed_vector.h>
+#include <nonstd/span.hpp>
 #include <wrl/client.h>
 
 struct D3D12_SHADER_BYTECODE;
@@ -15,12 +16,39 @@ using ID3DBlob = ID3D10Blob;
 
 namespace scrap::d3d12
 {
+struct RaytracingFixedStageShaderEntryPoint
+{
+    RaytracingShaderStage stage = RaytracingShaderStage::None;
+    SharedString entryPoint;
+};
+
+struct RaytracingCallableShaderEntryPoint
+{
+    SharedString entryPoint;
+};
+
+namespace detail
+{
+struct RaytracingShaderInfo
+{
+    SharedString entryPoint;
+    WSharedString wideEntryPoint;
+};
+} // namespace detail
+
+struct RaytracingCallableShaderInfo : public detail::RaytracingShaderInfo
+{};
+
+struct RaytracingFixedStageShaderInfo : public detail::RaytracingShaderInfo
+{
+    RaytracingShaderStage stage = RaytracingShaderStage::None;
+};
+
 struct RaytracingShaderParams
 {
-    // std::array<std::filesystem::path, (size_t)RaytracingShaderStage::Count> filepaths;
-    // std::array<std::string, (size_t)RaytracingShaderStage::Count> entryPoints;
     std::filesystem::path filepath;
-    RaytracingShaderStageMask stages = RaytracingShaderStageMask::None;
+    nonstd::span<const RaytracingFixedStageShaderEntryPoint> fixedStageEntryPoints;
+    nonstd::span<const RaytracingCallableShaderEntryPoint> callableEntryPoints;
     bool debug = false;
 };
 
@@ -52,11 +80,18 @@ public:
     bool hasShaderStage(RaytracingShaderStage stage)
     {
         auto stageMask = RaytracingShaderStageToMask(stage);
-        return (stageMask & mParams.stages) == stageMask;
+        return (stageMask & mAvailableStages) == stageMask;
     }
 
-    ID3DBlob* getShader() const { return mShaderBlob.Get(); }
+    ID3DBlob* getShaderResource() const { return mShaderBlob.Get(); }
     D3D12_SHADER_BYTECODE getShaderByteCode() const;
+
+    nonstd::span<const RaytracingFixedStageShaderInfo, (size_t)RaytracingShaderStage::Count>
+    getFixedStageShaders() const
+    {
+        return mFixedStageShaders;
+    }
+    nonstd::span<const RaytracingCallableShaderInfo> getCallableShaders() const { return mCallableShaders; }
 
     /* ShaderInputs& accessShaderInputs() { return mShaderInputs; }
        const ShaderInputs& getShaderInputs() const { return mShaderInputs; }
@@ -66,11 +101,13 @@ public:
        ShaderResourceDimension resourceDimension) const;*/
 
 private:
-    struct ShaderInfo
-    {};
+    std::filesystem::path mFilepath;
+    RaytracingShaderStageMask mAvailableStages = RaytracingShaderStageMask::None;
 
-    RaytracingShaderParams mParams;
-    std::array<ShaderInfo, (size_t)GraphicsShaderStage::Count> mShaders;
+    eastl::fixed_vector<RaytracingFixedStageShaderInfo, (size_t)RaytracingShaderStage::Count> mFixedStageShaders;
+    std::vector<RaytracingCallableShaderInfo> mCallableShaders;
+
+    bool mDebug = false;
     RaytracingShaderState mState = RaytracingShaderState::Invalid;
     std::mutex mCreationMutex;
 
