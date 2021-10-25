@@ -4,11 +4,35 @@
 
 #include <array>
 #include <locale>
+#include <new>
 
 #include <Windows.h>
 #include <spdlog/sinks/msvc_sink.h>
 #include <spdlog/sinks/stdout_sinks.h>
 #include <spdlog/spdlog.h>
+
+// eastl new operators
+void* operator new[](size_t size,
+                     const char* /*pName*/,
+                     int /*flags*/,
+                     unsigned /*debugFlags*/,
+                     const char* /*file*/,
+                     int /*line*/)
+{
+    return malloc(size);
+}
+
+void* operator new[](size_t size,
+                     size_t alignment,
+                     size_t alignmentOffset,
+                     const char* /*pName*/,
+                     int /*flags*/,
+                     unsigned /*debugFlags*/,
+                     const char* /*file*/,
+                     int /*line*/)
+{
+    return _aligned_offset_malloc(size, alignment, alignmentOffset);
+}
 
 int WINAPI wWinMain(_In_ HINSTANCE /*hInstance*/,
                     _In_opt_ HINSTANCE /*hPrevInstance*/,

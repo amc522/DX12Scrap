@@ -224,5 +224,8 @@
     <Natvis Include="external\span\nonstd_span.natvis">
       <Filter>misc</Filter>
     </Natvis>
+    <Natvis Include="external\EASTL\doc\EASTL.natvis">
+      <Filter>misc</Filter>
+    </Natvis>
   </ItemGroup>
 </Project>
