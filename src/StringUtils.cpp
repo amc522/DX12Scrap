@@ -13,4 +13,12 @@ std::wstring Utf8ToWideString(std::string_view utf8String)
     MultiByteToWideChar(CP_UTF8, 0, utf8String.data(), (int)utf8String.size(), wideString.data(), wideStringSize);
     return wideString;
 }
+WSharedString Utf8ToWideSharedString(std::string_view utf8String)
+{
+    int wideStringSize = MultiByteToWideChar(CP_UTF8, 0, utf8String.data(), (int)utf8String.size(), nullptr, 0);
+    WSharedStringInitializer wideString(wideStringSize);
+
+    MultiByteToWideChar(CP_UTF8, 0, utf8String.data(), (int)utf8String.size(), wideString.data(), wideStringSize);
+    return WSharedString(std::move(wideString));
+}
 }

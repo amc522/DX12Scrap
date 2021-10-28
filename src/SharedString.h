@@ -5,20 +5,30 @@
 #include <algorithm>
 #include <atomic>
 #include <iterator>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
 namespace scrap
 {
 template<class CharT, class TraitsT>
+class BasicSharedStringInitializer;
+
+template<class CharT, class TraitsT>
 class BasicSharedString;
 
 namespace detail
 {
+//==============================
+// BasicSharedStringData
+//==============================
 template<class CharT, class TraitsT>
 class BasicSharedStringData
 {
 public:
+    using difference_type = typename std::basic_string<CharT, TraitsT>::difference_type;
+    using pointer = typename std::basic_string<CharT, TraitsT>::pointer;
+    using const_pointer = typename std::basic_string<CharT, TraitsT>::const_pointer;
     using value_type = CharT;
 
     using RefCounterValueType = int;
@@ -195,160 +205,285 @@ protected:
     size_t mLength = 0;
 };
 
-template<class CharT, class TraitsT>
-class BasicSharedStringIterator
+//==============================
+// SharedStringConstIterator
+//==============================
+
+template<class SharedStringT, bool IsConstV = true>
+class SharedStringConstIterator
 {
 public:
-#ifdef _MSC_VER
-    // Tell Microsoft standard library that BasicSharedStringIterator's are checked.
-    using _Unchecked_type = typename CharT*;
-#endif
-
+    using SharedStringType = std::conditional_t<IsConstV, const SharedStringT, SharedStringT>;
     using iterator_category = std::random_access_iterator_tag;
-    using value_type = std::remove_cv_t<CharT>;
-    using difference_type = ptrdiff_t;
-
+    using value_type = typename SharedStringT::value_type;
+    using difference_type = typename SharedStringT::difference_type;
+    using pointer = typename SharedStringT::const_pointer;
     using reference = const value_type&;
-    using pointer = std::add_pointer_t<reference>;
 
-    BasicSharedStringIterator() = default;
+    constexpr SharedStringConstIterator() noexcept = default;
 
-    constexpr BasicSharedStringIterator(const BasicSharedString<CharT, TraitsT>* shared_string, size_t idx) noexcept
-        : mSharedString(shared_string)
-        , mIndex(idx)
+    constexpr SharedStringConstIterator(SharedStringType* sharedString, size_t index) noexcept
+        : mSharedString(sharedString)
+        , mIndex(index)
     {}
 
-    constexpr BasicSharedStringIterator(const BasicSharedStringIterator<CharT, TraitsT>& other) noexcept
-        : BasicSharedStringIterator(other.mSharedString, other.mIndex)
-    {}
+    constexpr SharedStringConstIterator& operator=(const SharedStringConstIterator&) noexcept = default;
 
-    constexpr reference operator*() const
-    {
-        // Expects(mIndex != mSharedString->size());
-        return *(mSharedString->data() + mIndex);
-    }
+    [[nodiscard]] constexpr reference operator*() const noexcept { return mSharedString->operator[](mIndex); }
 
-    constexpr pointer operator->() const
-    {
-        // Expects(mIndex != mSharedString->size());
-        return mSharedString->data() + mIndex;
-    }
+    [[nodiscard]] constexpr pointer operator->() const noexcept { return mSharedString->data() + mIndex; }
 
-    constexpr BasicSharedStringIterator<CharT, TraitsT>& operator++()
+    constexpr SharedStringConstIterator& operator++() noexcept
     {
-        // Expects(0 <= mIndex && mIndex != mSharedString->size());
         ++mIndex;
         return *this;
     }
 
-    constexpr BasicSharedStringIterator<CharT, TraitsT> operator++(int)
+    constexpr SharedStringConstIterator operator++(int) noexcept
     {
-        auto ret = *this;
+        SharedStringConstIterator ret = *this;
         ++(*this);
         return ret;
     }
 
-    constexpr BasicSharedStringIterator<CharT, TraitsT>& operator--()
+    constexpr SharedStringConstIterator& operator--() noexcept
     {
-        // Expects(mIndex != 0 && mIndex <= mSharedString->size());
         --mIndex;
         return *this;
     }
 
-    constexpr BasicSharedStringIterator<CharT, TraitsT> operator--(int)
+    constexpr SharedStringConstIterator operator--(int) noexcept
     {
-        auto ret = *this;
+        SharedStringConstIterator ret = *this;
         --(*this);
         return ret;
     }
 
-    constexpr BasicSharedStringIterator<CharT, TraitsT> operator+(difference_type n) const
+    constexpr SharedStringConstIterator& operator+=(const difference_type offset) noexcept
     {
-        auto ret = *this;
-        return ret += n;
-    }
-
-    constexpr BasicSharedStringIterator<CharT, TraitsT>& operator+=(difference_type n)
-    {
-        // Expects((mIndex + n) >= 0 && (mIndex + n) <= mSharedString->size());
-        mIndex += n;
+        mIndex += offset;
         return *this;
     }
 
-    constexpr BasicSharedStringIterator<CharT, TraitsT> operator-(difference_type n) const
+    [[nodiscard]] constexpr SharedStringConstIterator operator+(const difference_type offset) const noexcept
     {
-        auto ret = *this;
-        return ret -= n;
+        SharedStringConstIterator ret = *this;
+        ret += offset;
+        return ret;
     }
 
-    constexpr BasicSharedStringIterator<CharT, TraitsT>& operator-=(difference_type n) { return *this += -n; }
+    constexpr SharedStringConstIterator& operator-=(const difference_type offset) noexcept { return *this += -offset; }
 
-    constexpr difference_type operator-(BasicSharedStringIterator<CharT, TraitsT> rhs) const
+    [[nodiscard]] constexpr SharedStringConstIterator operator-(const difference_type offset) const noexcept
     {
-        // Expects(mSharedString == rhs.mSharedString);
+        SharedStringConstIterator ret = *this;
+        ret -= offset;
+        return ret;
+    }
+
+    [[nodiscard]] constexpr difference_type operator-(const SharedStringConstIterator& rhs) const noexcept
+    {
         return mIndex - rhs.mIndex;
     }
 
-    constexpr reference operator[](difference_type n) const { return *(*this + n); }
-
-    constexpr friend bool operator==(BasicSharedStringIterator<CharT, TraitsT> lhs,
-                                     BasicSharedStringIterator<CharT, TraitsT> rhs) noexcept
+    [[nodiscard]] constexpr reference operator[](const difference_type offset) const noexcept
     {
-        return lhs.mSharedString == rhs.mSharedString && lhs.mIndex == rhs.mIndex;
+        return *(*this + offset);
     }
 
-    constexpr friend bool operator!=(BasicSharedStringIterator<CharT, TraitsT> lhs,
-                                     BasicSharedStringIterator<CharT, TraitsT> rhs) noexcept
+    [[nodiscard]] constexpr bool operator==(const SharedStringConstIterator& rhs) const noexcept
     {
-        return !(lhs == rhs);
+        return mIndex == rhs.mIndex;
     }
 
-    constexpr friend bool operator<(BasicSharedStringIterator<CharT, TraitsT> lhs,
-                                    BasicSharedStringIterator<CharT, TraitsT> rhs) noexcept
-    {
-        return lhs.mIndex < rhs.mIndex;
-    }
+    [[nodiscard]] bool operator!=(const SharedStringConstIterator& rhs) const noexcept { return !(*this == rhs); }
 
-    constexpr friend bool operator<=(BasicSharedStringIterator<CharT, TraitsT> lhs,
-                                     BasicSharedStringIterator<CharT, TraitsT> rhs) noexcept
-    {
-        return !(rhs < lhs);
-    }
+    [[nodiscard]] bool operator<(const SharedStringConstIterator& rhs) const noexcept { return mIndex < rhs.mIndex; }
 
-    constexpr friend bool operator>(BasicSharedStringIterator<CharT, TraitsT> lhs,
-                                    BasicSharedStringIterator<CharT, TraitsT> rhs) noexcept
-    {
-        return rhs < lhs;
-    }
+    [[nodiscard]] bool operator>(const SharedStringConstIterator& rhs) const noexcept { return rhs < *this; }
 
-    constexpr friend bool operator>=(BasicSharedStringIterator<CharT, TraitsT> lhs,
-                                     BasicSharedStringIterator<CharT, TraitsT> rhs) noexcept
-    {
-        return !(rhs > lhs);
-    }
+    [[nodiscard]] bool operator<=(const SharedStringConstIterator& rhs) const noexcept { return !(rhs < *this); }
 
-private:
-    const BasicSharedString<CharT, TraitsT>* mSharedString = nullptr;
+    [[nodiscard]] bool operator>=(const SharedStringConstIterator& rhs) const noexcept { return !(*this < rhs); }
+
+    SharedStringType* mSharedString = nullptr;
     size_t mIndex = 0;
+};
+
+//==============================
+// SharedStringIterator
+//==============================
+
+template<class SharedStringT>
+class SharedStringIterator : public SharedStringConstIterator<SharedStringT, false>
+{
+public:
+    using Base = SharedStringConstIterator<SharedStringT>;
+
+    using iterator_category = std::random_access_iterator_tag;
+    using value_type = typename SharedStringT::value_type;
+    using difference_type = typename SharedStringT::difference_type;
+    using pointer = typename SharedStringT::pointer;
+    using reference = value_type&;
+
+    using Base::Base;
+
+    constexpr SharedStringIterator& operator=(const SharedStringIterator&) noexcept = default;
+
+    [[nodiscard]] constexpr reference operator*() const noexcept { return const_cast<reference>(Base::operator*()); }
+
+    [[nodiscard]] constexpr pointer operator->() const noexcept { return this->mSharedString->data() + this->mIndex; }
+
+    constexpr SharedStringIterator& operator++() noexcept
+    {
+        Base::operator++();
+        return *this;
+    }
+
+    constexpr SharedStringIterator operator++(int) noexcept
+    {
+        SharedStringIterator ret = *this;
+        Base::operator++();
+        return ret;
+    }
+
+    constexpr SharedStringIterator& operator--() noexcept
+    {
+        Base::operator--();
+        return *this;
+    }
+
+    constexpr SharedStringIterator operator--(int) noexcept
+    {
+        SharedStringIterator ret = *this;
+        Base::operator--();
+        return ret;
+    }
+
+    constexpr SharedStringIterator& operator+=(const difference_type offset) noexcept
+    {
+        Base::operator+=(offset);
+        return *this;
+    }
+
+    [[nodiscard]] constexpr SharedStringIterator operator+(const difference_type offset) const noexcept
+    {
+        SharedStringIterator ret = *this;
+        ret += offset;
+        return ret;
+    }
+
+    constexpr SharedStringIterator& operator-=(const difference_type offset) noexcept
+    {
+        Base::operator-=(offset);
+        return *this;
+    }
+
+    using Base::operator-;
+
+    [[nodiscard]] constexpr SharedStringIterator operator-(const difference_type offset) const noexcept
+    {
+        SharedStringIterator ret = *this;
+        ret -= offset;
+        return ret;
+    }
+
+    [[nodiscard]] constexpr reference operator[](const difference_type offset) const noexcept
+    {
+        return const_cast<reference>(Base::operator[](offset));
+    }
 };
 } // namespace detail
 
-template<class CharT, class TraitsT>
-constexpr detail::BasicSharedStringIterator<CharT, TraitsT>
-operator+(typename detail::BasicSharedStringIterator<CharT, TraitsT>::difference_type n,
-          detail::BasicSharedStringIterator<CharT, TraitsT> rhs)
+template<class SharedStringT, bool IsConstV>
+[[nodiscard]] constexpr detail::SharedStringConstIterator<SharedStringT, IsConstV>
+operator+(typename detail::SharedStringConstIterator<SharedStringT, IsConstV>::difference_type offset,
+          detail::SharedStringConstIterator<SharedStringT, IsConstV> next) noexcept
 {
-    return rhs + n;
+    return next += offset;
 }
 
-template<class CharT, class TraitsT>
-constexpr detail::BasicSharedStringIterator<CharT, TraitsT>
-operator-(typename detail::BasicSharedStringIterator<CharT, TraitsT>::difference_type n,
-          detail::BasicSharedStringIterator<CharT, TraitsT> rhs)
+template<class SharedStringT, bool IsConstV>
+[[nodiscard]] constexpr detail::SharedStringIterator<SharedStringT>
+operator+(typename detail::SharedStringIterator<SharedStringT>::difference_type offset,
+          detail::SharedStringIterator<SharedStringT> next) noexcept
 {
-    return rhs - n;
+    return next += offset;
 }
 
+//==============================
+// BasicSharedStringInitializer
+//==============================
+template<class CharT, class TraitsT = std::char_traits<CharT>>
+class BasicSharedStringInitializer : public detail::BasicSharedStringData<CharT, TraitsT>
+{
+private:
+    using Base = detail::BasicSharedStringData<CharT, TraitsT>;
+
+public:
+    static const size_t npos = size_t(-1);
+
+    using iterator = detail::SharedStringIterator<BasicSharedStringInitializer<CharT, TraitsT>>;
+    using const_iterator = detail::SharedStringConstIterator<BasicSharedStringInitializer<CharT, TraitsT>>;
+    using reverse_iterator = std::reverse_iterator<iterator>;
+    using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+
+    using Base::Base;
+
+    explicit constexpr BasicSharedStringInitializer(size_t length)
+        : detail::BasicSharedStringData<CharT, TraitsT>(length)
+    {}
+
+    BasicSharedStringInitializer(const BasicSharedStringInitializer<CharT, TraitsT>&) = delete;
+    BasicSharedStringInitializer(BasicSharedStringInitializer<CharT, TraitsT>&&) noexcept = default;
+
+    BasicSharedStringInitializer<CharT, TraitsT>&
+    operator=(const BasicSharedStringInitializer<CharT, TraitsT>&) = delete;
+    BasicSharedStringInitializer<CharT, TraitsT>&
+    operator=(BasicSharedStringInitializer<CharT, TraitsT>&&) noexcept = default;
+
+    const CharT at(size_t index) const
+    {
+        if(index >= this->mLength)
+        {
+            throw std::out_of_range("BasicSharedString::at() called with an index that is out of bounds");
+        }
+
+        return this->getStringBuffer()[index];
+    }
+
+    const CharT& operator[](size_t index) noexcept { return this->accessStringBuffer()[index]; }
+    const CharT& operator[](size_t index) const noexcept { return this->getStringBuffer()[index]; }
+
+    CharT* data() noexcept { return this->accessStringBuffer(); }
+    const CharT* data() const noexcept { return this->getStringBuffer(); }
+
+    const CharT* c_str() const noexcept { return this->getStringBuffer(); }
+
+    constexpr iterator begin() const noexcept { return {this, 0}; }
+
+    constexpr iterator end() const noexcept { return {this, this->size()}; }
+
+    constexpr const_iterator cbegin() const noexcept { return {this, 0}; }
+
+    constexpr const_iterator cend() const noexcept { return {this, this->size()}; }
+
+    constexpr reverse_iterator rbegin() const noexcept { return reverse_iterator{this->end()}; }
+
+    constexpr reverse_iterator rend() const noexcept { return reverse_iterator{this->begin()}; }
+
+    constexpr const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator{this->cend()}; }
+
+    constexpr const_reverse_iterator crend() const noexcept { return const_reverse_iterator{this->cbegin()}; }
+
+    size_t size() const noexcept { return this->mLength; }
+
+    size_t length() const noexcept { return this->mLength; }
+};
+
+//==============================
+// BasicSharedString
+//==============================
 template<class CharT, class TraitsT = std::char_traits<CharT>>
 class BasicSharedString : public detail::BasicSharedStringData<CharT, TraitsT>
 {
@@ -358,13 +493,15 @@ private:
 public:
     static const size_t npos = size_t(-1);
 
-    using iterator = detail::BasicSharedStringIterator<CharT, TraitsT>;
-    using const_iterator = detail::BasicSharedStringIterator<CharT, TraitsT>;
+    using difference_type = typename std::allocator_traits<std::allocator<CharT>>::difference_type;
+    using iterator = detail::SharedStringConstIterator<BasicSharedString<CharT, TraitsT>>;
+    using const_iterator = detail::SharedStringConstIterator<BasicSharedString<CharT, TraitsT>>;
     using reverse_iterator = std::reverse_iterator<iterator>;
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
     using value_type = detail::BasicSharedStringData<CharT, TraitsT>::value_type;
 
-public:
+    using Base::Base;
+
     BasicSharedString() = default;
 
     explicit constexpr BasicSharedString(const CharT* str) noexcept: detail::BasicSharedStringData<CharT, TraitsT>(str)
@@ -390,6 +527,10 @@ public:
     template<class InputIterator>
     BasicSharedString(InputIterator first, InputIterator last)
         : detail::BasicSharedStringData<CharT, TraitsT>(first, last)
+    {}
+
+    BasicSharedString(BasicSharedStringInitializer<CharT, TraitsT>&& initializer) noexcept
+        : detail::BasicSharedStringData<CharT, TraitsT>(std::move(initializer))
     {}
 
     constexpr BasicSharedString(const BasicSharedString<CharT, TraitsT>& other) noexcept = default;
@@ -510,7 +651,7 @@ public:
         return this->getStringBuffer()[index];
     }
 
-    const CharT operator[](size_t index) const noexcept { return this->getStringBuffer()[index]; }
+    const CharT& operator[](size_t index) const noexcept { return this->getStringBuffer()[index]; }
 
     const CharT* data() const noexcept { return this->getStringBuffer(); }
 
@@ -632,8 +773,13 @@ public:
     }
 };
 
+using SharedStringInitializer = BasicSharedStringInitializer<std::string::value_type>;
+using WSharedStringInitializer = BasicSharedStringInitializer<std::wstring::value_type>;
+using U16SharedStringInitializer = BasicSharedStringInitializer<std::u16string::value_type>;
+using U32SharedStringInitializer = BasicSharedStringInitializer<std::u32string::value_type>;
+
 using SharedString = BasicSharedString<std::string::value_type>;
 using WSharedString = BasicSharedString<std::wstring::value_type>;
 using U16SharedString = BasicSharedString<std::u16string::value_type>;
-using U32Sharedu32string = BasicSharedString<std::u32string::value_type>;
+using U32SharedString = BasicSharedString<std::u32string::value_type>;
 } // namespace scrap

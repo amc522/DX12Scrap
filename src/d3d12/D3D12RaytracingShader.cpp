@@ -25,7 +25,7 @@ RaytracingShader::RaytracingShader(RaytracingShaderParams&& params)
         RaytracingFixedStageShaderInfo shaderInfo;
         shaderInfo.stage = entryPoint.stage;
         shaderInfo.entryPoint = entryPoint.entryPoint;
-        shaderInfo.wideEntryPoint = WSharedString(Utf8ToWideString(shaderInfo.entryPoint));
+        shaderInfo.wideEntryPoint = Utf8ToWideSharedString(shaderInfo.entryPoint);
 
         mFixedStageShaders.push_back(std::move(shaderInfo));
     }
@@ -36,7 +36,7 @@ RaytracingShader::RaytracingShader(RaytracingShaderParams&& params)
     {
         RaytracingCallableShaderInfo shaderInfo;
         shaderInfo.entryPoint = entryPoint.entryPoint;
-        shaderInfo.wideEntryPoint = WSharedString(Utf8ToWideString(shaderInfo.entryPoint));
+        shaderInfo.wideEntryPoint = Utf8ToWideSharedString(shaderInfo.entryPoint);
 
         mCallableShaders.push_back(std::move(shaderInfo));
     }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SharedString.h"
+
 #include <string>
 #include <string_view>
 
@@ -38,4 +40,5 @@ public:
 };
 
 std::wstring Utf8ToWideString(std::string_view utf8String);
+WSharedString Utf8ToWideSharedString(std::string_view utf8String);
 } // namespace scrap
