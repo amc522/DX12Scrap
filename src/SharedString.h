@@ -16,6 +16,186 @@ class BasicSharedString;
 namespace detail
 {
 template<class CharT, class TraitsT>
+class BasicSharedStringData
+{
+public:
+    using value_type = CharT;
+
+    using RefCounterValueType = int;
+    using RefCounterType = std::atomic<RefCounterValueType>;
+
+private:
+    class Header
+    {
+    public:
+        Header() = default;
+        Header(const CharT* str, size_t length): hash(std::basic_string_view<CharT>(str, length)) {}
+
+        RefCounterType refCount = 1;
+        BasicStringHash<CharT> hash;
+    };
+
+public:
+    constexpr BasicSharedStringData() noexcept = default;
+    explicit constexpr BasicSharedStringData(size_t length) noexcept
+    {
+        allocate(length);
+
+        CharT* stringBuffer = accessStringBuffer();
+        std::fill(stringBuffer, stringBuffer + mLength + 1, 0);
+    }
+
+    constexpr BasicSharedStringData(const CharT* str, size_t length) noexcept
+    {
+        if(str == nullptr || length == 0) { return; }
+
+        allocate(length);
+        CharT* stringBuffer = accessStringBuffer();
+
+        std::memcpy(stringBuffer, str, sizeof(CharT) * length);
+
+        if(!TraitsT::eq(str[length - 1], CharT(0))) { stringBuffer[length] = CharT(0); }
+    }
+
+    explicit constexpr BasicSharedStringData(const CharT* str) noexcept
+        : BasicSharedStringData(str, TraitsT::length(str))
+    {}
+
+    template<size_t N>
+    explicit constexpr BasicSharedStringData(const CharT (&str)[N]) noexcept: BasicSharedStringData(str, N)
+    {}
+
+    explicit constexpr BasicSharedStringData(std::string_view str) noexcept
+        : BasicSharedStringData(str.data(), str.size())
+    {}
+
+    explicit constexpr BasicSharedStringData(const std::basic_string<CharT, TraitsT>& str) noexcept
+        : BasicSharedStringData(str.data(), str.length())
+    {}
+
+    template<class InputIterator>
+    BasicSharedStringData(InputIterator first, InputIterator last)
+    {
+        size_t length = std::distance(first, last);
+        if(length == 0) { return; }
+
+        allocate(length);
+
+        mLength = (TraitsT::eq(*(first + (mLength - 1u)), CharT(0))) ? mLength - 1u : mLength;
+
+        CharT* stringBuffer = accessStringBuffer();
+        std::copy_n(first, mLength, stringBuffer);
+        stringBuffer[mLength] = CharT(0);
+    }
+
+    BasicSharedStringData(const BasicSharedStringData<CharT, TraitsT>& other) noexcept: mData(other.mData)
+    {
+        if(other.mData == nullptr) { return; }
+
+        other.addRef();
+
+        mLength = other.mLength;
+    }
+
+    BasicSharedStringData(BasicSharedStringData<CharT, TraitsT>&& other) noexcept
+        : mData(other.mData)
+        , mLength(other.mLength)
+    {
+        other.mData = nullptr;
+        other.mLength = 0;
+    }
+
+    BasicSharedStringData& operator=(const BasicSharedStringData<CharT, TraitsT>& other) noexcept
+    {
+        destroy();
+
+        if(other.mData == nullptr) { return *this; }
+
+        other.addRef();
+
+        mData = other.mData;
+        mLength = other.mLength;
+
+        return *this;
+    }
+
+    BasicSharedStringData& operator=(BasicSharedStringData<CharT, TraitsT>&& other) noexcept
+    {
+        destroy();
+
+        mData = other.mData;
+        mLength = other.mLength;
+
+        other.mData = nullptr;
+        other.mLength = 0;
+
+        return *this;
+    }
+
+    operator std::basic_string_view<CharT, TraitsT>() const noexcept
+    {
+        if(empty()) { return std::basic_string_view<CharT, TraitsT>(); }
+
+        return std::basic_string_view<CharT, TraitsT>(getStringBuffer(), mLength);
+    }
+
+    [[nodiscard]] constexpr bool empty() const noexcept { return mData == nullptr; }
+
+    [[nodiscard]] constexpr CharT* accessStringBuffer() noexcept
+    {
+        return reinterpret_cast<CharT*>(mData + sizeof(Header));
+    }
+
+    [[nodiscard]] constexpr const CharT* getStringBuffer() const noexcept
+    {
+        return reinterpret_cast<const CharT*>(mData + sizeof(Header));
+    }
+
+    [[nodiscard]] RefCounterType& getRefCount() const noexcept { return reinterpret_cast<Header*>(mData)->refCount; }
+
+    RefCounterValueType addRef() const noexcept { return ++getRefCount(); }
+
+    RefCounterValueType decRef() const noexcept { return --getRefCount(); }
+
+    [[nodiscard]] constexpr BasicStringHash<CharT> getHash() const noexcept
+    {
+        return reinterpret_cast<const Header*>(mData)->hash;
+    }
+
+    void setHash(BasicStringHash<CharT> value) noexcept { return reinterpret_cast<Header*>(mData)->hash = value; }
+
+protected:
+    virtual ~BasicSharedStringData() { destroy(); }
+
+    void allocate(size_t length) noexcept
+    {
+        mLength = length;
+        if(length == 0) { return; }
+
+        // Using mLength + 1 to account for the terminating \0
+        mData = new uint8_t[(mLength + 1) * sizeof(CharT) + sizeof(Header)];
+        new(mData) Header();
+        CharT* charBuffer = new(mData + sizeof(Header)) CharT[mLength + 1];
+    }
+
+    void destroy() noexcept
+    {
+        if(mData != nullptr)
+        {
+            int count = decRef();
+
+            if(count == 0) { delete[] mData; }
+        }
+
+        mData = nullptr;
+        mLength = 0;
+    }
+
+    uint8_t* mData = nullptr;
+    size_t mLength = 0;
+};
+
+template<class CharT, class TraitsT>
 class BasicSharedStringIterator
 {
 public:
@@ -170,11 +350,10 @@ operator-(typename detail::BasicSharedStringIterator<CharT, TraitsT>::difference
 }
 
 template<class CharT, class TraitsT = std::char_traits<CharT>>
-class BasicSharedString
+class BasicSharedString : public detail::BasicSharedStringData<CharT, TraitsT>
 {
 private:
-    using RefCounterValueType = int;
-    using RefCounterType = std::atomic<RefCounterValueType>;
+    using Base = detail::BasicSharedStringData<CharT, TraitsT>;
 
 public:
     static const size_t npos = size_t(-1);
@@ -183,128 +362,64 @@ public:
     using const_iterator = detail::BasicSharedStringIterator<CharT, TraitsT>;
     using reverse_iterator = std::reverse_iterator<iterator>;
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
-    using value_type = CharT;
+    using value_type = detail::BasicSharedStringData<CharT, TraitsT>::value_type;
 
 public:
     BasicSharedString() = default;
 
-    explicit constexpr BasicSharedString(const CharT* str) noexcept: BasicSharedString(str, TraitsT::length(str)) {}
+    explicit constexpr BasicSharedString(const CharT* str) noexcept: detail::BasicSharedStringData<CharT, TraitsT>(str)
+    {}
 
-    constexpr BasicSharedString(const CharT* str, size_t length) noexcept: mLength(length)
-    {
-        if(str == nullptr)
-        {
-            length = 0;
-            return;
-        }
-
-        mData = new uint8_t[(length + 1) * sizeof(CharT) + sizeof(Header)];
-        new(mData) Header(str, length);
-        CharT* charBuffer = new(mData + sizeof(Header)) CharT[length + 1];
-
-        if(length == 0) { charBuffer[0] = CharT(0); }
-        else
-        {
-            std::memcpy(charBuffer, str, sizeof(CharT) * length);
-
-            if(!TraitsT::eq(str[length - 1], CharT(0))) { charBuffer[length] = CharT(0); }
-        }
-    }
+    constexpr BasicSharedString(const CharT* str, size_t length) noexcept
+        : detail::BasicSharedStringData<CharT, TraitsT>(length)
+    {}
 
     template<size_t N>
-    explicit constexpr BasicSharedString(const CharT (&str)[N]) noexcept: BasicSharedString(str, N - 1)
+    explicit constexpr BasicSharedString(const CharT (&str)[N]) noexcept
+        : detail::BasicSharedStringData<CharT, TraitsT>(str)
     {}
 
-    explicit constexpr BasicSharedString(std::string_view str) noexcept: BasicSharedString(str.data(), str.size()) {}
+    explicit constexpr BasicSharedString(std::string_view str) noexcept
+        : detail::BasicSharedStringData<CharT, TraitsT>(str)
+    {}
 
     explicit constexpr BasicSharedString(const std::basic_string<CharT, TraitsT>& str) noexcept
-        : BasicSharedString(str.data(), str.length())
+        : detail::BasicSharedStringData<CharT, TraitsT>(str)
     {}
-
-    constexpr BasicSharedString(const BasicSharedString<CharT, TraitsT>& other) noexcept
-    {
-        if(other.mData == nullptr) { return; }
-
-        other.addRef();
-
-        mData = other.mData;
-        mLength = other.mLength;
-    }
-
-    constexpr BasicSharedString(BasicSharedString<CharT, TraitsT>&& other) noexcept
-    {
-        std::swap(mData, other.mData);
-        std::swap(mLength, other.mLength);
-    }
 
     template<class InputIterator>
     BasicSharedString(InputIterator first, InputIterator last)
-    {
-        mLength = std::distance(first, last);
+        : detail::BasicSharedStringData<CharT, TraitsT>(first, last)
+    {}
 
-        if(mLength == 0) { return; }
+    constexpr BasicSharedString(const BasicSharedString<CharT, TraitsT>& other) noexcept = default;
+    constexpr BasicSharedString(BasicSharedString<CharT, TraitsT>&& other) noexcept = default;
 
-        mLength = (TraitsT::eq(*(first + (mLength - 1u)), CharT(0))) ? mLength - 1u : mLength;
+    ~BasicSharedString() noexcept final = default;
 
-        mData = new uint8_t[(mLength + 1) * sizeof(CharT) + sizeof(Header)];
-        CharT* charBuffer = new(mData + sizeof(Header)) CharT[mLength + 1];
+    BasicSharedString<CharT, TraitsT>& operator=(const BasicSharedString<CharT, TraitsT>& other) noexcept = default;
 
-        {
-            std::copy_n(first, mLength, charBuffer);
-
-            charBuffer[mLength] = CharT(0);
-        }
-
-        new(mData) Header(charBuffer, mLength);
-    }
-
-    ~BasicSharedString() noexcept { destroy(); }
-
-    BasicSharedString<CharT, TraitsT>& operator=(const BasicSharedString<CharT, TraitsT>& other) noexcept
-    {
-        if(mData != nullptr) { destroy(); }
-
-        if(other.mData == nullptr) { return *this; }
-
-        other.addRef();
-
-        mData = other.mData;
-        mLength = other.mLength;
-
-        return *this;
-    }
-
-    BasicSharedString<CharT, TraitsT>& operator=(BasicSharedString<CharT, TraitsT>&& other) noexcept
-    {
-        if(mData != nullptr) { destroy(); }
-
-        if(other.mData == nullptr) { return *this; }
-
-        std::swap(mData, other.mData);
-        std::swap(mLength, other.mLength);
-
-        return *this;
-    }
+    BasicSharedString<CharT, TraitsT>& operator=(BasicSharedString<CharT, TraitsT>&& other) noexcept = default;
 
     operator BasicStringHash<CharT>() const noexcept
     {
-        if(mData == nullptr) { return BasicStringHash<CharT>{}; }
+        if(this->empty()) { return BasicStringHash<CharT>{}; }
 
-        return getHash();
+        return this->getHash();
     }
 
     operator std::basic_string_view<CharT, TraitsT>() const noexcept
     {
-        if(mData == nullptr) { return std::basic_string_view<CharT, TraitsT>(); }
+        if(this->empty()) { return std::basic_string<CharT, TraitsT>(); }
 
-        return std::basic_string_view<CharT, TraitsT>(getStringBuffer(), mLength);
+        return std::basic_string_view<CharT, TraitsT>(this->getStringBuffer(), this->mLength);
     }
 
     explicit operator std::basic_string<CharT, TraitsT>() const noexcept
     {
-        if(mData == nullptr) { return std::basic_string<CharT, TraitsT>(); }
+        if(this->empty()) { return std::basic_string<CharT, TraitsT>(); }
 
-        return std::basic_string<CharT, TraitsT>(getStringBuffer(), mLength);
+        return std::basic_string<CharT, TraitsT>(this->getStringBuffer(), this->mLength);
     }
 
     friend bool operator==(const BasicSharedString<CharT, TraitsT>& left, const CharT* right)
@@ -387,19 +502,19 @@ public:
 
     const CharT at(size_t index) const
     {
-        if(index >= mLength)
+        if(index >= this->mLength)
         {
             throw std::out_of_range("BasicSharedString::at() called with an index that is out of bounds");
         }
 
-        return getStringBuffer()[index];
+        return this->getStringBuffer()[index];
     }
 
-    const CharT operator[](size_t index) const noexcept { return getStringBuffer()[index]; }
+    const CharT operator[](size_t index) const noexcept { return this->getStringBuffer()[index]; }
 
-    const CharT* data() const noexcept { return getStringBuffer(); }
+    const CharT* data() const noexcept { return this->getStringBuffer(); }
 
-    const CharT* c_str() const noexcept { return getStringBuffer(); }
+    const CharT* c_str() const noexcept { return this->getStringBuffer(); }
 
     constexpr iterator begin() const noexcept { return {this, 0}; }
 
@@ -407,52 +522,53 @@ public:
 
     constexpr const_iterator cbegin() const noexcept { return {this, 0}; }
 
-    constexpr const_iterator cend() const noexcept { return {this, size()}; }
+    constexpr const_iterator cend() const noexcept { return {this, this->size()}; }
 
-    constexpr reverse_iterator rbegin() const noexcept { return reverse_iterator{end()}; }
+    constexpr reverse_iterator rbegin() const noexcept { return reverse_iterator{this->end()}; }
 
-    constexpr reverse_iterator rend() const noexcept { return reverse_iterator{begin()}; }
+    constexpr reverse_iterator rend() const noexcept { return reverse_iterator{this->begin()}; }
 
-    constexpr const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator{cend()}; }
+    constexpr const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator{this->cend()}; }
 
-    constexpr const_reverse_iterator crend() const noexcept { return const_reverse_iterator{cbegin()}; }
+    constexpr const_reverse_iterator crend() const noexcept { return const_reverse_iterator{this->cbegin()}; }
 
-    bool empty() const noexcept { return mData == nullptr || mLength == 0; }
+    size_t size() const noexcept { return this->mLength; }
 
-    size_t size() const noexcept { return mLength; }
+    size_t length() const noexcept { return this->mLength; }
 
-    size_t length() const noexcept { return mLength; }
-
-    BasicStringHash<CharT> hash() const noexcept { return (mData != nullptr) ? getHash() : BasicStringHash<CharT>{}; }
+    BasicStringHash<CharT> hash() const noexcept
+    {
+        return (this->empty()) ? this->getHash() : BasicStringHash<CharT>{};
+    }
 
     template<class TraitsU>
     size_t find(std::basic_string_view<CharT, TraitsU> str, size_t pos = 0) const
     {
-        std::basic_string_view<CharT, TraitsU> sharedStrView{getStringBuffer(), mLength};
+        std::basic_string_view<CharT, TraitsU> sharedStrView{this->getStringBuffer(), this->mLength};
         return sharedStrView.find(str, pos);
     }
 
     size_t find(std::basic_string<CharT, TraitsT> str, size_t pos = 0) const
     {
-        std::basic_string_view<CharT, TraitsT> sharedStrView{getStringBuffer(), mLength};
+        std::basic_string_view<CharT, TraitsT> sharedStrView{this->getStringBuffer(), this->mLength};
         return sharedStrView.find(str, pos);
     }
 
     size_t find(const CharT* s, size_t pos, size_t count) const
     {
-        std::basic_string_view<CharT, TraitsT> sharedStrView{getStringBuffer(), mLength};
+        std::basic_string_view<CharT, TraitsT> sharedStrView{this->getStringBuffer(), this->mLength};
         return sharedStrView.find(s, pos, count);
     }
 
     size_t find(const CharT* s, size_t pos = 0) const
     {
-        std::basic_string_view<CharT, TraitsT> sharedStrView{getStringBuffer(), mLength};
+        std::basic_string_view<CharT, TraitsT> sharedStrView{this->getStringBuffer(), this->mLength};
         return sharedStrView.find(s, pos);
     }
 
     size_t find(CharT ch, size_t pos = 0) const
     {
-        std::basic_string_view<CharT, TraitsT> sharedStrView{getStringBuffer(), mLength};
+        std::basic_string_view<CharT, TraitsT> sharedStrView{this->getStringBuffer(), this->mLength};
         return sharedStrView.find(ch, pos);
     }
 
@@ -470,25 +586,25 @@ public:
     size_t rfind(const std::basic_string<CharT, TraitsT>& str,
                  size_t pos = std::basic_string<CharT, TraitsT>::npos) const
     {
-        std::basic_string_view<CharT, TraitsT> sharedStrView{getStringBuffer(), mLength};
+        std::basic_string_view<CharT, TraitsT> sharedStrView{this->getStringBuffer(), this->mLength};
         return sharedStrView.rfind(str.data(), pos, str.size());
     }
 
     size_t rfind(const CharT* s, size_t pos, size_t count) const
     {
-        std::basic_string_view<CharT, TraitsT> sharedStrView{getStringBuffer(), mLength};
+        std::basic_string_view<CharT, TraitsT> sharedStrView{this->getStringBuffer(), this->mLength};
         return sharedStrView.rfind(s, pos, count);
     }
 
     size_t rfind(const CharT* s, size_t pos = std::basic_string<CharT, TraitsT>::npos) const
     {
-        std::basic_string_view<CharT, TraitsT> sharedStrView{getStringBuffer(), mLength};
+        std::basic_string_view<CharT, TraitsT> sharedStrView{this->getStringBuffer(), this->mLength};
         return sharedStrView.rfind(s, pos);
     }
 
     size_t rfind(CharT ch, size_t pos = std::basic_string<CharT, TraitsT>::npos) const
     {
-        std::basic_string_view<CharT, TraitsT> sharedStrView{getStringBuffer(), mLength};
+        std::basic_string_view<CharT, TraitsT> sharedStrView{this->getStringBuffer(), this->mLength};
         return sharedStrView.rfind(ch, pos);
     }
 
@@ -498,9 +614,9 @@ public:
         size_t reverseOffset;
 
         if(pos == std::basic_string<CharT, TraitsT>::npos) { reverseOffset = 0; }
-        else if(pos < mLength)
+        else if(pos < this->mLength)
         {
-            reverseOffset = mLength - pos;
+            reverseOffset = this->mLength - pos;
         }
         else
         {
@@ -512,47 +628,8 @@ public:
 
         if(findItr == crend()) { return std::basic_string<CharT, TraitsT>::npos; }
 
-        return mLength - std::distance(crbegin(), findItr) - 1;
+        return this->mLength - std::distance(crbegin(), findItr) - 1;
     }
-
-private:
-    class Header
-    {
-    public:
-        Header() = default;
-        Header(const CharT* str, size_t length): hash(std::basic_string_view<CharT>(str, length)) {}
-
-        RefCounterType refCount = 1;
-        BasicStringHash<CharT> hash;
-    };
-
-    const CharT* getStringBuffer() const noexcept { return reinterpret_cast<const CharT*>(mData + sizeof(Header)); }
-
-    RefCounterType& getRefCounter() const noexcept { return reinterpret_cast<Header*>(mData)->refCount; }
-
-    RefCounterValueType addRef() const noexcept { return ++getRefCounter(); }
-
-    RefCounterValueType decRef() const noexcept { return --getRefCounter(); }
-
-    BasicStringHash<CharT> getHash() const noexcept { return reinterpret_cast<const Header*>(mData)->hash; }
-
-    void setHash(BasicStringHash<CharT> value) noexcept { return reinterpret_cast<Header*>(mData)->hash = value; }
-
-    void destroy() noexcept
-    {
-        if(mData != nullptr)
-        {
-            int count = decRef();
-
-            if(count == 0) { delete[] mData; }
-        }
-
-        mData = nullptr;
-        mLength = 0;
-    }
-
-    uint8_t* mData = nullptr;
-    size_t mLength = 0;
 };
 
 using SharedString = BasicSharedString<std::string::value_type>;
