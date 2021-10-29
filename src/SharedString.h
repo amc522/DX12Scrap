@@ -41,7 +41,7 @@ private:
         Header() = default;
         Header(const CharT* str, size_t length): hash(std::basic_string_view<CharT>(str, length)) {}
 
-        RefCounterType refCount = 1;
+        mutable RefCounterType refCount = 1;
         BasicStringHash<CharT> hash;
     };
 
@@ -65,6 +65,8 @@ public:
         std::memcpy(stringBuffer, str, sizeof(CharT) * length);
 
         if(!TraitsT::eq(str[length - 1], CharT(0))) { stringBuffer[length] = CharT(0); }
+
+        calculateHash();
     }
 
     explicit constexpr BasicSharedStringData(const CharT* str) noexcept
@@ -96,6 +98,8 @@ public:
         CharT* stringBuffer = accessStringBuffer();
         std::copy_n(first, mLength, stringBuffer);
         stringBuffer[mLength] = CharT(0);
+
+        calculateHash();
     }
 
     BasicSharedStringData(const BasicSharedStringData<CharT, TraitsT>& other) noexcept: mData(other.mData)
@@ -161,7 +165,7 @@ public:
         return reinterpret_cast<const CharT*>(mData + sizeof(Header));
     }
 
-    [[nodiscard]] RefCounterType& getRefCount() const noexcept { return reinterpret_cast<Header*>(mData)->refCount; }
+    [[nodiscard]] RefCounterType& getRefCount() const noexcept { return getHeader()->refCount; }
 
     RefCounterValueType addRef() const noexcept { return ++getRefCount(); }
 
@@ -169,10 +173,10 @@ public:
 
     [[nodiscard]] constexpr BasicStringHash<CharT> getHash() const noexcept
     {
-        return reinterpret_cast<const Header*>(mData)->hash;
+        return getHeader()->hash;
     }
 
-    void setHash(BasicStringHash<CharT> value) noexcept { return reinterpret_cast<Header*>(mData)->hash = value; }
+    void calculateHash() noexcept { getHeader()->hash = BasicStringHash<CharT>(std::basic_string_view<CharT, TraitsT>(getStringBuffer(), mLength)); }
 
 protected:
     virtual ~BasicSharedStringData() { destroy(); }
@@ -183,7 +187,7 @@ protected:
         if(length == 0) { return; }
 
         // Using mLength + 1 to account for the terminating \0
-        mData = new uint8_t[(mLength + 1) * sizeof(CharT) + sizeof(Header)];
+        mData = new std::byte[(mLength + 1) * sizeof(CharT) + sizeof(Header)];
         new(mData) Header();
         CharT* charBuffer = new(mData + sizeof(Header)) CharT[mLength + 1];
     }
@@ -201,7 +205,10 @@ protected:
         mLength = 0;
     }
 
-    uint8_t* mData = nullptr;
+    [[nodiscard]] Header* getHeader() noexcept { return reinterpret_cast<Header*>(mData); }
+    [[nodiscard]] const Header* getHeader() const noexcept { return reinterpret_cast<const Header*>(mData); }
+
+    std::byte* mData = nullptr;
     size_t mLength = 0;
 };
 
@@ -531,7 +538,9 @@ public:
 
     BasicSharedString(BasicSharedStringInitializer<CharT, TraitsT>&& initializer) noexcept
         : detail::BasicSharedStringData<CharT, TraitsT>(std::move(initializer))
-    {}
+    {
+        this->calculateHash();
+    }
 
     constexpr BasicSharedString(const BasicSharedString<CharT, TraitsT>& other) noexcept = default;
     constexpr BasicSharedString(BasicSharedString<CharT, TraitsT>&& other) noexcept = default;

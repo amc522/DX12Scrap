@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?> 
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="scrap::detail::BasicSharedStringData&lt;*,*&gt;>">
+    <DisplayString>{($T1*)(mData + sizeof(Header))}</DisplayString>
+    <Expand>
+      <Item Name="[size]">mLength</Item>
+      <Item Name="[header]">(Header*)mData</Item>
+      <ArrayItems>
+        <Size>mLength</Size>
+        <ValuePointer>($T1*)(mData + sizeof(Header))</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
   <Type Name="scrap::BasicSharedStringInitializer&lt;*,*&gt;>">
     <DisplayString>{($T1*)(mData + sizeof(Header))}</DisplayString>
     <Expand>
