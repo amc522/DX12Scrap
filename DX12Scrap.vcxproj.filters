@@ -103,6 +103,9 @@
     <ClCompile Include="src\StringUtils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\d3d12\D3D12ShaderTable.cpp">
+      <Filter>Source Files\d3d12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application.h">
@@ -226,6 +229,15 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="src\StringHash.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\d3d12\D3D12ShaderTable.h">
+      <Filter>Source Files\d3d12</Filter>
+    </ClInclude>
+    <ClInclude Include="src\EnumIterator.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\SpanUtility.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

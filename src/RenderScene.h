@@ -10,6 +10,7 @@
 #include "d3d12/D3D12CommandList.h"
 #include "d3d12/D3D12Config.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
+#include "d3d12/D3D12ShaderTable.h"
 
 #include <array>
 #include <cstdint>
@@ -163,9 +164,7 @@ private:
     std::shared_ptr<d3d12::RaytracingShader> mShader;
     std::shared_ptr<d3d12::RaytracingPipelineState> mPipelineState;
 
-    std::unique_ptr<d3d12::Buffer> mRayGenShaderTable;
-    std::unique_ptr<d3d12::Buffer> mMissShaderTable;
-    std::unique_ptr<d3d12::Buffer> mHitGroupShaderTable;
+    std::shared_ptr<d3d12::ShaderTable> mShaderTable;
 
     RayGenConstantBuffer mRayGenCpuConstantBuffer;
     std::shared_ptr<d3d12::Buffer> mFrameConstantBuffer;

@@ -3,6 +3,7 @@
 #include "CpuMesh.h"
 #include "FrameInfo.h"
 #include "PrimitiveMesh.h"
+#include "SpanUtility.h"
 #include "Window.h"
 #include "d3d12/D3D12BLAccelerationStructure.h"
 #include "d3d12/D3D12Buffer.h"
@@ -651,17 +652,13 @@ void RaytracingScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d
 {
     mCommandList.beginRecording();
 
-    auto DispatchRays = [&](ID3D12GraphicsCommandList4* commandList, auto* stateObject, auto* dispatchDesc) {
-        // Since each shader table has only one shader record, the stride is same as the size.
-        dispatchDesc->HitGroupTable.StartAddress = mHitGroupShaderTable->getResource()->GetGPUVirtualAddress();
-        dispatchDesc->HitGroupTable.SizeInBytes = mHitGroupShaderTable->getByteSize();
-        dispatchDesc->HitGroupTable.StrideInBytes = dispatchDesc->HitGroupTable.SizeInBytes;
-        dispatchDesc->MissShaderTable.StartAddress = mMissShaderTable->getResource()->GetGPUVirtualAddress();
-        dispatchDesc->MissShaderTable.SizeInBytes = mMissShaderTable->getByteSize();
-        dispatchDesc->MissShaderTable.StrideInBytes = dispatchDesc->MissShaderTable.SizeInBytes;
-        dispatchDesc->RayGenerationShaderRecord.StartAddress =
-            mRayGenShaderTable->getResource()->GetGPUVirtualAddress();
-        dispatchDesc->RayGenerationShaderRecord.SizeInBytes = mRayGenShaderTable->getByteSize();
+    auto DispatchRays = [&](ID3D12GraphicsCommandList4* commandList, ID3D12StateObject* stateObject,
+                            D3D12_DISPATCH_RAYS_DESC* dispatchDesc) {
+        mShaderTable->markAsUsed(commandList);
+
+        dispatchDesc->HitGroupTable = mShaderTable->getHitGroupTableAddressRangeAndStride(0);
+        dispatchDesc->MissShaderTable = mShaderTable->getMissTableAddressRangeAndStride(0);
+        dispatchDesc->RayGenerationShaderRecord = mShaderTable->getRaygenRecordAddressAndStride(0);
         dispatchDesc->Width = frameInfo.mainWindow->getSize().x;
         dispatchDesc->Height = frameInfo.mainWindow->getSize().y;
         dispatchDesc->Depth = 1;
@@ -844,10 +841,10 @@ bool RaytracingScene::createPipelineState()
     pipelineStateParams.fixedStages.raygen.shaderIndex = 0;
     pipelineStateParams.fixedStages.raygen.shaderEntryPointIndex = 0;
     pipelineStateParams.fixedStages.raygen.localRootSignatureIndex = 0;
-   
+
     pipelineStateParams.fixedStages.closestHit.shaderIndex = 0;
     pipelineStateParams.fixedStages.closestHit.shaderEntryPointIndex = 1;
-   
+
     pipelineStateParams.fixedStages.miss.shaderIndex = 0;
     pipelineStateParams.fixedStages.miss.shaderEntryPointIndex = 2;
 
@@ -972,101 +969,29 @@ constexpr nonstd::span<const std::byte> AsBytes(const T& value)
 
 bool RaytracingScene::buildShaderTables()
 {
-    auto device = d3d12::DeviceContext::instance().getDevice5();
-
-    static constexpr uint32_t kShaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-    static constexpr std::array<std::byte, kShaderIdentifierSize> kEmptyShaderIdentifierArray = {};
-    using ShaderIdentifier = nonstd::span<const std::byte, kShaderIdentifierSize>;
-    static constexpr ShaderIdentifier kEmptyShaderIdentifier(kEmptyShaderIdentifierArray);
-    ShaderIdentifier rayGenShaderIdentifier = kEmptyShaderIdentifier;
-    ShaderIdentifier missShaderIdentifier = kEmptyShaderIdentifier;
-    ShaderIdentifier hitGroupShaderIdentifier = kEmptyShaderIdentifier;
-
-    // Get shader identifiers.
+    struct RootArguments
     {
-        ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
-        if(FAILED(mPipelineState->getPipelineState()->QueryInterface(IID_PPV_ARGS(&stateObjectProperties)))) { return false; }
+        RayGenConstantBuffer cb;
+    } rootArguments;
+    rootArguments.cb = mRayGenCpuConstantBuffer;
 
-        auto GetShaderIdentifier = [](ID3D12StateObjectProperties* stateObjectProperties,
-                                      std::wstring_view shaderName) {
-            return ShaderIdentifier(
-                reinterpret_cast<std::byte*>(stateObjectProperties->GetShaderIdentifier(shaderName.data())),
-                D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-        };
+    d3d12::ShaderTableParams params;
+    params.raygen.entryByteStride = sizeof(RootArguments);
+    params.raygen.capacity = 1;
+    params.hitGroup.entryByteStride = 0;
+    params.hitGroup.capacity = 1;
+    params.miss.entryByteStride = 0;
+    params.miss.capacity = 1;
+    params.name = "Shader Table";
 
-        rayGenShaderIdentifier = GetShaderIdentifier(stateObjectProperties.Get(), kRaygenShaderName);
-        missShaderIdentifier = GetShaderIdentifier(stateObjectProperties.Get(), kMissShaderName);
-        hitGroupShaderIdentifier = GetShaderIdentifier(stateObjectProperties.Get(), kHitGroupName);
-    }
+    mShaderTable = std::make_shared<d3d12::ShaderTable>();
+    mShaderTable->init(params);
 
-    //// Ray gen shader table
-    struct ShaderRecord
-    {
-        ShaderIdentifier shaderIdentifier;
-        nonstd::span<const std::byte> localRootArguments;
-    };
-
-    auto MakeShaderTable = [](ID3D12GraphicsCommandList* commandList, nonstd::span<const ShaderRecord> shaderRecords,
-                              uint32_t shaderRecordSize, std::string_view name) {
-        shaderRecordSize = AlignInteger(shaderRecordSize, uint32_t(D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT));
-        d3d12::Buffer::SimpleParams params;
-        params.accessFlags = ResourceAccessFlags::CpuWrite;
-        params.flags = d3d12::BufferFlags::None;
-        params.byteSize = shaderRecordSize * shaderRecords.size();
-        params.initialResourceState = D3D12_RESOURCE_STATE_COMMON;
-        params.name = name;
-
-        auto gpuBuffer = std::make_unique<d3d12::Buffer>();
-        gpuBuffer->init(params);
-
-        {
-            d3d12::GpuBufferWriteGuard writeGuard(*gpuBuffer.get(), commandList);
-            nonstd::span<std::byte> writeBuffer = writeGuard.getWriteBuffer();
-            auto itr = writeBuffer.begin();
-
-            for(const ShaderRecord& shaderRecord : shaderRecords)
-            {
-                itr = std::copy(shaderRecord.shaderIdentifier.begin(), shaderRecord.shaderIdentifier.end(), itr);
-                itr = std::copy(shaderRecord.localRootArguments.begin(), shaderRecord.localRootArguments.end(), itr);
-            }
-        }
-
-        auto resourceBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
-            gpuBuffer->getResource(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
-        commandList->ResourceBarrier(1, &resourceBarrier);
-        return gpuBuffer;
-    };
-
-    {
-        struct RootArguments
-        {
-            RayGenConstantBuffer cb;
-        } rootArguments;
-        rootArguments.cb = mRayGenCpuConstantBuffer;
-
-        const std::array<ShaderRecord, 1> shaderRecords = {
-            ShaderRecord{rayGenShaderIdentifier, AsBytes(rootArguments)}};
-
-        const UINT shaderRecordSize = kShaderIdentifierSize + sizeof(rootArguments);
-        mRayGenShaderTable =
-            MakeShaderTable(mCommandList.get(), shaderRecords, shaderRecordSize, "RayGen Shader Table");
-    }
-
-    // Miss shader table
-    {
-        std::array<ShaderRecord, 1> shaderRecords = {ShaderRecord{missShaderIdentifier}};
-
-        const UINT shaderRecordSize = kShaderIdentifierSize;
-        mMissShaderTable = MakeShaderTable(mCommandList.get(), shaderRecords, shaderRecordSize, "Miss Shader Table");
-    }
-
-    // Hit group shader table
-    {
-        std::array<ShaderRecord, 1> shaderRecords = {ShaderRecord{hitGroupShaderIdentifier}};
-        const UINT shaderRecordSize = kShaderIdentifierSize;
-        mHitGroupShaderTable =
-            MakeShaderTable(mCommandList.get(), shaderRecords, shaderRecordSize, "Hit Group Shader Table");
-    }
+    std::array<nonstd::span<const std::byte>, (size_t)RaytracingPipelineStage::Count> localRootArguments{
+        ToByteSpan(rootArguments),
+        {},
+        {}};
+    mShaderTable->addPipelineState(mPipelineState, localRootArguments, mCommandList.get());
 
     return true;
 }

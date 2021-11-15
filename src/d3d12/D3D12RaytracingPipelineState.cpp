@@ -252,6 +252,34 @@ void RaytracingPipelineState::create()
     if(FAILED(hr)) { return; }
 
     mStateObject = TrackedGpuObject(std::move(stateObject));
+
+#pragma region collect_shader_identifiers
+    {
+        ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
+
+        if(FAILED(mStateObject->QueryInterface(IID_PPV_ARGS(&stateObjectProperties)))) { return; }
+
+        auto makeShaderIdentifier = [&](std::wstring_view entryPointName) {
+            return RaytracingShaderIdentifier(
+                reinterpret_cast<std::byte*>(stateObjectProperties->GetShaderIdentifier(entryPointName.data())),
+                detail::kShaderIdentifierSize);
+        };
+
+        mFixedStageShaderIdentifiers[(size_t)RaytracingPipelineStage::RayGen] =
+            makeShaderIdentifier(getFixedStageShaderEntryPointName(RaytracingShaderStage::RayGen));
+        mFixedStageShaderIdentifiers[(size_t)RaytracingPipelineStage::HitGroup] = makeShaderIdentifier(mHitGroupName);
+        mFixedStageShaderIdentifiers[(size_t)RaytracingPipelineStage::Miss] =
+            makeShaderIdentifier(getFixedStageShaderEntryPointName(RaytracingShaderStage::Miss));
+
+        for(CallableShaderParams& shaderInfo : mCallableShaderParams)
+        {
+            if(!shaderInfo.hasValidShaderEntryPoint()) { continue; }
+
+            std::wstring_view entryPointName = getShaderEntryPointName(shaderInfo);
+            shaderInfo.shaderIdentifier = makeShaderIdentifier(entryPointName.data());
+        }
+    }
+#pragma endregion
 }
 
 void RaytracingPipelineState::markAsUsed(ID3D12CommandQueue* commandQueue)
@@ -274,6 +302,22 @@ void RaytracingPipelineState::markAsUsed(ID3D12CommandList* commandList)
     {
         localRootSignature.markAsUsed(commandList);
     }
+}
+
+RaytracingShaderIdentifier RaytracingPipelineState::getShaderIdentifier(RaytracingPipelineStage stage) const
+{
+    return mFixedStageShaderIdentifiers[(size_t)stage];
+}
+
+std::wstring_view
+scrap::d3d12::RaytracingPipelineState::getFixedStageShaderEntryPointName(const RaytracingShaderStage stage) const
+{
+    return getShaderEntryPointName(mFixedStageShaderParams[(size_t)stage]);
+}
+
+std::wstring_view scrap::d3d12::RaytracingPipelineState::getCallableShaderEntryPointName(size_t index) const
+{
+    return getShaderEntryPointName(mCallableShaderParams[index]);
 }
 
 std::wstring_view

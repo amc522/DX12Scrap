@@ -109,20 +109,13 @@ constexpr std::string_view ToStringView(RaytracingShaderStage stage)
 {
     switch(stage)
     {
-    case scrap::RaytracingShaderStage::RayGen:
-        return "RayGen";
-    case scrap::RaytracingShaderStage::Intersection:
-        return "Intersection";
-    case scrap::RaytracingShaderStage::AnyHit:
-        return "AnyHit";
-    case scrap::RaytracingShaderStage::ClosestHit:
-        return "ClosestHit";
-    case scrap::RaytracingShaderStage::Miss:
-        return "Miss";
-    case scrap::RaytracingShaderStage::None:
-        return "None";
-    default:
-        return "Unknown RaytracingShaderStage";
+    case scrap::RaytracingShaderStage::RayGen: return "RayGen";
+    case scrap::RaytracingShaderStage::Intersection: return "Intersection";
+    case scrap::RaytracingShaderStage::AnyHit: return "AnyHit";
+    case scrap::RaytracingShaderStage::ClosestHit: return "ClosestHit";
+    case scrap::RaytracingShaderStage::Miss: return "Miss";
+    case scrap::RaytracingShaderStage::None: return "None";
+    default: return "Unknown RaytracingShaderStage";
     }
 }
 
@@ -158,6 +151,28 @@ enum class RaytracingShaderType
     Callable,
     Unknown,
 };
+
+enum class RaytracingPipelineStage
+{
+    RayGen,
+    HitGroup,
+    Miss,
+    Count,
+    First = 0,
+    Last = Count - 1,
+    None,
+};
+
+constexpr std::string_view ToStringView(RaytracingPipelineStage stage)
+{
+    switch(stage)
+    {
+    case scrap::RaytracingPipelineStage::RayGen: return "RayGen";
+    case scrap::RaytracingPipelineStage::HitGroup: return "HitGroup";
+    case scrap::RaytracingPipelineStage::Miss: return "Miss";
+    default: return "Unknown RaytracingPipelineStage";
+    }
+}
 
 enum class ResourceAccessFlags
 {

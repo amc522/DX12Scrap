@@ -9,6 +9,7 @@
 #include <variant>
 
 #include <d3d12.h>
+#include <nonstd/span.hpp>
 #include <wrl/client.h>
 
 namespace scrap::d3d12
@@ -61,6 +62,20 @@ struct RaytracingPipelineStateParams
     uint32_t maxRecursionDepth = 1;
 };
 
+namespace detail
+{
+static constexpr uint32_t kShaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+
+} // namespace detail
+
+using RaytracingShaderIdentifier = nonstd::span<const std::byte, detail::kShaderIdentifierSize>;
+
+namespace detail
+{
+static constexpr std::array<std::byte, kShaderIdentifierSize> kEmptyShaderIdentifierArray = {};
+static constexpr RaytracingShaderIdentifier kEmptyShaderIdentifier(kEmptyShaderIdentifierArray);
+} // namespace detail
+
 class RaytracingPipelineState
 {
 public:
@@ -81,13 +96,32 @@ public:
     void markAsUsed(ID3D12CommandQueue* commandQueue);
     void markAsUsed(ID3D12CommandList* commandList);
 
+    [[nodiscard]] size_t getCallableShaderCount() const { return mCallableShaderParams.size(); }
+
+    [[nodiscard]] RaytracingShaderIdentifier getShaderIdentifier(RaytracingPipelineStage stage) const;
+    [[nodiscard]] RaytracingShaderIdentifier getCallableShaderIdentifier(size_t index) const
+    {
+        return mCallableShaderParams[index].shaderIdentifier;
+    }
+
 private:
+    struct CallableShaderParams : RaytracingPipelineStateShaderParams
+    {
+        CallableShaderParams(const RaytracingPipelineStateShaderParams& other)
+            : RaytracingPipelineStateShaderParams(other)
+        {}
+
+        RaytracingShaderIdentifier shaderIdentifier = detail::kEmptyShaderIdentifier;
+    };
+
+    std::wstring_view getFixedStageShaderEntryPointName(const RaytracingShaderStage stage) const;
+    std::wstring_view getCallableShaderEntryPointName(size_t index) const;
     std::wstring_view getShaderEntryPointName(const RaytracingPipelineStateShaderParams& shaderParams) const;
 
     TrackedGpuObject<ID3D12StateObject> mStateObject;
     std::vector<std::shared_ptr<RaytracingShader>> mShaders;
     std::array<RaytracingPipelineStateShaderParams, (size_t)RaytracingShaderStage::Count> mFixedStageShaderParams;
-    std::vector<RaytracingPipelineStateShaderParams> mCallableShaderParams;
+    std::vector<CallableShaderParams> mCallableShaderParams;
     uint32_t mValidFixedStageExportCount = 0;
     std::wstring mHitGroupName;
     RaytracingPipelineStatePrimitiveType mPrimitiveType;
@@ -97,5 +131,8 @@ private:
 
     TrackedGpuObject<ID3D12RootSignature> mGlobalRootSignature;
     eastl::fixed_vector<TrackedGpuObject<ID3D12RootSignature>, 1> mLocalRootSignatures;
+
+    std::array<RaytracingShaderIdentifier, (size_t)RaytracingPipelineStage::Count> mFixedStageShaderIdentifiers = {
+        detail::kEmptyShaderIdentifier, detail::kEmptyShaderIdentifier, detail::kEmptyShaderIdentifier};
 };
 } // namespace scrap::d3d12
