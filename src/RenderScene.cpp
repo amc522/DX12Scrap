@@ -579,23 +579,6 @@ void RasterScene::endFrame()
 //=====================================
 RaytracingScene::RaytracingScene(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "RaytracingScene Command List")
 {
-    mRayGenCpuConstantBuffer.viewport = {-1.0f, 1.0f, 1.0f, -1.0f};
-
-    constexpr float border = 0.1f;
-    auto frameSize = d3d12::DeviceContext::instance().getFrameSize();
-    const float aspectRatio = (float)frameSize.x / (float)frameSize.y;
-
-    if(frameSize.x <= frameSize.y)
-    {
-        mRayGenCpuConstantBuffer.stencil = {-1 + border, -1 + border * aspectRatio, 1.0f - border,
-                                            1 - border * aspectRatio};
-    }
-    else
-    {
-        mRayGenCpuConstantBuffer.stencil = {-1 + border / aspectRatio, -1 + border, 1 - border / aspectRatio,
-                                            1.0f - border};
-    }
-
     mCommandList.beginRecording();
 
     if(!createRenderTargets())
@@ -639,6 +622,8 @@ RaytracingScene::RaytracingScene(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT,
 
     mCommandList.execute(d3d12::DeviceContext::instance().getGraphicsContext().getCommandQueue());
 
+    mCamera.setPosition(glm::vec3(0.0f, 0.0f, -5.0f));
+
     mInitialized = true;
 }
 
@@ -646,7 +631,24 @@ RaytracingScene::RaytracingScene(RaytracingScene&&) = default;
 RaytracingScene::~RaytracingScene() = default;
 RaytracingScene& RaytracingScene::operator=(RaytracingScene&&) = default;
 
-void RaytracingScene::preRender(const FrameInfo& frameInfo) {}
+void RaytracingScene::preRender(const FrameInfo& frameInfo)
+{
+    mCamera.update(frameInfo);
+    const auto windowSize = frameInfo.mainWindow->getSize();
+
+    const glm::mat4x4 worldToViewMat = mCamera.worldToViewMatrix();
+    const glm::mat4x4 viewToClipMat =
+        glm::perspectiveFovLH_ZO(1.04719f, (float)windowSize.x, (float)windowSize.y, 0.1f, 100.0f);
+    const glm::mat4x4 worldToClipMat = viewToClipMat * worldToViewMat;
+    const glm::mat4x4 clipToWorldMat = glm::inverse(worldToClipMat);
+
+    RayGenConstantBuffer raygenCb;
+    raygenCb.clipToWorld = glm::transpose(clipToWorldMat);
+    raygenCb.cameraWorldPos = mCamera.getPosition();
+
+    mShaderTableAllocation.updateLocalRootArguments(RaytracingPipelineStage::RayGen, ToByteSpan(raygenCb),
+                                                    d3d12::DeviceContext::instance().getCopyContext().getCommandList());
+}
 
 void RaytracingScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context)
 {
@@ -788,7 +790,7 @@ bool RaytracingScene::createRootSignatures()
     // This is a root signature that enables a shader to have unique arguments that come from shader tables.
     {
         std::array<D3D12_ROOT_PARAMETER1, d3d12::RaytracingLocalRootParamSlot::Count> rootParams = {};
-        auto& raygenCbParam = rootParams[d3d12::RaytracingLocalRootParamSlot::ViewportCB];
+        auto& raygenCbParam = rootParams[d3d12::RaytracingLocalRootParamSlot::RayGenCb];
         raygenCbParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         raygenCbParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         raygenCbParam.Constants.Num32BitValues = sizeof(RayGenConstantBuffer) / sizeof(uint32_t);
@@ -824,7 +826,7 @@ bool RaytracingScene::createPipelineState()
         d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::Miss, SharedString("MyMissShader")}};
 
     d3d12::RaytracingShaderParams shaderParams;
-    shaderParams.filepath = "assets/hello_raytracing.hlsl";
+    shaderParams.filepath = "assets/raytracing_basic3d.hlsl";
     shaderParams.fixedStageEntryPoints = fixedStageShaderEntryPoints;
 
 #ifdef _DEBUG
@@ -862,55 +864,26 @@ bool RaytracingScene::createPipelineState()
 
 bool RaytracingScene::buildGeometry()
 {
-    { // Positions
-        d3d12::Buffer::FormattedParams params;
-        params.format = gpufmt::Format::R32G32B32_SFLOAT;
-        params.numElements = 3;
-        params.accessFlags = ResourceAccessFlags::GpuRead;
-        params.name = "Triangle Positions Buffer";
+    constexpr uint32_t subdivisions = 1;
+    MeshSizes meshSizes = CalculateCubeMeshSizes(CubeMeshTopologyType::Triangle, subdivisions);
 
-        const float depth = 1.0f;
+    CpuMesh cubeMesh(GetCubeMeshPrimitiveTopology(CubeMeshTopologyType::Triangle));
+    cubeMesh.initIndices(IndexBufferFormat::UInt16, meshSizes.indexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::Position, 0, gpufmt::Format::R32G32B32_SFLOAT,
+                                 meshSizes.vertexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::Normal, 0, gpufmt::Format::R32G32B32_SFLOAT,
+                                 meshSizes.vertexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::Tangent, 0, gpufmt::Format::R32G32B32_SFLOAT,
+                                 meshSizes.vertexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::Binormal, 0, gpufmt::Format::R32G32B32_SFLOAT,
+                                 meshSizes.vertexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::TexCoord, 0, gpufmt::Format::R32G32_SFLOAT,
+                                 meshSizes.vertexCount);
 
-        std::array<glm::vec3, 3> vertices{{{0.0f, 0.7f, 1.0f}, {0.7f, -0.7f, 1.0f}, {-0.7f, -0.7f, 1.0f}}};
-        mTriangleMesh.createVertexElement(ShaderVertexSemantic::Position, 0, params,
-                                          nonstd::as_bytes(nonstd::span(vertices)));
-    }
+    PrimitiveMesh3dParams primitiveParams(cubeMesh);
+    GenerateCubeMeshTris(primitiveParams, subdivisions);
 
-    //{ // UVs
-    //    d3d12::Buffer::FormattedParams params;
-    //    params.format = gpufmt::Format::R32G32_SFLOAT;
-    //    params.numElements = 3;
-    //    params.accessFlags = ResourceAccessFlags::GpuRead;
-    //    params.name = "Triangle TexCoords Buffer";
-
-    //    std::array<glm::vec2, 3> vertices{{{0.0f, 1.0f}, {1.0f, 1.0f}, {0.5f, 0.0f}}};
-    //    mTriangleMesh.createVertexElement(ShaderVertexSemantic::TexCoord, 0, params,
-    //                                      nonstd::as_bytes(nonstd::span(vertices)));
-    //}
-
-    //{ // Colors
-    //    d3d12::Buffer::FormattedParams params;
-    //    params.format = gpufmt::Format::R32G32B32A32_SFLOAT;
-    //    params.numElements = 3;
-    //    params.accessFlags = ResourceAccessFlags::GpuRead;
-    //    params.name = "Triangle TexCoords Buffer";
-
-    //    std::array<glm::vec4, 3> vertices{{{1.0f, 0.0, 0.0, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f,
-    //    0.0f, 1.0f, 1.0f}}}; mTriangleMesh.createVertexElement(ShaderVertexSemantic::Color, 0, params,
-    //                                      nonstd::as_bytes(nonstd::span(vertices)));
-    //}
-
-    { // Indices
-        GpuMesh::IndexBufferParams params;
-        params.format = IndexBufferFormat::UInt16;
-        params.numIndices = 3;
-        params.accessFlags = ResourceAccessFlags::GpuRead;
-        params.initialResourceState = D3D12_RESOURCE_STATE_COMMON;
-        params.name = "Triangle Index Buffer";
-
-        std::array<uint16_t, 3> indices{0, 1, 2};
-        mTriangleMesh.initIndices(params, nonstd::as_bytes(nonstd::span(indices)));
-    }
+    mCubeMesh = GpuMesh(cubeMesh, ResourceAccessFlags::GpuRead, "Cube");
 
     return true;
 }
@@ -928,8 +901,8 @@ bool RaytracingScene::buildAccelerationStructures()
 
         d3d12::BLAccelerationStructure::GeometryParams geomParams;
         geomParams.flags = d3d12::RaytracingGeometryFlags::None;
-        geomParams.indexBuffer = mTriangleMesh.getIndexBuffer();
-        geomParams.vertexBuffer = mTriangleMesh.getVertexBuffer(ShaderVertexSemantic::Position, 0);
+        geomParams.indexBuffer = mCubeMesh.getIndexBuffer();
+        geomParams.vertexBuffer = mCubeMesh.getVertexBuffer(ShaderVertexSemantic::Position, 0);
 
         mBlas->addMesh(geomParams);
         mBlas->build(mCommandList);
@@ -948,7 +921,7 @@ bool RaytracingScene::buildAccelerationStructures()
 
         d3d12::TLAccelerationStructure::InstanceParams instanceParams;
         instanceParams.accelerationStructure = mBlas;
-        instanceParams.flags = 0;
+        instanceParams.flags = d3d12::TlasInstanceFlags::TriangleFrontCcw;
         instanceParams.instanceContributionToHitGroupIndex = 0;
         instanceParams.instanceId = 0;
         instanceParams.instanceMask = 1;
@@ -972,8 +945,7 @@ bool RaytracingScene::buildShaderTables()
     struct RootArguments
     {
         RayGenConstantBuffer cb;
-    } rootArguments;
-    rootArguments.cb = mRayGenCpuConstantBuffer;
+    } rootArguments{};
 
     d3d12::ShaderTableParams params;
     params.raygen.entryByteStride = sizeof(RootArguments);
@@ -991,7 +963,12 @@ bool RaytracingScene::buildShaderTables()
         ToByteSpan(rootArguments),
         {},
         {}};
-    mShaderTable->addPipelineState(mPipelineState, localRootArguments, mCommandList.get());
+
+    auto shaderTableResult = mShaderTable->addPipelineState(mPipelineState, localRootArguments, mCommandList.get());
+
+    if(!shaderTableResult) { return false; }
+
+    mShaderTableAllocation = std::move(shaderTableResult.value());
 
     return true;
 }

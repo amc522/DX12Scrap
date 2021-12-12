@@ -21,6 +21,16 @@ struct TLAccelerationStructureParams : public AccelerationStructureParams
     } instanceDescs;
 };
 
+enum class TlasInstanceFlags : uint8_t
+{
+    None = 0,
+    TriangleCullDisable = 1 << 0,
+    TriangleFrontCcw = 1 << 1,
+    ForceOpaque = 1 << 2,
+    ForceNonOpaque = 1 << 3,
+};
+DEFINE_ENUM_BITWISE_OPERATORS(TlasInstanceFlags)
+
 class TLAccelerationStructure
 {
 public:
@@ -28,10 +38,11 @@ public:
     {
         std::shared_ptr<BLAccelerationStructure> accelerationStructure;
         glm::mat4x3 transform = glm::identity<glm::mat4x3>();
+        TlasInstanceFlags flags;
         uint32_t instanceId : 24;
         uint32_t instanceMask : 8;
         uint32_t instanceContributionToHitGroupIndex : 24;
-        uint32_t flags : 8;
+        uint32_t padding : 8;
     };
 
     TLAccelerationStructure(const TLAccelerationStructureParams& params);

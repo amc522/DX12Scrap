@@ -34,17 +34,21 @@ void ShaderTable::init(const ShaderTableParams& params)
         bufferParams.byteSize = params.entryByteStride * params.capacity;
         bufferParams.name = tableNames[(size_t)stage];
 
-        auto& shaderTable = mShaderTables[(size_t)stage];
-        shaderTable = std::make_shared<Buffer>();
-        shaderTable->init(bufferParams);
+        auto& stageShaderTable = mShaderTables[(size_t)stage];
+        stageShaderTable.shaderTableBuffer = std::make_shared<Buffer>();
+        stageShaderTable.shaderTableBuffer->init(bufferParams);
+        stageShaderTable.freeBlocks = FreeBlockTracker(params.capacity);
     }
 }
 
-void ShaderTable::addPipelineState(
+tl::expected<ShaderTableAllocation, ShaderTable::Error> ShaderTable::addPipelineState(
     std::shared_ptr<RaytracingPipelineState> pipelineState,
     std::array<nonstd::span<const std::byte>, (size_t)RaytracingPipelineStage::Count> localRootArguments,
     ID3D12GraphicsCommandList* commandList)
 {
+    ShaderTableAllocation allocation;
+    allocation.mShaderTable = this;
+
     std::lock_guard lockGuard(mMutex);
 
     for(auto stage : Enumerator<RaytracingPipelineStage>())
@@ -52,27 +56,79 @@ void ShaderTable::addPipelineState(
         const auto& stageArguments = localRootArguments[(size_t)stage];
         const auto stageIdentifier = pipelineState->getShaderIdentifier(stage);
 
-        GpuBufferWriteGuard<Buffer> raygenTableWriteGuard{*mShaderTables[(size_t)stage], commandList};
-        auto writeBuffer = raygenTableWriteGuard.getWriteBuffer();
-        writeBuffer = writeBuffer.subspan(mShaderTableSizes[(size_t)stage] * mParams[(size_t)stage].entryByteStride,
+        StageShaderTable& stageShaderTable = mShaderTables[(size_t)stage];
+        auto result = stageShaderTable.freeBlocks.reserve();
+
+        if(!result) { return tl::make_unexpected(Error::InsufficientSpace); }
+
+        GpuBufferWriteGuard<Buffer> stageTableWriteGuard{*stageShaderTable.shaderTableBuffer, commandList};
+        auto writeBuffer = stageTableWriteGuard.getWriteBuffer();
+        writeBuffer = writeBuffer.subspan(result->getRange().start * mParams[(size_t)stage].entryByteStride,
                                           stageArguments.size_bytes());
 
         auto writeItr = writeBuffer.begin();
         writeItr = std::copy(stageIdentifier.begin(), stageIdentifier.end(), writeItr);
         std::copy(stageArguments.begin(), stageArguments.end(), writeItr);
 
-        ++mShaderTableSizes[(size_t)stage];
+        allocation.mTableReservations[(size_t)stage] = std::move(result.value());
     }
 
-    auto result = mPipelineStates.emplace(std::move(pipelineState));
+    auto result = mPipelineStates.emplace(pipelineState);
     if(!result.second) { ++result.first->refCount; }
+
+    allocation.mPipelineState = std::move(pipelineState);
+
+    return allocation;
+}
+
+void ShaderTable::deallocate(const std::shared_ptr<RaytracingPipelineState>& pipelineState)
+{
+    struct LessThan
+    {
+        bool operator()(const std::shared_ptr<RaytracingPipelineState>& left, const RefCountedPipelineState& right)
+        {
+            return left < right.pipelineState;
+        }
+
+        bool operator()(const RefCountedPipelineState& left, const std::shared_ptr<RaytracingPipelineState>& right)
+        {
+            return left.pipelineState < right;
+        }
+    };
+
+    auto findPtr = mPipelineStates.find_as(pipelineState, LessThan());
+
+    if(findPtr != nullptr)
+    {
+        --findPtr->refCount;
+
+        if(findPtr->refCount == 0) { mPipelineStates.erase(*findPtr); }
+    }
+}
+
+void ShaderTable::updateLocalRootArguments(RaytracingPipelineStage stage,
+                                           size_t index,
+                                           nonstd::span<const std::byte> localRootArguments,
+                                           ID3D12GraphicsCommandList* commandList)
+{
+    std::shared_ptr<d3d12::Buffer>& buffer = mShaderTables[(size_t)stage].shaderTableBuffer;
+
+    GpuBufferWriteGuard<d3d12::Buffer> writeGuard(*buffer, commandList);
+
+    const size_t entryByteSize = mParams[(size_t)stage].entryByteStride;
+    const size_t offset = index * entryByteSize + detail::kShaderIdentifierSize;
+    auto rootArgumentsBuffer =
+        writeGuard.getWriteBuffer().subspan(offset, entryByteSize - detail::kShaderIdentifierSize);
+    std::copy(localRootArguments.begin(), localRootArguments.end(), rootArgumentsBuffer.begin());
 }
 
 D3D12_GPU_VIRTUAL_ADDRESS_RANGE ShaderTable::getRaygenRecordAddressAndStride(size_t index) const
 {
     D3D12_GPU_VIRTUAL_ADDRESS_RANGE ret;
     ret.SizeInBytes = mParams[(size_t)RaytracingPipelineStage::RayGen].entryByteStride;
-    ret.StartAddress = mShaderTables[(size_t)RaytracingPipelineStage::RayGen]->getResource()->GetGPUVirtualAddress() +
+    ret.StartAddress = mShaderTables[(size_t)RaytracingPipelineStage::RayGen]
+                           .shaderTableBuffer->getResource()
+                           ->GetGPUVirtualAddress() +
                        ret.SizeInBytes * index;
 
     return ret;
@@ -81,13 +137,14 @@ D3D12_GPU_VIRTUAL_ADDRESS_RANGE ShaderTable::getRaygenRecordAddressAndStride(siz
 D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE ShaderTable::getHitGroupTableAddressRangeAndStride(size_t indexOffset,
                                                                                               size_t count) const
 {
+    const std::shared_ptr<Buffer>& shaderTableBuffer =
+        mShaderTables[(size_t)RaytracingPipelineStage::HitGroup].shaderTableBuffer;
+
     D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE ret;
     ret.StrideInBytes = mParams[(size_t)RaytracingPipelineStage::HitGroup].entryByteStride;
-    ret.StartAddress = mShaderTables[(size_t)RaytracingPipelineStage::HitGroup]->getResource()->GetGPUVirtualAddress() +
-                       ret.StrideInBytes * indexOffset;
-    ret.SizeInBytes = (count > 0) ? ret.StrideInBytes * count
-                                  : mShaderTables[(size_t)RaytracingPipelineStage::HitGroup]->getByteSize() -
-                                        (ret.StrideInBytes * indexOffset);
+    ret.StartAddress = shaderTableBuffer->getResource()->GetGPUVirtualAddress() + ret.StrideInBytes * indexOffset;
+    ret.SizeInBytes =
+        (count > 0) ? ret.StrideInBytes * count : shaderTableBuffer->getByteSize() - (ret.StrideInBytes * indexOffset);
 
     return ret;
 }
@@ -95,13 +152,14 @@ D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE ShaderTable::getHitGroupTableAddressR
 D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE ShaderTable::getMissTableAddressRangeAndStride(size_t indexOffset,
                                                                                           size_t count) const
 {
+    const std::shared_ptr<Buffer>& shaderTableBuffer =
+        mShaderTables[(size_t)RaytracingPipelineStage::Miss].shaderTableBuffer;
+
     D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE ret;
     ret.StrideInBytes = mParams[(size_t)RaytracingPipelineStage::Miss].entryByteStride;
-    ret.StartAddress = mShaderTables[(size_t)RaytracingPipelineStage::Miss]->getResource()->GetGPUVirtualAddress() +
-                       ret.StrideInBytes * indexOffset;
-    ret.SizeInBytes = (count > 0) ? ret.StrideInBytes * count
-                                  : mShaderTables[(size_t)RaytracingPipelineStage::Miss]->getByteSize() -
-                                        (ret.StrideInBytes * indexOffset);
+    ret.StartAddress = shaderTableBuffer->getResource()->GetGPUVirtualAddress() + ret.StrideInBytes * indexOffset;
+    ret.SizeInBytes =
+        (count > 0) ? ret.StrideInBytes * count : shaderTableBuffer->getByteSize() - (ret.StrideInBytes * indexOffset);
 
     return ret;
 }
@@ -110,7 +168,7 @@ void ShaderTable::markAsUsed(ID3D12CommandList* commandList)
 {
     for(auto& shaderTable : mShaderTables)
     {
-        shaderTable->markAsUsed(commandList);
+        shaderTable.shaderTableBuffer->markAsUsed(commandList);
     }
 
     for(auto& pipelineState : mPipelineStates)
@@ -123,13 +181,40 @@ void ShaderTable::markAsUsed(ID3D12CommandQueue* commandQueue)
 {
     for(auto& shaderTable : mShaderTables)
     {
-        shaderTable->markAsUsed(commandQueue);
+        shaderTable.shaderTableBuffer->markAsUsed(commandQueue);
     }
 
     for(auto& pipelineState : mPipelineStates)
     {
         pipelineState.pipelineState->markAsUsed(commandQueue);
     }
+}
+
+ShaderTableAllocation& ShaderTableAllocation::operator=(ShaderTableAllocation&& other)
+{
+    destroy();
+
+    mShaderTable = other.mShaderTable;
+    other.mShaderTable = nullptr;
+    mTableReservations = std::move(other.mTableReservations);
+    mPipelineState = std::move(other.mPipelineState);
+
+    return *this;
+}
+
+void ShaderTableAllocation::updateLocalRootArguments(RaytracingPipelineStage stage,
+                                                     nonstd::span<const std::byte> localRootArguments,
+                                                     ID3D12GraphicsCommandList* commandList)
+{
+    mShaderTable->updateLocalRootArguments(stage, mTableReservations[(size_t)stage].getRange().start,
+                                           localRootArguments, commandList);
+}
+
+void ShaderTableAllocation::destroy()
+{
+    if(mShaderTable == nullptr) { return; }
+
+    mShaderTable->deallocate(mPipelineState);
 }
 
 } // namespace scrap::d3d12

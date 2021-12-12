@@ -23,6 +23,7 @@ public:
     void setMovementSpeed(float metersPerSecond) { mMovementSpeed_m_per_sec = metersPerSecond; }
     void setRotationSpeed(float radiansPerSecond) { mRotationSpeed_rad_per_sec = radiansPerSecond; }
 
+    const glm::vec3 getPosition() const { return mPosition; }
     void setPosition(glm::vec3 position) { mPosition = position; }
 
 private:

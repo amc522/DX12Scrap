@@ -31,10 +31,29 @@ void TLAccelerationStructure::setInstance(const InstanceParams& params, size_t i
 
     const glm::mat3x4 transposedTransform = glm::transpose(params.transform);
 
+    uint8_t flags = 0;
+
+    if((params.flags & TlasInstanceFlags::TriangleCullDisable) == TlasInstanceFlags::TriangleCullDisable)
+    {
+        flags |= D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
+    }
+    if((params.flags & TlasInstanceFlags::TriangleFrontCcw) == TlasInstanceFlags::TriangleFrontCcw)
+    {
+        flags |= D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_FRONT_COUNTERCLOCKWISE;
+    }
+    if((params.flags & TlasInstanceFlags::ForceOpaque) == TlasInstanceFlags::ForceOpaque)
+    {
+        flags |= D3D12_RAYTRACING_INSTANCE_FLAG_FORCE_OPAQUE;
+    }
+    if((params.flags & TlasInstanceFlags::ForceNonOpaque) == TlasInstanceFlags::ForceNonOpaque)
+    {
+        flags |= D3D12_RAYTRACING_INSTANCE_FLAG_FORCE_NON_OPAQUE;
+    }
+
     D3D12_RAYTRACING_INSTANCE_DESC& desc =
         mInstanceDescsWriteGuard.getWriteBufferAs<D3D12_RAYTRACING_INSTANCE_DESC>()[index];
     desc.AccelerationStructure = params.accelerationStructure->getBuffer().getResource()->GetGPUVirtualAddress();
-    desc.Flags = params.flags;
+    desc.Flags = flags;
     desc.InstanceContributionToHitGroupIndex = params.instanceContributionToHitGroupIndex;
     desc.InstanceID = params.instanceId;
     desc.InstanceMask = params.instanceMask;

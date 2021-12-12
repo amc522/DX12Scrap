@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FreeBlockTracker.h"
 #include "RenderDefs.h"
 
 #include <memory>
@@ -35,17 +36,63 @@ struct ShaderTableParams
     std::string_view name;
 };
 
+class ShaderTable;
+
+class ShaderTableAllocation
+{
+public:
+    ShaderTableAllocation() = default;
+    ShaderTableAllocation(const ShaderTableAllocation&) = delete;
+    ShaderTableAllocation(ShaderTableAllocation&& other)
+        : mShaderTable(other.mShaderTable)
+        , mTableReservations(std::move(other.mTableReservations))
+        , mPipelineState(std::move(other.mPipelineState))
+    {
+        other.mShaderTable = nullptr;
+    }
+
+    ~ShaderTableAllocation() { destroy(); }
+
+    ShaderTableAllocation& operator=(const ShaderTableAllocation&) = delete;
+    ShaderTableAllocation& operator=(ShaderTableAllocation&& other);
+
+    void updateLocalRootArguments(RaytracingPipelineStage stage,
+                                  nonstd::span<const std::byte> localRootArguments,
+                                  ID3D12GraphicsCommandList* commandList);
+
+private:
+    friend class ShaderTable;
+
+    void destroy();
+
+    ShaderTable* mShaderTable = nullptr;
+    std::array<ScopedReservedBlocks, (size_t)RaytracingPipelineStage::Count> mTableReservations = {};
+    std::shared_ptr<RaytracingPipelineState> mPipelineState;
+};
+
 class ShaderTable
 {
 public:
+    enum class Error
+    {
+        InsufficientSpace
+    };
+
     ShaderTable() = default;
 
     void init(const ShaderTableParams& params);
 
-    void addPipelineState(
+    [[nodiscard]] tl::expected<ShaderTableAllocation, Error> addPipelineState(
         std::shared_ptr<RaytracingPipelineState> pipelineState,
         std::array<nonstd::span<const std::byte>, (size_t)RaytracingPipelineStage::Count> localRootArguments,
         ID3D12GraphicsCommandList* commandList);
+
+    void deallocate(const std::shared_ptr<RaytracingPipelineState>& pipelineState);
+
+    void updateLocalRootArguments(RaytracingPipelineStage stage,
+                                  size_t index,
+                                  nonstd::span<const std::byte> localRootArguments,
+                                  ID3D12GraphicsCommandList* commandList);
 
     D3D12_GPU_VIRTUAL_ADDRESS_RANGE getRaygenRecordAddressAndStride(size_t index) const;
     D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE getHitGroupTableAddressRangeAndStride(size_t indexOffset,
@@ -57,6 +104,12 @@ public:
     void markAsUsed(ID3D12CommandQueue* commandQueue);
 
 private:
+    struct StageShaderTable
+    {
+        std::shared_ptr<Buffer> shaderTableBuffer;
+        FreeBlockTracker freeBlocks;
+    };
+
     struct RefCountedPipelineState
     {
         RefCountedPipelineState(std::shared_ptr<RaytracingPipelineState> pipelineState_)
@@ -77,8 +130,7 @@ private:
         }
     };
 
-    std::array<std::shared_ptr<Buffer>, (size_t)RaytracingPipelineStage::Count> mShaderTables;
-    std::array<uint32_t, (size_t)RaytracingPipelineStage::Count> mShaderTableSizes = {};
+    std::array<StageShaderTable, (size_t)RaytracingPipelineStage::Count> mShaderTables;
     std::array<ShaderTableStageParams, (size_t)RaytracingPipelineStage::Count> mParams;
     eastl::vector_set<RefCountedPipelineState> mPipelineStates;
     std::mutex mMutex;

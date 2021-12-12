@@ -38,18 +38,11 @@ class Texture;
 class TLAccelerationStructure;
 } // namespace d3d12
 
-struct Viewport
-{
-    float left;
-    float top;
-    float right;
-    float bottom;
-};
-
 struct RayGenConstantBuffer
 {
-    Viewport viewport;
-    Viewport stencil;
+    glm::mat4x4 clipToWorld;
+    glm::vec3 cameraWorldPos;
+    float padding;
 };
 
 struct FrameConstantBuffer
@@ -156,7 +149,7 @@ private:
     d3d12::GraphicsCommandList mCommandList;
 
     std::unique_ptr<d3d12::Texture> mRenderTarget;
-    GpuMesh mTriangleMesh;
+    GpuMesh mCubeMesh;
 
     std::unique_ptr<d3d12::TLAccelerationStructure> mTlas;
     std::shared_ptr<d3d12::BLAccelerationStructure> mBlas;
@@ -165,6 +158,7 @@ private:
     std::shared_ptr<d3d12::RaytracingPipelineState> mPipelineState;
 
     std::shared_ptr<d3d12::ShaderTable> mShaderTable;
+    d3d12::ShaderTableAllocation mShaderTableAllocation;
 
     RayGenConstantBuffer mRayGenCpuConstantBuffer;
     std::shared_ptr<d3d12::Buffer> mFrameConstantBuffer;

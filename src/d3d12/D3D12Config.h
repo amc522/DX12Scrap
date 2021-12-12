@@ -53,7 +53,7 @@ namespace RaytracingLocalRootParamSlot
 {
 enum Value
 {
-    ViewportCB,
+    RayGenCb,
     Count
 };
 }
