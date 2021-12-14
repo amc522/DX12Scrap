@@ -648,11 +648,16 @@ void RaytracingScene::preRender(const FrameInfo& frameInfo)
 
     mShaderTableAllocation.updateLocalRootArguments(RaytracingPipelineStage::RayGen, ToByteSpan(raygenCb),
                                                     d3d12::DeviceContext::instance().getCopyContext().getCommandList());
+
+    mCubeMeshTransform = glm::rotate(mCubeMeshTransform, 0.01f, glm::vec3(0.0f, 1.0f, 0.0f));
+    mTlasInstance.updateTransform(static_cast<glm::mat4x3>(mCubeMeshTransform));
 }
 
 void RaytracingScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context)
 {
     mCommandList.beginRecording();
+
+    mTlas->build(mCommandList);
 
     auto DispatchRays = [&](ID3D12GraphicsCommandList4* commandList, ID3D12StateObject* stateObject,
                             D3D12_DISPATCH_RAYS_DESC* dispatchDesc) {
@@ -681,6 +686,8 @@ void RaytracingScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d
         mTlas->getAccelerationStructureBuffer().getResource()->GetGPUVirtualAddress());
 
     mPipelineState->markAsUsed(mCommandList.get());
+    mTlas->markAsUsed(mCommandList);
+
     DispatchRays(mCommandList.get4(), mPipelineState->getPipelineState(), &dispatchDesc);
 
     D3D12_RESOURCE_BARRIER preCopyBarriers[2];
@@ -912,7 +919,7 @@ bool RaytracingScene::buildAccelerationStructures()
         d3d12::TLAccelerationStructureParams tlasParams;
         tlasParams.initialReservedObjects = 1;
         tlasParams.buildOption = d3d12::AccelerationStructureBuildOption::FastTrace;
-        tlasParams.flags = d3d12::AccelerationStructureFlags::None;
+        tlasParams.flags = d3d12::AccelerationStructureFlags::AllowUpdates;
         tlasParams.instanceDescs.accessFlags = ResourceAccessFlags::None;
         tlasParams.instanceDescs.bufferFlags = d3d12::BufferFlags::None;
         tlasParams.name = "TLAS";
@@ -927,8 +934,10 @@ bool RaytracingScene::buildAccelerationStructures()
         instanceParams.instanceMask = 1;
         instanceParams.transform = glm::identity<glm::mat4x3>();
 
-        mTlas->setInstance(instanceParams, 0);
-        mTlas->build(mCommandList);
+        auto instanceAddResult = mTlas->addInstance(instanceParams);
+        if(!instanceAddResult) { return false; }
+
+        mTlasInstance = std::move(instanceAddResult.value());
     }
 
     return true;

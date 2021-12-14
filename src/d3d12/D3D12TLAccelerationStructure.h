@@ -7,8 +7,10 @@
 
 #include <memory>
 
+#include <EASTL/vector.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/mat4x3.hpp>
+#include <tl/expected.hpp>
 
 namespace scrap::d3d12
 {
@@ -31,6 +33,42 @@ enum class TlasInstanceFlags : uint8_t
 };
 DEFINE_ENUM_BITWISE_OPERATORS(TlasInstanceFlags)
 
+class TLAccelerationStructure;
+
+class TlasInstanceAllocation
+{
+public:
+    TlasInstanceAllocation() = default;
+    TlasInstanceAllocation(const TlasInstanceAllocation&) = delete;
+    TlasInstanceAllocation(TlasInstanceAllocation&& other)
+        : mAccelerationStructure(other.mAccelerationStructure)
+        , mId(other.mId)
+    {
+        other.mAccelerationStructure = nullptr;
+    }
+
+    TlasInstanceAllocation(TLAccelerationStructure& accelerationStructure, size_t id)
+        : mAccelerationStructure(&accelerationStructure)
+        , mId(id)
+    {}
+
+    TlasInstanceAllocation& operator=(const TlasInstanceAllocation&) = delete;
+    TlasInstanceAllocation& operator=(TlasInstanceAllocation&& other);
+
+    ~TlasInstanceAllocation();
+
+    void updateTransform(const glm::mat4x3& transform);
+
+private:
+    TLAccelerationStructure* mAccelerationStructure = nullptr;
+    size_t mId = std::numeric_limits<size_t>::max();
+};
+
+enum class TlasError
+{
+    InsufficientSpace,
+};
+
 class TLAccelerationStructure
 {
 public:
@@ -47,22 +85,35 @@ public:
 
     TLAccelerationStructure(const TLAccelerationStructureParams& params);
 
-    const d3d12::Buffer& getAccelerationStructureBuffer() const { return mAccelerationStructure; }
+    const d3d12::Buffer& getAccelerationStructureBuffer() const { return *mAccelerationStructureGpuBuffer; }
 
-    void setInstance(const InstanceParams& params, size_t index);
+    tl::expected<TlasInstanceAllocation, TlasError> addInstance(const InstanceParams& params);
+    void removeInstanceById(size_t id);
+    void updateInstanceTransformById(size_t id, const glm::mat4x3& transform);
 
     bool build(const GraphicsCommandList& commandList);
 
     void markAsUsed(const GraphicsCommandList& commandList);
 
 private:
-    TLAccelerationStructureParams mParams;
-    std::vector<std::shared_ptr<BLAccelerationStructure>> mInstanceAccelerationStructures;
+    bool doesInstanceDescsNeedResize(uint32_t newCapacity);
+    void resizeInstanceDescsBuffer(uint32_t capacity);
 
-    Buffer mAccelerationStructure;
-    Buffer mScratchBuffer;
-    Buffer mInstanceDescs;
-    GpuBufferWriteGuard<Buffer> mInstanceDescsWriteGuard;
+    struct InternalInstance
+    {
+        size_t id;
+        std::shared_ptr<BLAccelerationStructure> blas;
+    };
+    eastl::vector<InternalInstance> mInstances;
+    eastl::vector<D3D12_RAYTRACING_INSTANCE_DESC> mInstanceDescs;
+    size_t mNextId = 0;
+    bool mIsDirty = false;
+
+    TLAccelerationStructureParams mParams;
+
+    std::unique_ptr<Buffer> mAccelerationStructureGpuBuffer;
+    std::unique_ptr<Buffer> mScratchGpuBuffer;
+    std::unique_ptr<Buffer> mInstanceDescsGpuBuffer;
     AccelerationStructureState mState = AccelerationStructureState::Invalid;
 };
 } // namespace scrap::d3d12

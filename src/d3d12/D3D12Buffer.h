@@ -22,6 +22,7 @@ enum class BufferFlags
     AccelerationStructure = 1 << 2,
     UavEnabled = 1 << 3,
     Raw = 1 << 4,
+    NonPixelShaderResource = 1 << 5,
 };
 DEFINE_ENUM_BITWISE_OPERATORS(BufferFlags);
 
@@ -188,6 +189,7 @@ private:
     uint32_t mSrvIndex = 0;
     uint32_t mUavIndex = 0;
     uint32_t mCbvIndex = 0;
+    bool mInitialized = false;
 };
 
 template<class T>

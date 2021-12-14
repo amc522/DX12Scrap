@@ -11,6 +11,7 @@
 #include "d3d12/D3D12Config.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
 #include "d3d12/D3D12ShaderTable.h"
+#include "d3d12/D3D12TLAccelerationStructure.h"
 
 #include <array>
 #include <cstdint>
@@ -150,9 +151,11 @@ private:
 
     std::unique_ptr<d3d12::Texture> mRenderTarget;
     GpuMesh mCubeMesh;
+    glm::mat4x4 mCubeMeshTransform = glm::identity<glm::mat4x4>();
 
     std::unique_ptr<d3d12::TLAccelerationStructure> mTlas;
     std::shared_ptr<d3d12::BLAccelerationStructure> mBlas;
+    d3d12::TlasInstanceAllocation mTlasInstance;
 
     std::shared_ptr<d3d12::RaytracingShader> mShader;
     std::shared_ptr<d3d12::RaytracingPipelineState> mPipelineState;

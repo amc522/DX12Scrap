@@ -114,6 +114,8 @@ void Buffer::transition(ID3D12GraphicsCommandList* commandList,
 
 std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<const std::byte> buffer)
 {
+    assert(!mInitialized);
+
     DeviceContext& deviceContext = DeviceContext::instance();
     HRESULT hr;
 
@@ -179,6 +181,7 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
     bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
     if((params.accessFlags & ResourceAccessFlags::GpuRead) != ResourceAccessFlags::GpuRead &&
+       (params.flags & BufferFlags::NonPixelShaderResource) != BufferFlags::NonPixelShaderResource &&
        !isAccelerationStructure && !isConstantBuffer)
     {
         bufferDesc.Flags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
@@ -384,6 +387,8 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<co
     }
 
     mParams = params;
+
+    mInitialized = true;
 
     return std::nullopt;
 }
