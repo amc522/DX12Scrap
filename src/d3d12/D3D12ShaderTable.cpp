@@ -64,7 +64,7 @@ tl::expected<ShaderTableAllocation, ShaderTable::Error> ShaderTable::addPipeline
         GpuBufferWriteGuard<Buffer> stageTableWriteGuard{*stageShaderTable.shaderTableBuffer, commandList};
         auto writeBuffer = stageTableWriteGuard.getWriteBuffer();
         writeBuffer = writeBuffer.subspan(result->getRange().start * mParams[(size_t)stage].entryByteStride,
-                                          stageArguments.size_bytes());
+                                          detail::kShaderIdentifierSize + stageArguments.size_bytes());
 
         auto writeItr = writeBuffer.begin();
         writeItr = std::copy(stageIdentifier.begin(), stageIdentifier.end(), writeItr);
