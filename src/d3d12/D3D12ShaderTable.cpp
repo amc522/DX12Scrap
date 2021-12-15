@@ -43,7 +43,7 @@ void ShaderTable::init(const ShaderTableParams& params)
 
 tl::expected<ShaderTableAllocation, ShaderTable::Error> ShaderTable::addPipelineState(
     std::shared_ptr<RaytracingPipelineState> pipelineState,
-    std::array<nonstd::span<const std::byte>, (size_t)RaytracingPipelineStage::Count> localRootArguments,
+    std::array<std::span<const std::byte>, (size_t)RaytracingPipelineStage::Count> localRootArguments,
     ID3D12GraphicsCommandList* commandList)
 {
     ShaderTableAllocation allocation;
@@ -108,7 +108,7 @@ void ShaderTable::deallocate(const std::shared_ptr<RaytracingPipelineState>& pip
 
 void ShaderTable::updateLocalRootArguments(RaytracingPipelineStage stage,
                                            size_t index,
-                                           nonstd::span<const std::byte> localRootArguments,
+                                           std::span<const std::byte> localRootArguments,
                                            ID3D12GraphicsCommandList* commandList)
 {
     std::shared_ptr<d3d12::Buffer>& buffer = mShaderTables[(size_t)stage].shaderTableBuffer;
@@ -203,7 +203,7 @@ ShaderTableAllocation& ShaderTableAllocation::operator=(ShaderTableAllocation&& 
 }
 
 void ShaderTableAllocation::updateLocalRootArguments(RaytracingPipelineStage stage,
-                                                     nonstd::span<const std::byte> localRootArguments,
+                                                     std::span<const std::byte> localRootArguments,
                                                      ID3D12GraphicsCommandList* commandList)
 {
     mShaderTable->updateLocalRootArguments(stage, mTableReservations[(size_t)stage].getRange().start,

@@ -243,10 +243,7 @@ ShaderVertexElement ParseBindlessVertexBufferName(std::string_view name,
 
     name = vertexElement.name;
 
-    if(StartsWith(name, std::string_view("Vertex")))
-    {
-        name.remove_prefix(6);
-    }
+    if(StartsWith(name, std::string_view("Vertex"))) { name.remove_prefix(6); }
 
     const size_t digitIndex = name.find_first_of("0123456789");
 
@@ -362,7 +359,7 @@ void GraphicsShader::create()
         ComPtr<IDxcBlobEncoding> sourceBlob;
         if(FAILED(utils->LoadFile(filepath.c_str(), nullptr, &sourceBlob)))
         {
-            spdlog::error("Failed to load '{}' for shader compilation", filepath.generic_u8string());
+            spdlog::error("Failed to load '{}' for shader compilation", filepath.generic_string());
             compiled = false;
             continue;
         }
@@ -386,8 +383,7 @@ void GraphicsShader::create()
             shaderInfo.compilerMessage =
                 std::string((const char*)errors->GetStringPointer(), errors->GetStringLength());
 
-            spdlog::error("Failed to compile shader '{}':\n{}", filepath.generic_u8string(),
-                          shaderInfo.compilerMessage);
+            spdlog::error("Failed to compile shader '{}':\n{}", filepath.generic_string(), shaderInfo.compilerMessage);
 
             compiled = false;
             continue;
@@ -442,7 +438,7 @@ void GraphicsShader::create()
                 spdlog::error(
                     "{}({}): Global resource '{}' is not supported. Global resources (Texture, Buffer, etc.) are not "
                     "supported. Only ressources accessed through the ResourceDescriptorHeap array are supported.",
-                    filepath.generic_u8string(), stage, shaderInputBindDesc.Name);
+                    filepath.generic_string(), stage, shaderInputBindDesc.Name);
                 compiled = false;
                 continue;
             }
@@ -454,7 +450,7 @@ void GraphicsShader::create()
                     spdlog::error(
                         "{}({}): Found {} resource '{}' at register {}, space {}. This is reserved for a constant "
                         "buffer that holds the vertex buffer descriptor indices.",
-                        filepath.generic_u8string(), stage, shaderInputBindDesc.Type, shaderInputBindDesc.Name,
+                        filepath.generic_string(), stage, shaderInputBindDesc.Type, shaderInputBindDesc.Name,
                         shaderInputBindDesc.BindPoint, shaderInputBindDesc.Space);
 
                     continue;
@@ -469,7 +465,7 @@ void GraphicsShader::create()
                     spdlog::error(
                         "{}({}): Found {} resource '{}' at register {}, space {}. This is reserved for a constant "
                         "buffer that holds resource descriptor indices.",
-                        filepath.generic_u8string(), stage, shaderInputBindDesc.Type, shaderInputBindDesc.Name,
+                        filepath.generic_string(), stage, shaderInputBindDesc.Type, shaderInputBindDesc.Name,
                         shaderInputBindDesc.BindPoint, shaderInputBindDesc.Space);
 
                     continue;
@@ -541,9 +537,8 @@ bool ParseBindlessConstantBufferVariable(const GraphicsShaderParams& params,
     }
     else
     {
-        spdlog::error("{}({}): '{}' in cbuffer '{}' must be a uint.",
-                      params.filepaths[(size_t)stage].generic_u8string(), stage, variableTypeDesc.Name,
-                      constantBufferDesc.Name);
+        spdlog::error("{}({}): '{}' in cbuffer '{}' must be a uint.", params.filepaths[(size_t)stage].generic_string(),
+                      stage, variableTypeDesc.Name, constantBufferDesc.Name);
         return false;
     }
 
@@ -613,7 +608,7 @@ void GraphicsShader::collectVertexInputs(GraphicsShaderStage stage,
     if(constantBufferReflection == nullptr)
     {
         spdlog::error("{}({}): Failed to retrieve reflection data for '{}' constant buffer.",
-                      mParams.filepaths[(size_t)stage].generic_u8string(), stage, shaderInputBindDesc.Name);
+                      mParams.filepaths[(size_t)stage].generic_string(), stage, shaderInputBindDesc.Name);
         return;
     }
 
@@ -621,7 +616,7 @@ void GraphicsShader::collectVertexInputs(GraphicsShaderStage stage,
     if(FAILED(constantBufferReflection->GetDesc(&vertexCbDesc)))
     {
         spdlog::error("{}({}): Failed to retrieve reflection data for '{}' constant buffer.",
-                      mParams.filepaths[(size_t)stage].generic_u8string(), stage, shaderInputBindDesc.Name);
+                      mParams.filepaths[(size_t)stage].generic_string(), stage, shaderInputBindDesc.Name);
         return;
     }
 
@@ -635,7 +630,7 @@ void GraphicsShader::collectVertexInputs(GraphicsShaderStage stage,
     if(vertexBufferCount > d3d12::kMaxBindlessVertexBuffers)
     {
         spdlog::error("{}({}): Exceeded the maximum allowed number of vertex buffers ({}). Found {} vertex buffers.",
-                      mParams.filepaths[(size_t)stage].generic_u8string(), stage, d3d12::kMaxBindlessVertexBuffers,
+                      mParams.filepaths[(size_t)stage].generic_string(), stage, d3d12::kMaxBindlessVertexBuffers,
                       vertexBufferCount);
         return;
     }
@@ -662,7 +657,7 @@ void GraphicsShader::collectResourceInputs(GraphicsShaderStage stage,
     if(constantBufferReflection == nullptr)
     {
         spdlog::error("{}({}): Failed to retrieve reflection data for '{}' constant buffer.",
-                      mParams.filepaths[(size_t)stage].generic_u8string(), stage, shaderInputBindDesc.Name);
+                      mParams.filepaths[(size_t)stage].generic_string(), stage, shaderInputBindDesc.Name);
         return;
     }
 
@@ -670,7 +665,7 @@ void GraphicsShader::collectResourceInputs(GraphicsShaderStage stage,
     if(FAILED(constantBufferReflection->GetDesc(&resourceCbDesc)))
     {
         spdlog::error("{}({}): Failed to retrieve reflection data for '{}' constant buffer.",
-                      mParams.filepaths[(size_t)stage].generic_u8string(), stage, shaderInputBindDesc.Name);
+                      mParams.filepaths[(size_t)stage].generic_string(), stage, shaderInputBindDesc.Name);
         return;
     }
 
@@ -683,7 +678,7 @@ void GraphicsShader::collectResourceInputs(GraphicsShaderStage stage,
     {
         spdlog::error("{}({}): Exceeded the maximum allowed number of bindless resources ({}). Found {} "
                       "bindless resources.",
-                      mParams.filepaths[(size_t)stage].generic_u8string(), stage, d3d12::kMaxBindlessResources,
+                      mParams.filepaths[(size_t)stage].generic_string(), stage, d3d12::kMaxBindlessResources,
                       resourceCount);
         return;
     }
@@ -691,12 +686,12 @@ void GraphicsShader::collectResourceInputs(GraphicsShaderStage stage,
     // Now actually parse each variable
     mShaderInputs.resources.reserve(resourceCount);
 
-    EnumerateBindlessConstantBufferVariables(
-        mParams, stage, constantBufferReflection, [&](std::string_view name, uint32_t index) {
-        ShaderResource resource = ParseBindlessResourceName(name);
-        resource.index = index;
+    EnumerateBindlessConstantBufferVariables(mParams, stage, constantBufferReflection,
+                                             [&](std::string_view name, uint32_t index) {
+                                                 ShaderResource resource = ParseBindlessResourceName(name);
+                                                 resource.index = index;
 
-        mShaderInputs.resources.push_back(std::move(resource));
-    });
+                                                 mShaderInputs.resources.push_back(std::move(resource));
+                                             });
 }
 } // namespace scrap::d3d12

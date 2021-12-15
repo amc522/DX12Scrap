@@ -60,7 +60,7 @@ void RaytracingShader::create()
     ComPtr<IDxcCompiler3> compiler;
     if(FAILED(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils))))
     {
-        spdlog::error("Failed to create IDxcUtils when compiling raytracing shader {}.", mFilepath.generic_u8string());
+        spdlog::error("Failed to create IDxcUtils when compiling raytracing shader {}.", mFilepath.generic_string());
         mState = RaytracingShaderState::Failed;
         return;
     }
@@ -68,7 +68,7 @@ void RaytracingShader::create()
     if(FAILED(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler))))
     {
         spdlog::error("Failed to create IDxcCompiler3 when compiling raytracing shader {}.",
-                      mFilepath.generic_u8string());
+                      mFilepath.generic_string());
         mState = RaytracingShaderState::Failed;
         return;
     }
@@ -77,7 +77,7 @@ void RaytracingShader::create()
     if(FAILED(utils->CreateDefaultIncludeHandler(&includeHandler)))
     {
         spdlog::error("Failed to create default include handler when compiling raytracing shader {}.",
-                      mFilepath.generic_u8string());
+                      mFilepath.generic_string());
     }
 
     UINT compileFlags = 0;
@@ -87,7 +87,7 @@ void RaytracingShader::create()
     ComPtr<IDxcBlobEncoding> sourceBlob;
     if(FAILED(utils->LoadFile(mFilepath.c_str(), nullptr, &sourceBlob)))
     {
-        spdlog::error("Failed to load '{}' for raytracing shader compilation.", mFilepath.generic_u8string());
+        spdlog::error("Failed to load '{}' for raytracing shader compilation.", mFilepath.generic_string());
         mState = RaytracingShaderState::Failed;
         return;
     }
@@ -108,7 +108,7 @@ void RaytracingShader::create()
     {
         mCompilerMessage = std::string((const char*)errors->GetStringPointer(), errors->GetStringLength());
 
-        spdlog::error("Failed to compile raytracing shader '{}':\n{}", mFilepath.generic_u8string(), mCompilerMessage);
+        spdlog::error("Failed to compile raytracing shader '{}':\n{}", mFilepath.generic_string(), mCompilerMessage);
 
         mState = RaytracingShaderState::Failed;
         return;
@@ -120,14 +120,14 @@ void RaytracingShader::create()
 
     if(FAILED(hr) || shader == nullptr)
     {
-        spdlog::error("Failed to get raytracing shader binary for '{}'.", mFilepath.generic_u8string());
+        spdlog::error("Failed to get raytracing shader binary for '{}'.", mFilepath.generic_string());
         mState = RaytracingShaderState::Failed;
         return;
     }
 
     if(FAILED(shader.As(&mShaderBlob)))
     {
-        spdlog::error("Failed to get raytracing shader binary for '{}'.", mFilepath.generic_u8string());
+        spdlog::error("Failed to get raytracing shader binary for '{}'.", mFilepath.generic_string());
         mState = RaytracingShaderState::Failed;
         return;
     }
@@ -171,8 +171,7 @@ void RaytracingShader::create()
 
         if(!found)
         {
-            spdlog::error("Failed to find '{}' when compiling '{}'", shaderInfo.entryPoint,
-                          mFilepath.generic_u8string());
+            spdlog::error("Failed to find '{}' when compiling '{}'", shaderInfo.entryPoint, mFilepath.generic_string());
             mState = RaytracingShaderState::Failed;
             return;
         }

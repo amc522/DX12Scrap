@@ -36,7 +36,7 @@ namespace gpufmt {
     inline constexpr auto span_dynamic_extent = nonstd::dynamic_extent;
 
     template<class T, size_t Extent = nonstd::dynamic_extent>
-    using span = nonstd::span<T, Extent>;
+    using span = std::span<T, Extent>;
 #endif
 
     using Extent = glm::tvec3<uint32_t>;

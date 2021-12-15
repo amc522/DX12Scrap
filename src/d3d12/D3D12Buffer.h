@@ -5,11 +5,11 @@
 #include "d3d12/D3D12TrackedGpuObject.h"
 
 #include <optional>
+#include <span>
 
 #include <d3d12.h>
 #include <dxgiformat.h>
 #include <gpufmt/format.h>
-#include <nonstd/span.hpp>
 #include <wrl/client.h>
 
 namespace scrap::d3d12
@@ -89,9 +89,9 @@ public:
     Buffer& operator=(const Buffer&) = delete;
     Buffer& operator=(Buffer&&) = delete;
 
-    std::optional<Error> init(const SimpleParams& params, nonstd::span<const std::byte> buffer = {});
-    std::optional<Error> init(const FormattedParams& params, nonstd::span<const std::byte> buffer = {});
-    std::optional<Error> init(const StructuredParams& params, nonstd::span<const std::byte> buffer = {});
+    std::optional<Error> init(const SimpleParams& params, std::span<const std::byte> buffer = {});
+    std::optional<Error> init(const FormattedParams& params, std::span<const std::byte> buffer = {});
+    std::optional<Error> init(const StructuredParams& params, std::span<const std::byte> buffer = {});
 
     ID3D12Resource* getResource() const { return mResource.getResource(); }
 
@@ -127,13 +127,13 @@ public:
     void markAsUsed(ID3D12CommandQueue* commandQueue);
     void markAsUsed(ID3D12CommandList* commandList);
 
-    nonstd::span<std::byte> map();
+    std::span<std::byte> map();
 
     template<class T>
-    nonstd::span<T> mapAs()
+    std::span<T> mapAs()
     {
         auto buffer = map();
-        return nonstd::span<T>(reinterpret_cast<T*>(buffer.data()), buffer.size_bytes() / sizeof(T));
+        return std::span<T>(reinterpret_cast<T*>(buffer.data()), buffer.size_bytes() / sizeof(T));
     }
 
     void unmap(ID3D12GraphicsCommandList* commandList);
@@ -180,7 +180,7 @@ private:
         Type type = Type::Unknown;
     };
 
-    std::optional<Error> initInternal(Params params, nonstd::span<const std::byte> buffer);
+    std::optional<Error> initInternal(Params params, std::span<const std::byte> buffer);
 
     Params mParams;
     TrackedShaderResource mResource;
@@ -234,17 +234,17 @@ public:
         return *this;
     }
 
-    nonstd::span<std::byte> getWriteBuffer() { return mWriteBuffer; }
+    std::span<std::byte> getWriteBuffer() { return mWriteBuffer; }
 
     template<class U>
-    nonstd::span<U> getWriteBufferAs()
+    std::span<U> getWriteBufferAs()
     {
-        return nonstd::span<U>(reinterpret_cast<U*>(mWriteBuffer.data()), mWriteBuffer.size_bytes() / sizeof(U));
+        return std::span<U>(reinterpret_cast<U*>(mWriteBuffer.data()), mWriteBuffer.size_bytes() / sizeof(U));
     }
 
 private:
     T* mGpuBuffer = nullptr;
     ID3D12GraphicsCommandList* mCommandList = nullptr;
-    nonstd::span<std::byte> mWriteBuffer;
+    std::span<std::byte> mWriteBuffer;
 };
 } // namespace scrap::d3d12

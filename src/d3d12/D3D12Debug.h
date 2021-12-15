@@ -134,6 +134,8 @@ public:
 
     [[nodiscard]] bool isPixAttached() const { return mIsPixAttached; }
 
+    void handleDeviceRemoved();
+
 private:
     static Debug* sInstance;
 #ifdef _DEBUG

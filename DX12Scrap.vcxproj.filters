@@ -240,15 +240,16 @@
     <ClInclude Include="src\SpanUtility.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\RenderObject.h" />
+    <ClInclude Include="src\EastlFixedVectorExt.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="external\glm\util\glm.natvis">
-      <Filter>misc</Filter>
-    </Natvis>
-    <Natvis Include="external\span\nonstd_span.natvis">
       <Filter>misc</Filter>
     </Natvis>
     <Natvis Include="dx12scrap.natvis">

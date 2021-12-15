@@ -27,7 +27,7 @@ RaytracingPipelineState::RaytracingPipelineState(RaytracingPipelineStateParams&&
         (uint32_t)std::count_if(mFixedStageShaderParams.cbegin(), mFixedStageShaderParams.cend(),
                                 [](const auto& shaderExport) { return shaderExport.hasValidShaderEntryPoint(); });
 
-    mCallableShaderParams.assign(params.callables.cbegin(), params.callables.cend());
+    mCallableShaderParams.assign(params.callables.begin(), params.callables.end());
 
     mLocalRootSignatures.reserve(params.localRootSignatures.size());
     for(ComPtr<ID3D12RootSignature>& localRootSignature : params.localRootSignatures)
@@ -78,8 +78,8 @@ void RaytracingPipelineState::create()
     for(size_t shaderIndex = 0; shaderIndex < mShaders.size(); ++shaderIndex)
     {
         const std::shared_ptr<RaytracingShader>& shader = mShaders[shaderIndex];
-        nonstd::span fixedStageShaders = shader->getFixedStageShaders();
-        nonstd::span callableShaders = shader->getCallableShaders();
+        std::span fixedStageShaders = shader->getFixedStageShaders();
+        std::span callableShaders = shader->getCallableShaders();
 
         for(const RaytracingPipelineStateShaderParams& shaderParams : mFixedStageShaderParams)
         {
@@ -117,7 +117,7 @@ void RaytracingPipelineState::create()
         const RaytracingPipelineStateShaderParams shaderParams = mFixedStageShaderParams[(size_t)stage];
         if(!shaderParams.hasValidShaderEntryPoint()) { return nullptr; }
 
-        nonstd::span fixedStageShaders = mShaders[shaderParams.shaderIndex]->getFixedStageShaders();
+        std::span fixedStageShaders = mShaders[shaderParams.shaderIndex]->getFixedStageShaders();
 
         return fixedStageShaders[shaderParams.shaderEntryPointIndex].wideEntryPoint.c_str();
     };

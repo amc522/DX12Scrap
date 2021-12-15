@@ -13,17 +13,17 @@ using namespace Microsoft::WRL;
 
 namespace scrap::d3d12
 {
-std::optional<Buffer::Error> Buffer::init(const SimpleParams& params, nonstd::span<const std::byte> buffer)
+std::optional<Buffer::Error> Buffer::init(const SimpleParams& params, std::span<const std::byte> buffer)
 {
     return initInternal(params, buffer);
 }
 
-std::optional<Buffer::Error> Buffer::init(const FormattedParams& params, nonstd::span<const std::byte> buffer)
+std::optional<Buffer::Error> Buffer::init(const FormattedParams& params, std::span<const std::byte> buffer)
 {
     return initInternal(params, buffer);
 }
 
-std::optional<Buffer::Error> Buffer::init(const StructuredParams& params, nonstd::span<const std::byte> buffer)
+std::optional<Buffer::Error> Buffer::init(const StructuredParams& params, std::span<const std::byte> buffer)
 {
     return initInternal(params, buffer);
 }
@@ -87,12 +87,12 @@ void Buffer::markAsUsed(ID3D12CommandList* commandList)
     mResource.markAsUsed(commandList);
 }
 
-nonstd::span<std::byte> Buffer::map()
+std::span<std::byte> Buffer::map()
 {
     void* data;
     if(FAILED(mUploadResource->Map(0, nullptr, &data))) { return {}; }
 
-    return nonstd::span<std::byte>(reinterpret_cast<std::byte*>(data), mParams.byteSize);
+    return std::span<std::byte>(reinterpret_cast<std::byte*>(data), mParams.byteSize);
 }
 
 void Buffer::unmap(ID3D12GraphicsCommandList* commandList)
@@ -112,7 +112,7 @@ void Buffer::transition(ID3D12GraphicsCommandList* commandList,
     commandList->ResourceBarrier(1, &barrier);
 }
 
-std::optional<Buffer::Error> Buffer::initInternal(Params params, nonstd::span<const std::byte> buffer)
+std::optional<Buffer::Error> Buffer::initInternal(Params params, std::span<const std::byte> buffer)
 {
     assert(!mInitialized);
 

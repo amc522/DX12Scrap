@@ -130,6 +130,12 @@ void Debug::init(DebugOptions options)
     {
         spdlog::error("Failed to set DXGI break on corruption and error");
     }
+
+    ComPtr<ID3D12DeviceRemovedExtendedDataSettings1> dredSettings;
+    D3D12GetDebugInterface(IID_PPV_ARGS(&dredSettings));
+
+    dredSettings->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+    dredSettings->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
 }
 
 void Debug::setDevice(Microsoft::WRL::ComPtr<ID3D12Device> device)
@@ -254,6 +260,19 @@ bool Debug::endCapture(bool discard)
     return true;
 }
 
+void Debug::handleDeviceRemoved()
+{
+    ComPtr<ID3D12DeviceRemovedExtendedData1> dred;
+    mDevice->QueryInterface(IID_PPV_ARGS(&dred));
+
+    D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT1 DredAutoBreadcrumbsOutput;
+    dred->GetAutoBreadcrumbsOutput1(&DredAutoBreadcrumbsOutput);
+
+    D3D12_DRED_PAGE_FAULT_OUTPUT DredPageFaultOutput;
+    dred->GetPageFaultAllocationOutput(&DredPageFaultOutput);
+    return;
+}
+
 ScopedGpuEvent::ScopedGpuEvent(ID3D12GraphicsCommandList* commandList, std::string_view label)
     : mContext(commandList)
     , mContextType(ContextType::GraphicsCommandList)
@@ -334,9 +353,17 @@ void Debug::setGpuMarker(ID3D12CommandQueue*, std::string_view) {}
 
 void Debug::setGpuMarker(ID3D12CommandQueue*, std::wstring_view) {}
 
-bool Debug::beginCapture() {}
+bool Debug::beginCapture()
+{
+    return false;
+}
 
-bool Debug::endCapture(bool discard) {}
+bool Debug::endCapture(bool discard)
+{
+    return false;
+}
+
+void Debug::handleDeviceRemoved() {}
 
 ScopedGpuEvent::ScopedGpuEvent(ID3D12GraphicsCommandList*, std::string_view) {}
 

@@ -4,8 +4,9 @@
 #include "RenderDefs.h"
 #include "d3d12/D3D12Buffer.h"
 
+#include <span>
+
 #include <gpufmt/format.h>
-#include <nonstd/span.hpp>
 
 namespace scrap
 {
@@ -33,7 +34,7 @@ public:
     [[nodiscard]] PrimitiveTopology getPrimitiveTopology() const { return mPrimitiveTopology; }
 
     void initIndices(IndexBufferFormat format, uint32_t indexCount);
-    void initIndices(IndexBufferFormat format, uint32_t indexCount, nonstd::span<std::byte> data);
+    void initIndices(IndexBufferFormat format, uint32_t indexCount, std::span<std::byte> data);
 
     [[nodiscard]] IndexBuffer getIndexBuffer() const;
 
@@ -55,16 +56,16 @@ public:
                              uint32_t semanticIndex,
                              gpufmt::Format format,
                              uint32_t elementCount,
-                             nonstd::span<const std::byte> data);
+                             std::span<const std::byte> data);
 
     [[nodiscard]] const VertexElement* getVertexElement(ShaderVertexSemantic semantic, uint32_t semanticIndex) const;
 
     [[nodiscard]] FormattedBufferSpan accessVertexElementBuffer(ShaderVertexSemantic semantic, uint32_t semanticIndex);
     [[nodiscard]] FormattedBufferView getVertexElementBuffer(ShaderVertexSemantic semantic, uint32_t semanticIndex);
 
-    [[nodiscard]] nonstd::span<VertexElement> accessVertexElements() { return mVertexElements; }
+    [[nodiscard]] std::span<VertexElement> accessVertexElements() { return mVertexElements; }
 
-    [[nodiscard]] nonstd::span<const VertexElement> getVertexElements() const { return mVertexElements; }
+    [[nodiscard]] std::span<const VertexElement> getVertexElements() const { return mVertexElements; }
 
 private:
     PrimitiveTopology mPrimitiveTopology = PrimitiveTopology::Undefined;

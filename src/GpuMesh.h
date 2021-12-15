@@ -4,10 +4,9 @@
 #include "d3d12/D3D12Buffer.h"
 
 #include <memory>
+#include <span>
 #include <string_view>
 #include <vector>
-
-#include <nonstd/span.hpp>
 
 namespace scrap
 {
@@ -40,7 +39,7 @@ public:
     [[nodiscard]] PrimitiveTopology getPrimitiveTopology() const { return mPrimitiveTopology; }
 
     void initIndices(const IndexBufferParams& params);
-    void initIndices(const IndexBufferParams& params, nonstd::span<const std::byte> data);
+    void initIndices(const IndexBufferParams& params, std::span<const std::byte> data);
 
     [[nodiscard]] const std::shared_ptr<d3d12::Buffer> getIndexBuffer() const { return mIndexBuffer; }
 
@@ -51,12 +50,12 @@ public:
     void createVertexElement(ShaderVertexSemantic semantic,
                              uint32_t semanticIndex,
                              const d3d12::Buffer::FormattedParams& bufferParams,
-                             nonstd::span<const std::byte> data);
+                             std::span<const std::byte> data);
 
     [[nodiscard]] const std::shared_ptr<d3d12::Buffer>& getVertexBuffer(ShaderVertexSemantic semantic,
                                                                         uint32_t semanticIndex) const;
 
-    [[nodiscard]] nonstd::span<const VertexElement> getVertexElements() const { return mVertexElements; }
+    [[nodiscard]] std::span<const VertexElement> getVertexElements() const { return mVertexElements; }
 
     [[nodiscard]] bool isReady() const;
     void markAsUsed(ID3D12CommandList* commandList);

@@ -7,12 +7,12 @@
 
 #include <array>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include <d3d12.h>
-#include <nonstd/span.hpp>
 #include <spdlog/spdlog.h>
 #include <wrl/client.h>
 
@@ -54,7 +54,7 @@ public:
     }
 
     void queueObjectForDestruction(Microsoft::WRL::ComPtr<ID3D12DeviceChild> deviceChild,
-                                   nonstd::span<FixedDescriptorHeapReservation> descriptors,
+                                   std::span<FixedDescriptorHeapReservation> descriptors,
                                    FrameCodeT lastUsedFrameCode)
     {
         if((deviceChild == nullptr && descriptors.empty()) || lastUsedFrameCode <= mLastCompletedFrameCode) { return; }

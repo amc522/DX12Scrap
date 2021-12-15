@@ -6,10 +6,10 @@
 #include "d3d12/D3D12TrackedGpuObject.h"
 
 #include <memory>
+#include <span>
 #include <variant>
 
 #include <d3d12.h>
-#include <nonstd/span.hpp>
 #include <wrl/client.h>
 
 namespace scrap::d3d12
@@ -38,10 +38,10 @@ struct RaytracingPipelineStateShaderParams
 
 struct RaytracingPipelineStateParams
 {
-    nonstd::span<Microsoft::WRL::ComPtr<ID3D12RootSignature>> localRootSignatures;
+    std::span<Microsoft::WRL::ComPtr<ID3D12RootSignature>> localRootSignatures;
     Microsoft::WRL::ComPtr<ID3D12RootSignature> globalRootSignature;
 
-    nonstd::span<std::shared_ptr<RaytracingShader>> shaders;
+    std::span<std::shared_ptr<RaytracingShader>> shaders;
     struct
     {
         RaytracingPipelineStateShaderParams raygen;
@@ -51,7 +51,7 @@ struct RaytracingPipelineStateParams
         RaytracingPipelineStateShaderParams miss;
     } fixedStages;
 
-    nonstd::span<RaytracingPipelineStateShaderParams> callables;
+    std::span<RaytracingPipelineStateShaderParams> callables;
 
     std::string_view hitGroupName;
 
@@ -68,7 +68,7 @@ static constexpr uint32_t kShaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_I
 
 } // namespace detail
 
-using RaytracingShaderIdentifier = nonstd::span<const std::byte, detail::kShaderIdentifierSize>;
+using RaytracingShaderIdentifier = std::span<const std::byte, detail::kShaderIdentifierSize>;
 
 namespace detail
 {

@@ -9,7 +9,6 @@
     "fmt",
     "glm",
     "sdl2",
-    "span-lite",
     "spdlog",
     "tl-expected"
   ]

@@ -34,7 +34,7 @@ public:
     void reserve(size_t count);
 
     void addMesh(const GeometryParams& geometryParams);
-    void addMesh(nonstd::span<const GeometryParams> geometries);
+    void addMesh(std::span<const GeometryParams> geometries);
 
     bool build(const GraphicsCommandList& commandList);
 

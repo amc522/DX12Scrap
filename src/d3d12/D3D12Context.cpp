@@ -26,7 +26,7 @@
 extern "C"
 {
     __declspec(dllexport) extern const UINT D3D12SDKVersion = 4;
-    __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\";
+    __declspec(dllexport) extern const char8_t* D3D12SDKPath = u8".\\D3D12\\";
 }
 
 using namespace Microsoft::WRL;
@@ -63,7 +63,7 @@ DeviceContext::DeviceContext(const Window& window, GpuPreference gpuPreference)
 
     spdlog::info("Initializing D3D12");
 
-    mDebug.init(DebugOptions::None);
+    mDebug.init(DebugOptions::EnableAttachToProcess);
 
     ComPtr<IDXGIFactory4> dxgiFactory4;
     UINT createFactoryFlags = 0;
@@ -263,9 +263,13 @@ void DeviceContext::beginFrame()
 
 void DeviceContext::endFrame()
 {
-    if(FAILED(mSwapChain->Present(1, 0)))
+    HRESULT hr = mSwapChain->Present(1, 0);
+    if(FAILED(hr))
     {
-        spdlog::error("Present call failed");
+        spdlog::error("Present call failed {}", HRESULT_t(hr));
+
+        if(hr == DXGI_ERROR_DEVICE_REMOVED) { mDebug.handleDeviceRemoved(); }
+
         return;
     }
 

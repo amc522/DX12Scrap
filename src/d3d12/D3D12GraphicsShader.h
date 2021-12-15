@@ -7,8 +7,8 @@
 #include <filesystem>
 #include <mutex>
 #include <optional>
+#include <span>
 
-#include <nonstd/span.hpp>
 #include <wrl/client.h>
 
 struct D3D12_SHADER_BYTECODE;
@@ -66,7 +66,9 @@ public:
     const ShaderInputs& getShaderInputs() const { return mShaderInputs; }
 
     std::optional<uint32_t> getVertexElementIndex(ShaderVertexSemantic semantic, uint32_t semanticIndex) const;
-    std::optional<uint32_t> getResourceIndex(uint64_t nameHash, ShaderResourceType resourceType, ShaderResourceDimension resourceDimension) const;
+    std::optional<uint32_t> getResourceIndex(uint64_t nameHash,
+                                             ShaderResourceType resourceType,
+                                             ShaderResourceDimension resourceDimension) const;
 
 private:
     struct ShaderInfo

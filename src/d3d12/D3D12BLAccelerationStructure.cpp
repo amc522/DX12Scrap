@@ -47,7 +47,7 @@ void BLAccelerationStructure::addMesh(const GeometryParams& geometryParams)
     mGeometryBuffers.push_back(geometryParams.vertexBuffer);
 }
 
-void BLAccelerationStructure::addMesh(nonstd::span<const GeometryParams> geometries)
+void BLAccelerationStructure::addMesh(std::span<const GeometryParams> geometries)
 {
     mGeometryDescs.reserve(geometries.size() + mGeometryDescs.size());
 

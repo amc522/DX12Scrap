@@ -79,6 +79,7 @@
     <ClInclude Include="src\d3d12\D3D12TLAccelerationStructure.h" />
     <ClInclude Include="src\d3d12\D3D12TrackedGpuObject.h" />
     <ClInclude Include="src\d3d12\D3D12Translations.h" />
+    <ClInclude Include="src\EastlFixedVectorExt.h" />
     <ClInclude Include="src\EnumIterator.h" />
     <ClInclude Include="src\FormattedBuffer.h" />
     <ClInclude Include="src\FrameInfo.h" />
@@ -90,6 +91,7 @@
     <ClInclude Include="src\Mouse.h" />
     <ClInclude Include="src\PrimitiveMesh.h" />
     <ClInclude Include="src\RenderDefs.h" />
+    <ClInclude Include="src\RenderObject.h" />
     <ClInclude Include="src\RenderScene.h" />
     <ClInclude Include="src\SharedString.h" />
     <ClInclude Include="src\SpanUtility.h" />
@@ -105,7 +107,6 @@
     <Natvis Include="dx12scrap.natvis" />
     <Natvis Include="external\EASTL\doc\EASTL.natvis" />
     <Natvis Include="external\glm\util\glm.natvis" />
-    <Natvis Include="external\span\nonstd_span.natvis" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -201,7 +202,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>SPDLOG_WCHAR_TO_UTF8_SUPPORT;SPDLOG_FMT_EXTERNAL;NOMINMAX;WIN32_LEAN_AND_MEAN;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>./src/;external\gpuformat\include;external\cputexture\include;external\dxc\inc</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -228,7 +229,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>SPDLOG_WCHAR_TO_UTF8_SUPPORT;SPDLOG_FMT_EXTERNAL;NOMINMAX;WIN32_LEAN_AND_MEAN;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>./src/;external\gpuformat\include;external\cputexture\include;external\dxc\inc</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -253,7 +254,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>SPDLOG_WCHAR_TO_UTF8_SUPPORT;SPDLOG_FMT_EXTERNAL;NOMINMAX;WIN32_LEAN_AND_MEAN;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>./src/;external\gpuformat\include;external\cputexture\include;external\dxc\inc</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -280,7 +281,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>SPDLOG_WCHAR_TO_UTF8_SUPPORT;SPDLOG_FMT_EXTERNAL;NOMINMAX;WIN32_LEAN_AND_MEAN;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>./src/;external\gpuformat\include;external\cputexture\include;external\dxc\inc</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>

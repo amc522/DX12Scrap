@@ -287,7 +287,7 @@ void RasterScene::createTriangle()
 
         std::array<glm::vec2, 3> vertices{{{-0.5f, -0.5f}, {0.5f, -0.5f}, {0.0f, 0.5f}}};
         mTriangleMesh.createVertexElement(ShaderVertexSemantic::Position, 0, params,
-                                          nonstd::as_bytes(nonstd::span(vertices)));
+                                          std::as_bytes(std::span(vertices)));
     }
 
     { // UVs
@@ -299,7 +299,7 @@ void RasterScene::createTriangle()
 
         std::array<glm::vec2, 3> vertices{{{0.0f, 1.0f}, {1.0f, 1.0f}, {0.5f, 0.0f}}};
         mTriangleMesh.createVertexElement(ShaderVertexSemantic::TexCoord, 0, params,
-                                          nonstd::as_bytes(nonstd::span(vertices)));
+                                          std::as_bytes(std::span(vertices)));
     }
 
     { // Colors
@@ -310,8 +310,7 @@ void RasterScene::createTriangle()
         params.name = "Triangle TexCoords Buffer";
 
         std::array<glm::vec4, 3> vertices{{{1.0f, 0.0, 0.0, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
-        mTriangleMesh.createVertexElement(ShaderVertexSemantic::Color, 0, params,
-                                          nonstd::as_bytes(nonstd::span(vertices)));
+        mTriangleMesh.createVertexElement(ShaderVertexSemantic::Color, 0, params, std::as_bytes(std::span(vertices)));
     }
 
     { // Indices
@@ -323,7 +322,7 @@ void RasterScene::createTriangle()
         params.name = "Triangle Index Buffer";
 
         std::array<uint16_t, 3> indices{0, 1, 2};
-        mTriangleMesh.initIndices(params, nonstd::as_bytes(nonstd::span(indices)));
+        mTriangleMesh.initIndices(params, std::as_bytes(std::span(indices)));
     }
 }
 
@@ -427,7 +426,7 @@ void RasterScene::preRender(const FrameInfo& frameInfo)
         d3d12::GpuBufferWriteGuard writeGuard(*mFrameConstantBuffer.get(),
                                               d3d12::DeviceContext::instance().getCopyContext().getCommandList());
 
-        nonstd::span<FrameConstantBuffer> buffer = writeGuard.getWriteBufferAs<FrameConstantBuffer>();
+        std::span<FrameConstantBuffer> buffer = writeGuard.getWriteBufferAs<FrameConstantBuffer>();
         buffer.front().time = std::chrono::duration_cast<std::chrono::duration<float>>(
                                   std::chrono::steady_clock::now().time_since_epoch())
                                   .count();
@@ -438,9 +437,7 @@ void RasterScene::preRender(const FrameInfo& frameInfo)
     }
 }
 
-void RasterScene::drawIndexed(d3d12::GraphicsPipelineState& pso,
-                              GpuMesh& mesh,
-                              nonstd::span<TextureBindingDesc> textures)
+void RasterScene::drawIndexed(d3d12::GraphicsPipelineState& pso, GpuMesh& mesh, std::span<TextureBindingDesc> textures)
 {
     if(!pso.isReady() || !mesh.isReady()) { return; }
 
@@ -845,7 +842,7 @@ bool RaytracingScene::createPipelineState()
     d3d12::RaytracingPipelineStateParams pipelineStateParams;
     pipelineStateParams.globalRootSignature = mGlobalRootSignature;
     pipelineStateParams.localRootSignatures = localRootSignatures;
-    pipelineStateParams.shaders = nonstd::span(&mShader, 1);
+    pipelineStateParams.shaders = std::span(&mShader, 1);
 
     pipelineStateParams.fixedStages.raygen.shaderIndex = 0;
     pipelineStateParams.fixedStages.raygen.shaderEntryPointIndex = 0;
@@ -944,9 +941,9 @@ bool RaytracingScene::buildAccelerationStructures()
 }
 
 template<typename T>
-constexpr nonstd::span<const std::byte> AsBytes(const T& value)
+constexpr std::span<const std::byte> AsBytes(const T& value)
 {
-    return nonstd::span<const std::byte>(reinterpret_cast<const std::byte*>(&value), sizeof(T));
+    return std::span<const std::byte>(reinterpret_cast<const std::byte*>(&value), sizeof(T));
 }
 
 bool RaytracingScene::buildShaderTables()
@@ -968,7 +965,7 @@ bool RaytracingScene::buildShaderTables()
     mShaderTable = std::make_shared<d3d12::ShaderTable>();
     mShaderTable->init(params);
 
-    std::array<nonstd::span<const std::byte>, (size_t)RaytracingPipelineStage::Count> localRootArguments{
+    std::array<std::span<const std::byte>, (size_t)RaytracingPipelineStage::Count> localRootArguments{
         ToByteSpan(rootArguments),
         {},
         {}};

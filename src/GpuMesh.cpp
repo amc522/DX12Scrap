@@ -26,7 +26,7 @@ GpuMesh::GpuMesh(const CpuMesh& cpuMesh, ResourceAccessFlags accessFlags, std::s
         initIndices(indexParams, cpuMesh.getIndices().buffer);
     }
 
-    nonstd::span vertexElements = cpuMesh.getVertexElements();
+    std::span vertexElements = cpuMesh.getVertexElements();
     mVertexElements.reserve(vertexElements.size());
 
     for(const CpuMesh::VertexElement& element : vertexElements)
@@ -60,7 +60,7 @@ void GpuMesh::initIndices(const IndexBufferParams& params)
     mIndexCount = params.numIndices;
 }
 
-void GpuMesh::initIndices(const IndexBufferParams& params, nonstd::span<const std::byte> data)
+void GpuMesh::initIndices(const IndexBufferParams& params, std::span<const std::byte> data)
 {
     d3d12::Buffer::FormattedParams bufferParams;
     bufferParams.accessFlags = params.accessFlags;
@@ -105,7 +105,7 @@ void GpuMesh::createVertexElement(ShaderVertexSemantic semantic,
 void GpuMesh::createVertexElement(ShaderVertexSemantic semantic,
                                   uint32_t semanticIndex,
                                   const d3d12::Buffer::FormattedParams& bufferParams,
-                                  nonstd::span<const std::byte> data)
+                                  std::span<const std::byte> data)
 {
     if(bufferParams.numElements == 0) { return; }
 

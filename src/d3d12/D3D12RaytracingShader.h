@@ -1,13 +1,14 @@
 #pragma once
 
+#include "EastlFixedVectorExt.h"
 #include "RenderDefs.h"
 #include "SharedString.h"
 
 #include <filesystem>
 #include <mutex>
+#include <span>
 
 #include <EASTL/fixed_vector.h>
-#include <nonstd/span.hpp>
 #include <wrl/client.h>
 
 struct D3D12_SHADER_BYTECODE;
@@ -47,8 +48,8 @@ struct RaytracingFixedStageShaderInfo : public detail::RaytracingShaderInfo
 struct RaytracingShaderParams
 {
     std::filesystem::path filepath;
-    nonstd::span<const RaytracingFixedStageShaderEntryPoint> fixedStageEntryPoints;
-    nonstd::span<const RaytracingCallableShaderEntryPoint> callableEntryPoints;
+    std::span<const RaytracingFixedStageShaderEntryPoint> fixedStageEntryPoints;
+    std::span<const RaytracingCallableShaderEntryPoint> callableEntryPoints;
     bool debug = false;
 };
 
@@ -86,12 +87,11 @@ public:
     ID3DBlob* getShaderResource() const { return mShaderBlob.Get(); }
     D3D12_SHADER_BYTECODE getShaderByteCode() const;
 
-    nonstd::span<const RaytracingFixedStageShaderInfo, (size_t)RaytracingShaderStage::Count>
-    getFixedStageShaders() const
+    std::span<const RaytracingFixedStageShaderInfo, (size_t)RaytracingShaderStage::Count> getFixedStageShaders() const
     {
-        return mFixedStageShaders;
+        return ToSpan(mFixedStageShaders);
     }
-    nonstd::span<const RaytracingCallableShaderInfo> getCallableShaders() const { return mCallableShaders; }
+    std::span<const RaytracingCallableShaderInfo> getCallableShaders() const { return mCallableShaders; }
 
     /* ShaderInputs& accessShaderInputs() { return mShaderInputs; }
        const ShaderInputs& getShaderInputs() const { return mShaderInputs; }

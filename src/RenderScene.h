@@ -93,7 +93,7 @@ private:
     void createCube();
     void createTexture();
 
-    void drawIndexed(d3d12::GraphicsPipelineState& pso, GpuMesh& mesh, nonstd::span<TextureBindingDesc> textures);
+    void drawIndexed(d3d12::GraphicsPipelineState& pso, GpuMesh& mesh, std::span<TextureBindingDesc> textures);
 
     Camera mCamera;
 

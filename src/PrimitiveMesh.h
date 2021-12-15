@@ -4,11 +4,11 @@
 #include "FormattedBuffer.h"
 
 #include <limits>
+#include <span>
 
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <gpufmt/format.h>
-#include <nonstd/span.hpp>
 
 namespace scrap
 {
@@ -20,9 +20,9 @@ struct MeshSizes
 
 struct PrimitiveMesh2dParams
 {
-    nonstd::span<std::byte> indices;
-    nonstd::span<std::byte> positions;
-    nonstd::span<std::byte> uvs;
+    std::span<std::byte> indices;
+    std::span<std::byte> positions;
+    std::span<std::byte> uvs;
 };
 
 struct PrimitiveMesh3dParams

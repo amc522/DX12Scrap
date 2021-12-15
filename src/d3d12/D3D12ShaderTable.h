@@ -5,11 +5,11 @@
 
 #include <memory>
 #include <mutex>
+#include <span>
 #include <string_view>
 #include <vector>
 
 #include <EASTL/vector_set.h>
-#include <nonstd/span.hpp>
 
 struct D3D12_GPU_VIRTUAL_ADDRESS_RANGE;
 struct D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE;
@@ -57,7 +57,7 @@ public:
     ShaderTableAllocation& operator=(ShaderTableAllocation&& other);
 
     void updateLocalRootArguments(RaytracingPipelineStage stage,
-                                  nonstd::span<const std::byte> localRootArguments,
+                                  std::span<const std::byte> localRootArguments,
                                   ID3D12GraphicsCommandList* commandList);
 
 private:
@@ -82,16 +82,16 @@ public:
 
     void init(const ShaderTableParams& params);
 
-    [[nodiscard]] tl::expected<ShaderTableAllocation, Error> addPipelineState(
-        std::shared_ptr<RaytracingPipelineState> pipelineState,
-        std::array<nonstd::span<const std::byte>, (size_t)RaytracingPipelineStage::Count> localRootArguments,
-        ID3D12GraphicsCommandList* commandList);
+    [[nodiscard]] tl::expected<ShaderTableAllocation, Error>
+    addPipelineState(std::shared_ptr<RaytracingPipelineState> pipelineState,
+                     std::array<std::span<const std::byte>, (size_t)RaytracingPipelineStage::Count> localRootArguments,
+                     ID3D12GraphicsCommandList* commandList);
 
     void deallocate(const std::shared_ptr<RaytracingPipelineState>& pipelineState);
 
     void updateLocalRootArguments(RaytracingPipelineStage stage,
                                   size_t index,
-                                  nonstd::span<const std::byte> localRootArguments,
+                                  std::span<const std::byte> localRootArguments,
                                   ID3D12GraphicsCommandList* commandList);
 
     D3D12_GPU_VIRTUAL_ADDRESS_RANGE getRaygenRecordAddressAndStride(size_t index) const;

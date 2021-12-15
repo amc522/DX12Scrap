@@ -12,7 +12,7 @@ void CpuMesh::initIndices(IndexBufferFormat format, uint32_t indexCount)
     mIndexBuffer.data.resize(IndexBufferFormatByteSize(format) * indexCount);
 }
 
-void CpuMesh::initIndices(IndexBufferFormat format, uint32_t indexCount, nonstd::span<std::byte> data)
+void CpuMesh::initIndices(IndexBufferFormat format, uint32_t indexCount, std::span<std::byte> data)
 {
     mIndexBuffer.format = format;
     mIndexBuffer.data.resize(IndexBufferFormatByteSize(format) * indexCount);
@@ -49,7 +49,7 @@ void CpuMesh::createVertexElement(ShaderVertexSemantic semantic,
                                   uint32_t semanticIndex,
                                   gpufmt::Format format,
                                   uint32_t elementCount,
-                                  nonstd::span<const std::byte> data)
+                                  std::span<const std::byte> data)
 {
     auto elementItr = std::find_if(mVertexElements.begin(), mVertexElements.end(),
                                    [semantic, semanticIndex](const VertexElement& element) {
