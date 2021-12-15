@@ -334,9 +334,9 @@ void Debug::setGpuMarker(ID3D12CommandQueue*, std::string_view) {}
 
 void Debug::setGpuMarker(ID3D12CommandQueue*, std::wstring_view) {}
 
-void Debug::beginCapture() {}
+bool Debug::beginCapture() {}
 
-void Debug::endCapture(bool discard) {}
+bool Debug::endCapture(bool discard) {}
 
 ScopedGpuEvent::ScopedGpuEvent(ID3D12GraphicsCommandList*, std::string_view) {}
 
