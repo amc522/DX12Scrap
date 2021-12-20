@@ -90,6 +90,9 @@ inline size_t BasicStringHash<CharT>::hashValue() const
 {
     return mHash;
 }
+
+using StringHash = BasicStringHash<std::string::value_type>;
+using WStringHash = BasicStringHash<std::wstring::value_type>;
 } // namespace scrap
 
 namespace std

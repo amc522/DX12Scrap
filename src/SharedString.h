@@ -155,29 +155,6 @@ public:
 
     [[nodiscard]] constexpr bool empty() const noexcept { return mData == nullptr; }
 
-    [[nodiscard]] constexpr CharT* accessStringBuffer() noexcept
-    {
-        return reinterpret_cast<CharT*>(mData + sizeof(Header));
-    }
-
-    [[nodiscard]] constexpr const CharT* getStringBuffer() const noexcept
-    {
-        return reinterpret_cast<const CharT*>(mData + sizeof(Header));
-    }
-
-    [[nodiscard]] RefCounterType& getRefCount() const noexcept { return getHeader()->refCount; }
-
-    RefCounterValueType addRef() const noexcept { return ++getRefCount(); }
-
-    RefCounterValueType decRef() const noexcept { return --getRefCount(); }
-
-    [[nodiscard]] constexpr BasicStringHash<CharT> getHash() const noexcept
-    {
-        return getHeader()->hash;
-    }
-
-    void calculateHash() noexcept { getHeader()->hash = BasicStringHash<CharT>(std::basic_string_view<CharT, TraitsT>(getStringBuffer(), mLength)); }
-
 protected:
     virtual ~BasicSharedStringData() { destroy(); }
 
@@ -207,6 +184,29 @@ protected:
 
     [[nodiscard]] Header* getHeader() noexcept { return reinterpret_cast<Header*>(mData); }
     [[nodiscard]] const Header* getHeader() const noexcept { return reinterpret_cast<const Header*>(mData); }
+
+    [[nodiscard]] constexpr CharT* accessStringBuffer() noexcept
+    {
+        return reinterpret_cast<CharT*>(mData + sizeof(Header));
+    }
+
+    [[nodiscard]] constexpr const CharT* getStringBuffer() const noexcept
+    {
+        return reinterpret_cast<const CharT*>(mData + sizeof(Header));
+    }
+
+    [[nodiscard]] RefCounterType& getRefCount() const noexcept { return getHeader()->refCount; }
+
+    RefCounterValueType addRef() const noexcept { return ++getRefCount(); }
+
+    RefCounterValueType decRef() const noexcept { return --getRefCount(); }
+
+    [[nodiscard]] constexpr BasicStringHash<CharT> getHash() const noexcept { return getHeader()->hash; }
+
+    void calculateHash() noexcept
+    {
+        getHeader()->hash = BasicStringHash<CharT>(std::basic_string_view<CharT, TraitsT>(getStringBuffer(), mLength));
+    }
 
     std::byte* mData = nullptr;
     size_t mLength = 0;
@@ -688,7 +688,7 @@ public:
 
     BasicStringHash<CharT> hash() const noexcept
     {
-        return (this->empty()) ? this->getHash() : BasicStringHash<CharT>{};
+        return (!this->empty()) ? this->getHash() : BasicStringHash<CharT>{};
     }
 
     template<class TraitsU>

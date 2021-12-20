@@ -12,12 +12,14 @@ namespace scrap
 template<class CharT>
 bool StartsWith(std::basic_string_view<CharT> str, std::basic_string_view<CharT> potentialPrefix)
 {
+    if(potentialPrefix.size() > str.size()) { return false; }
     return std::equal(potentialPrefix.begin(), potentialPrefix.end(), str.begin());
 }
 
 template<class CharT>
 bool EndsWith(std::basic_string_view<CharT> str, std::basic_string_view<CharT> potentialSuffix)
 {
+    if(potentialSuffix.size() > str.size()) { return false; }
     return std::equal(potentialSuffix.rbegin(), potentialSuffix.rend(), str.rbegin());
 }
 
