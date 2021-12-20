@@ -25,7 +25,7 @@
 // https://devblogs.microsoft.com/directx/gettingstarted-dx12agility/#howto
 extern "C"
 {
-    __declspec(dllexport) extern const UINT D3D12SDKVersion = 4;
+    __declspec(dllexport) extern const UINT D3D12SDKVersion = 600;
     __declspec(dllexport) extern const char8_t* D3D12SDKPath = u8".\\D3D12\\";
 }
 
