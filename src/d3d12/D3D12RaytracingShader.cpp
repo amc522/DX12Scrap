@@ -1,5 +1,9 @@
 #include "D3D12RaytracingShader.h"
 
+#include "d3d12/D3D12Config.h"
+#include "d3d12/D3D12ShaderReflection.h"
+#include "d3d12/D3D12Strings.h"
+
 #include <d3d12.h>
 #include <d3d12shader.h>
 #include <d3dcommon.h>
@@ -29,6 +33,11 @@ RaytracingShader::RaytracingShader(RaytracingShaderParams&& params)
 
         mFixedStageShaders.push_back(std::move(shaderInfo));
     }
+
+    std::stable_sort(mFixedStageShaders.begin(), mFixedStageShaders.end(),
+                     [](const RaytracingFixedStageShaderInfo& left, const RaytracingFixedStageShaderInfo& right) {
+                         return left.stage < right.stage;
+                     });
 
     mCallableShaders.reserve(params.callableEntryPoints.size());
 
@@ -82,7 +91,7 @@ void RaytracingShader::create()
 
     UINT compileFlags = 0;
 
-    LPCWSTR compilerArgs[] = {mFilepath.c_str(), L"-T lib_6_6", (mDebug) ? L"-Zi" : L"", (mDebug) ? L"-Od" : L"O3"};
+    LPCWSTR compilerArgs[] = {mFilepath.c_str(), L"-T lib_6_6", (mDebug) ? L"-Zi" : L"", (mDebug) ? L"-Od" : L"O3", L"-enable-16bit-types"};
 
     ComPtr<IDxcBlobEncoding> sourceBlob;
     if(FAILED(utils->LoadFile(mFilepath.c_str(), nullptr, &sourceBlob)))
@@ -146,7 +155,7 @@ void RaytracingShader::create()
     D3D12_LIBRARY_DESC libraryDesc;
     reflection->GetDesc(&libraryDesc);
 
-    for(const RaytracingFixedStageShaderInfo& shaderInfo : mFixedStageShaders)
+    for(RaytracingFixedStageShaderInfo& shaderInfo : mFixedStageShaders)
     {
         bool found = false;
 
@@ -162,10 +171,121 @@ void RaytracingShader::create()
             auto itr = std::search(functionName.begin(), functionName.end(), shaderInfo.entryPoint.begin(),
                                    shaderInfo.entryPoint.end());
 
-            if(itr != functionName.end())
+            if(itr == functionName.end()) { continue; }
+
+            found = true;
+
+            for(uint32_t resourceIndex = 0; resourceIndex < functionDesc.BoundResources; ++resourceIndex)
             {
-                found = true;
-                break;
+                D3D12_SHADER_INPUT_BIND_DESC shaderInputBindDesc;
+                HRESULT hr = functionReflection->GetResourceBindingDesc(resourceIndex, &shaderInputBindDesc);
+
+                if(FAILED(hr)) { continue; }
+
+                if(ShaderReflection::IsVertexIndicesRegister(shaderInputBindDesc))
+                {
+                    ID3D12ShaderReflectionConstantBuffer* constantBufferReflection =
+                        functionReflection->GetConstantBufferByName(shaderInputBindDesc.Name);
+                    auto result = ShaderReflection::CollectVertexInputs(constantBufferReflection);
+
+                    if(result) { shaderInfo.inputs.vertexElements = std::move(result->vertexElements); }
+                    else
+                    {
+                        switch(result.error().error)
+                        {
+                        case ShaderReflectionError::ResourceInReservedRegisterSpace:
+                            logShaderError(
+                                functionDesc.Name,
+                                "Found {} resource '{}' at register {}, space {}. This is reserved for a constant "
+                                "buffer that holds the vertex buffer descriptor indices.",
+                                shaderInputBindDesc.Type, shaderInputBindDesc.Name, shaderInputBindDesc.BindPoint,
+                                shaderInputBindDesc.Space);
+                            break;
+                        case ShaderReflectionError::GetConstantBufferFailure:
+                            logShaderError(functionDesc.Name,
+                                           "Failed to retrieve reflection data for constant buffer '{}'.",
+                                           result.error().constantBufferName);
+                            break;
+                        case ShaderReflectionError::GetConstantBufferDescFailure:
+                            logShaderError(functionDesc.Name,
+                                           "Failed to retrieve reflection data for '{}' constant buffer.",
+
+                                           result.error().constantBufferName);
+                            break;
+                        case ShaderReflectionError::InvalidMemberType:
+                            logShaderError(
+                                functionDesc.Name,
+                                "Member '{}' in constant buffer '{}' must be a uint. This constant buffer is "
+                                "reserved for bindless vertex buffer indices.",
+                                ToHlslVariableString(result.error().variableType, result.error().memberName,
+                                                     result.error().variableTypeRows,
+                                                     result.error().variableTypeColumns,
+                                                     result.error().variableElements),
+                                result.error().constantBufferName);
+                            break;
+                        case ShaderReflectionError::ExceededMaxResourceCount:
+                            logShaderError(
+                                functionDesc.Name,
+                                "Exceeded the maximum allowed number of vertex buffers ({}). Found {} vertex buffers.",
+                                d3d12::kMaxBindlessVertexBuffers, result.error().resourceOverflowCount);
+                            break;
+                        default: break;
+                        }
+
+                        continue;
+                    }
+                }
+                else if(ShaderReflection::IsResourceIndicesRegister(shaderInputBindDesc))
+                {
+                    ID3D12ShaderReflectionConstantBuffer* constantBufferReflection =
+                        functionReflection->GetConstantBufferByName(shaderInputBindDesc.Name);
+                    auto result = ShaderReflection::CollectResourceInputs(constantBufferReflection);
+
+                    if(result) { shaderInfo.inputs.resources = std::move(result->resources); }
+                    else
+                    {
+                        switch(result.error().error)
+                        {
+                        case ShaderReflectionError::ResourceInReservedRegisterSpace:
+                            logShaderError(
+                                functionDesc.Name,
+                                "Found {} resource '{}' at register {}, space {}. This is reserved for a constant "
+                                "buffer that holds the resource descriptor indices.",
+                                shaderInputBindDesc.Type, shaderInputBindDesc.Name, shaderInputBindDesc.BindPoint,
+                                shaderInputBindDesc.Space);
+                            break;
+                        case ShaderReflectionError::GetConstantBufferFailure:
+                            logShaderError(functionDesc.Name,
+                                           "Failed to retrieve reflection data for constant buffer '{}'.",
+                                           result.error().constantBufferName);
+                            break;
+                        case ShaderReflectionError::GetConstantBufferDescFailure:
+                            logShaderError(functionDesc.Name,
+                                           "Failed to retrieve reflection data for '{}' constant buffer.",
+                                           result.error().constantBufferName);
+                            break;
+                        case ShaderReflectionError::InvalidMemberType:
+                            logShaderError(
+                                functionDesc.Name,
+                                "Member '{}' in constant buffer '{}' must be a uint. This constant buffer is "
+                                "reserved for bindless resournce indices.",
+                                ToHlslVariableString(result.error().variableType, result.error().memberName,
+                                                     result.error().variableTypeRows,
+                                                     result.error().variableTypeColumns,
+                                                     result.error().variableElements),
+                                result.error().constantBufferName);
+                            break;
+                        case ShaderReflectionError::ExceededMaxResourceCount:
+                            logShaderError(functionDesc.Name,
+                                           "Exceeded the maximum allowed number of resources ({}). Found {} resources.",
+                                           d3d12::kMaxBindlessResources, result.error().resourceOverflowCount);
+                            break;
+                        default: break;
+                        }
+
+                        continue;
+                    }
+                }
             }
         }
 
@@ -183,5 +303,121 @@ void RaytracingShader::create()
 D3D12_SHADER_BYTECODE RaytracingShader::getShaderByteCode() const
 {
     return CD3DX12_SHADER_BYTECODE(mShaderBlob.Get());
+}
+
+std::span<const RaytracingFixedStageShaderInfo>
+RaytracingShader::getFixedStageShaders(RaytracingShaderStage stage) const
+{
+    auto stageStartItr =
+        std::find_if(mFixedStageShaders.cbegin(), mFixedStageShaders.cend(),
+                     [stage](const RaytracingFixedStageShaderInfo& info) { return info.stage == stage; });
+
+    if(stageStartItr == mFixedStageShaders.cend()) { return {}; }
+
+    auto stageEndItr = stageStartItr + 1;
+    while(stageEndItr != mFixedStageShaders.cend() && stageEndItr->stage == stage)
+    {
+        ++stageEndItr;
+    }
+
+    return std::span(stageStartItr, stageEndItr);
+}
+
+const RaytracingFixedStageShaderInfo* RaytracingShader::getFixedStageShader(RaytracingShaderStage stage,
+                                                                                          size_t index) const
+{
+    auto shaders = getFixedStageShaders(stage);
+
+    if(index >= shaders.size()) { return nullptr; }
+
+    return &shaders[index];
+}
+
+size_t RaytracingShader::getFixedStageIndex(RaytracingShaderStage stage, std::string_view entryPointName) const
+{
+    auto itr = std::find_if(mFixedStageShaders.cbegin(), mFixedStageShaders.cend(),
+                            [stage, entryPointName](const auto& stageShader) {
+                                return stageShader.stage == stage && stageShader.entryPoint == entryPointName;
+                            });
+    return std::distance(mFixedStageShaders.begin(), itr);
+}
+
+size_t RaytracingShader::getFixedStageIndex(RaytracingShaderStage stage, std::wstring_view entryPointName) const
+{
+    auto itr = std::find_if(mFixedStageShaders.cbegin(), mFixedStageShaders.cend(),
+                            [stage, entryPointName](const auto& stageShader) {
+                                return stageShader.stage == stage && stageShader.wideEntryPoint == entryPointName;
+                            });
+    return std::distance(mFixedStageShaders.begin(), itr);
+}
+
+size_t RaytracingShader::getFixedStageIndex(RaytracingShaderStage stage, StringHash entryPointName) const
+{
+    auto itr = std::find_if(mFixedStageShaders.cbegin(), mFixedStageShaders.cend(),
+                            [stage, entryPointName](const auto& stageShader) {
+                                return stageShader.stage == stage && stageShader.entryPoint == entryPointName;
+                            });
+    return std::distance(mFixedStageShaders.begin(), itr);
+}
+
+size_t RaytracingShader::getFixedStageIndex(RaytracingShaderStage stage, WStringHash entryPointName) const
+{
+    auto itr = std::find_if(mFixedStageShaders.cbegin(), mFixedStageShaders.cend(),
+                            [stage, entryPointName](const auto& stageShader) {
+                                return stageShader.stage == stage && stageShader.wideEntryPoint == entryPointName;
+                            });
+    return std::distance(mFixedStageShaders.cbegin(), itr);
+}
+
+size_t RaytracingShader::getFixedStageIndex(RaytracingShaderStage stage, const SharedString& entryPointName) const
+{
+    return getFixedStageIndex(stage, entryPointName.hash());
+}
+
+size_t RaytracingShader::getFixedStageIndex(RaytracingShaderStage stage, const WSharedString& entryPointName) const
+{
+    return getFixedStageIndex(stage, entryPointName.hash());
+}
+
+std::optional<uint32_t> RaytracingShader::getVertexElementIndex(RaytracingShaderStage stage, ShaderVertexSemantic semantic, uint32_t semanticIndex) const
+{
+    const RaytracingFixedStageShaderInfo* shaderInfo = getFixedStageShader(stage, 0);
+
+    if(shaderInfo == nullptr) { return std::nullopt; }
+
+    for(const ShaderVertexElement& element : shaderInfo->inputs.vertexElements)
+    {
+        if(element.semantic == semantic && element.semanticIndex == semanticIndex) { return element.index; }
+    }
+
+    return std::nullopt;
+}
+
+std::optional<uint32_t> RaytracingShader::getResourceIndex(RaytracingShaderStage stage, uint64_t nameHash, ShaderResourceType resourceType, ShaderResourceDimension resourceDimension) const
+{
+    const RaytracingFixedStageShaderInfo* shaderInfo = getFixedStageShader(stage, 0);
+
+    if(shaderInfo == nullptr) { return std::nullopt; }
+
+    for(const ShaderResource& resource : shaderInfo->inputs.resources)
+    {
+        if(resource.nameHash == resource.nameHash && resource.type == resourceType &&
+           resource.dimension == resourceDimension)
+        {
+            return resource.index;
+        }
+    }
+
+    return std::nullopt;
+}
+
+void RaytracingShader::logShaderErrorImpl(std::string_view stageName, std::string_view message)
+{
+    spdlog::error("{} ({}): {}", mFilepath.generic_string(), stageName, message);
+}
+
+detail::RaytracingShaderInfo* RaytracingShader::findShaderInfoByName(std::string_view name)
+{
+    return nullptr;
 }
 } // namespace scrap::d3d12

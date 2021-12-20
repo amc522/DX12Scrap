@@ -78,12 +78,14 @@ private:
         std::string compilerMessage;
     };
 
-    void collectVertexInputs(GraphicsShaderStage stage,
-                             ID3D12ShaderReflection* reflection,
-                             const D3D12_SHADER_INPUT_BIND_DESC& shaderInputBindDesc);
-    void collectResourceInputs(GraphicsShaderStage stage,
-                               ID3D12ShaderReflection* reflection,
-                               const D3D12_SHADER_INPUT_BIND_DESC& shaderInputBindDesc);
+    template<class... Args>
+    void logShaderError(GraphicsShaderStage stage, std::string_view messageFormatStr, Args&&... messageArgs)
+    {
+        std::string message = fmt::format(messageFormatStr, std::forward<Args>(messageArgs)...);
+        logShaderErrorImpl(stage, message);
+    }
+
+    void logShaderErrorImpl(GraphicsShaderStage stage, std::string_view message);
 
     GraphicsShaderParams mParams;
     std::array<ShaderInfo, (size_t)GraphicsShaderStage::Count> mShaders;

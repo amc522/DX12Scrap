@@ -502,6 +502,8 @@ void RasterScene::drawIndexed(d3d12::GraphicsPipelineState& pso, GpuMesh& mesh, 
 
 void RasterScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context)
 {
+    mCommandList.beginRecording();
+
     {
         d3d12::ScopedGpuEvent gpuEvent(mCommandList.get(), "RasterScene");
 
@@ -578,6 +580,8 @@ RaytracingScene::RaytracingScene(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT,
 {
     mCommandList.beginRecording();
 
+    createTexture();
+
     if(!createRenderTargets())
     {
         spdlog::critical("Failed to create raytracing render target.");
@@ -633,18 +637,78 @@ void RaytracingScene::preRender(const FrameInfo& frameInfo)
     mCamera.update(frameInfo);
     const auto windowSize = frameInfo.mainWindow->getSize();
 
-    const glm::mat4x4 worldToViewMat = mCamera.worldToViewMatrix();
-    const glm::mat4x4 viewToClipMat =
-        glm::perspectiveFovLH_ZO(1.04719f, (float)windowSize.x, (float)windowSize.y, 0.1f, 100.0f);
-    const glm::mat4x4 worldToClipMat = viewToClipMat * worldToViewMat;
-    const glm::mat4x4 clipToWorldMat = glm::inverse(worldToClipMat);
+    {
+        const glm::mat4x4 worldToViewMat = mCamera.worldToViewMatrix();
+        const glm::mat4x4 viewToWorldMat = glm::inverse(worldToViewMat);
+        const glm::mat4x4 viewToClipMat =
+            glm::perspectiveFovLH_ZO(1.04719f, (float)windowSize.x, (float)windowSize.y, 0.1f, 100.0f);
+        const glm::mat4x4 clipToViewMat = glm::inverse(viewToClipMat);
+        const glm::mat4x4 worldToClipMat = viewToClipMat * worldToViewMat;
+        const glm::mat4x4 clipToWorldMat = glm::inverse(worldToClipMat);
 
-    RayGenConstantBuffer raygenCb;
-    raygenCb.clipToWorld = glm::transpose(clipToWorldMat);
-    raygenCb.cameraWorldPos = mCamera.getPosition();
+        d3d12::GpuBufferWriteGuard<d3d12::Buffer> writeGuard(
+            *mFrameConstantBuffer, d3d12::DeviceContext::instance().getCopyContext().getCommandList());
+        auto frameCbSpan = writeGuard.getWriteBufferAs<FrameConstantBuffer>();
 
-    mShaderTableAllocation.updateLocalRootArguments(RaytracingPipelineStage::RayGen, ToByteSpan(raygenCb),
-                                                    d3d12::DeviceContext::instance().getCopyContext().getCommandList());
+        FrameConstantBuffer& frameCb = frameCbSpan[0];
+        frameCb.worldToView = glm::transpose(worldToViewMat);
+        frameCb.viewToWorld = glm::transpose(viewToWorldMat);
+        frameCb.viewToClip = glm::transpose(viewToClipMat);
+        frameCb.clipToView = glm::transpose(clipToViewMat);
+        frameCb.worldToClip = glm::transpose(worldToClipMat);
+        frameCb.clipToWorld = glm::transpose(clipToWorldMat);
+        frameCb.cameraWorldPos = mCamera.getPosition();
+        frameCb.time = std::chrono::duration_cast<std::chrono::duration<float>>(
+                           std::chrono::steady_clock::now().time_since_epoch())
+                           .count();
+        frameCb.frameTimeDelta = frameInfo.frameDeltaSec.count();
+    }
+
+    {
+        struct BindlessIndices
+        {
+            std::array<uint32_t, d3d12::kMaxBindlessResources> resourceIndices = {};
+            std::array<uint32_t, d3d12::kMaxBindlessVertexBuffers> vertexBufferIndices = {};
+        } bindlessIndices;
+
+        {   // bind vertex buffers
+            // creating an array with one more than necessary to give a slot to assign buffers not used by the
+            // shader.
+            for(const GpuMesh::VertexElement& vertexElement : mCubeMesh.getVertexElements())
+            {
+                const std::optional<uint32_t> constantBufferIndex = mShader->getVertexElementIndex(
+                    RaytracingShaderStage::ClosestHit, vertexElement.semantic, vertexElement.semanticIndex);
+
+                if(!constantBufferIndex) { continue; }
+                bindlessIndices.vertexBufferIndices[constantBufferIndex.value()] =
+                    vertexElement.buffer->getSrvDescriptorHeapIndex();
+            }
+        }
+
+        { // bind resources
+            const std::optional<uint32_t> textureIndex =
+                mShader->getResourceIndex(RaytracingShaderStage::ClosestHit, std::hash<std::string_view>()("Textue"),
+                                          ShaderResourceType::Texture, mTexture->getShaderResourceDimension());
+
+            if(textureIndex)
+            {
+                bindlessIndices.resourceIndices[textureIndex.value()] = mTexture->getSrvDescriptorHeapIndex();
+            }
+
+            const std::optional<uint32_t> indexBufferIndex =
+                mShader->getResourceIndex(RaytracingShaderStage::ClosestHit, std::hash<std::string_view>()("IndexBuffer"),
+                                          ShaderResourceType::Buffer, ShaderResourceDimension::Buffer);
+
+            if(indexBufferIndex)
+            {
+                bindlessIndices.resourceIndices[indexBufferIndex.value()] = mCubeMesh.getIndexBuffer()->getSrvDescriptorHeapIndex();
+            }
+        }
+
+        mShaderTableAllocation.updateLocalRootArguments(
+            RaytracingPipelineStage::HitGroup, ToByteSpan(bindlessIndices),
+            d3d12::DeviceContext::instance().getCopyContext().getCommandList());
+    }
 
     mCubeMeshTransform = glm::rotate(mCubeMeshTransform, 0.01f, glm::vec3(0.0f, 1.0f, 0.0f));
     mTlasInstance.updateTransform(static_cast<glm::mat4x3>(mCubeMeshTransform));
@@ -682,8 +746,13 @@ void RaytracingScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d
         d3d12::RaytracingGlobalRootParamSlot::AccelerationStructure,
         mTlas->getAccelerationStructureBuffer().getResource()->GetGPUVirtualAddress());
 
+    mCommandList.get()->SetComputeRootConstantBufferView(d3d12::RaytracingGlobalRootParamSlot::FrameCB,
+                                                         mFrameConstantBuffer->getResource()->GetGPUVirtualAddress());
+
     mPipelineState->markAsUsed(mCommandList.get());
     mTlas->markAsUsed(mCommandList);
+    mRenderTarget->markAsUsed(mCommandList.get());
+    mFrameConstantBuffer->markAsUsed(mCommandList.get());
 
     DispatchRays(mCommandList.get4(), mPipelineState->getPipelineState(), &dispatchDesc);
 
@@ -710,6 +779,62 @@ void RaytracingScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d
 void RaytracingScene::endFrame()
 {
     mCommandList.endFrame();
+}
+
+void RaytracingScene::createTexture()
+{
+    cputex::TextureParams textureParams;
+    textureParams.dimension = cputex::TextureDimension::Texture2D;
+    textureParams.extent = {1024, 1024, 1};
+    textureParams.faces = 1;
+    textureParams.mips = cputex::maxMips(textureParams.extent);
+    textureParams.arraySize = 1;
+    textureParams.format = gpufmt::Format::R8G8B8A8_UNORM;
+    cputex::UniqueTexture cpuTexture{textureParams};
+
+    //-------------------------------------
+    // Generate a checkboard texture
+    //-------------------------------------
+    for(uint32_t mip = 0; mip < textureParams.mips; ++mip)
+    {
+        cputex::SurfaceSpan surface = cpuTexture.accessMipSurface(0, 0, mip);
+        const UINT bytesPerPixel = gpufmt::formatInfo(textureParams.format).blockByteSize;
+        const UINT rowPitch = surface.extent().x * bytesPerPixel;
+        const UINT cellPitch = std::max(rowPitch >> 3, 1u); // The width of a cell in the checkboard texture.
+        const UINT cellHeight =
+            std::max(surface.extent().x >> 3,
+                     std::max(cellPitch / bytesPerPixel, 1u)); // The height of a cell in the checkerboard texture.
+        const UINT textureSize = static_cast<UINT>(surface.sizeInBytes());
+
+        UINT8* pData = surface.accessDataAs<UINT8>().data();
+
+        for(UINT n = 0; n < textureSize; n += bytesPerPixel)
+        {
+            UINT x = n % rowPitch;
+            UINT y = n / rowPitch;
+            UINT i = x / cellPitch;
+            UINT j = y / cellHeight;
+
+            if(i % 2 == j % 2)
+            {
+                pData[n] = 0x00;     // R
+                pData[n + 1] = 0x00; // G
+                pData[n + 2] = 0x00; // B
+                pData[n + 3] = 0xff; // A
+            }
+            else
+            {
+                pData[n] = 0xff;     // R
+                pData[n + 1] = 0xff; // G
+                pData[n + 2] = 0xff; // B
+                pData[n + 3] = 0xff; // A
+            }
+        }
+    }
+
+    auto texture = std::make_unique<d3d12::Texture>();
+    texture->initFromMemory(cpuTexture, ResourceAccessFlags::GpuRead, "Firsrt Texture");
+    mTexture = std::move(texture);
 }
 
 bool RaytracingScene::createRenderTargets()
@@ -751,6 +876,7 @@ bool RaytracingScene::createRootSignatures()
     {
         std::array<D3D12_ROOT_PARAMETER1, d3d12::RaytracingGlobalRootParamSlot::Count> rootParams = {};
 
+        // Output UAV
         D3D12_DESCRIPTOR_RANGE1 descriptorRange = {};
         descriptorRange.NumDescriptors = 1;
         descriptorRange.OffsetInDescriptorsFromTableStart = 0;
@@ -759,24 +885,51 @@ bool RaytracingScene::createRootSignatures()
         descriptorRange.RegisterSpace = d3d12::reservedShaderRegister::kOutputBuffer.registerSpace;
         descriptorRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
 
-        D3D12_ROOT_PARAMETER1& uavRootParam = rootParams[d3d12::RaytracingGlobalRootParamSlot::OutputView];
+        auto& uavRootParam = rootParams[d3d12::RaytracingGlobalRootParamSlot::OutputView];
         uavRootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         uavRootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         uavRootParam.DescriptorTable.NumDescriptorRanges = 1;
         uavRootParam.DescriptorTable.pDescriptorRanges = &descriptorRange;
 
         // tlas = top level acceleration structure
-        D3D12_ROOT_PARAMETER1& tlasRootParam = rootParams[d3d12::RaytracingGlobalRootParamSlot::AccelerationStructure];
+        auto& tlasRootParam = rootParams[d3d12::RaytracingGlobalRootParamSlot::AccelerationStructure];
         tlasRootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
         tlasRootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         tlasRootParam.Descriptor.ShaderRegister = d3d12::reservedShaderRegister::kAccelerationStructure.shaderRegister;
         tlasRootParam.Descriptor.RegisterSpace = d3d12::reservedShaderRegister::kAccelerationStructure.registerSpace;
         tlasRootParam.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
 
+        // Frame constant buffer
+        auto& frameCbRootParam = rootParams[d3d12::RaytracingGlobalRootParamSlot::FrameCB];
+        frameCbRootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+        frameCbRootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        frameCbRootParam.Descriptor.ShaderRegister = d3d12::reservedShaderRegister::kFrameCB.shaderRegister;
+        frameCbRootParam.Descriptor.RegisterSpace = d3d12::reservedShaderRegister::kFrameCB.registerSpace;
+        frameCbRootParam.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+
+        // Static samplers
+        std::array<D3D12_STATIC_SAMPLER_DESC, 1> staticSamplers = {};
+        D3D12_STATIC_SAMPLER_DESC& sampler = staticSamplers[0];
+        sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler.MipLODBias = 0;
+        sampler.MaxAnisotropy = 0;
+        sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+        sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        sampler.MinLOD = 0.0f;
+        sampler.MaxLOD = D3D12_FLOAT32_MAX;
+        sampler.ShaderRegister = 0;
+        sampler.RegisterSpace = 0;
+        sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
         D3D12_VERSIONED_ROOT_SIGNATURE_DESC globalDesc = {};
-        globalDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+        globalDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
         globalDesc.Desc_1_1.NumParameters = (uint32_t)rootParams.size();
         globalDesc.Desc_1_1.pParameters = rootParams.data();
+        globalDesc.Desc_1_1.NumStaticSamplers = (uint32_t)staticSamplers.size();
+        globalDesc.Desc_1_1.pStaticSamplers = staticSamplers.data();
         globalDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
 
         auto rootSigResult = SerializeAndCreateRootSignature(globalDesc);
@@ -786,20 +939,32 @@ bool RaytracingScene::createRootSignatures()
             return false;
         }
 
+        rootSigResult.value()->SetName(L"Raytracing Global Root Signature");
+
         mGlobalRootSignature = std::move(rootSigResult.value());
         spdlog::info("Created raytracing global root signature.");
     }
 
-    // Local Root Signature
+    // Local Root Signatures
     // This is a root signature that enables a shader to have unique arguments that come from shader tables.
     {
-        std::array<D3D12_ROOT_PARAMETER1, d3d12::RaytracingLocalRootParamSlot::Count> rootParams = {};
-        auto& raygenCbParam = rootParams[d3d12::RaytracingLocalRootParamSlot::RayGenCb];
-        raygenCbParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-        raygenCbParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        raygenCbParam.Constants.Num32BitValues = sizeof(RayGenConstantBuffer) / sizeof(uint32_t);
-        raygenCbParam.Constants.ShaderRegister = d3d12::reservedShaderRegister::kRaygenCB.shaderRegister;
-        raygenCbParam.Constants.RegisterSpace = d3d12::reservedShaderRegister::kRaygenCB.registerSpace;
+        std::array<D3D12_ROOT_PARAMETER1, d3d12::RaytracingClosestHitLocalRootParamSlot::Count> rootParams = {};
+
+        // Bindless resource indices
+        auto& resourceIndicesParam = rootParams[d3d12::RaytracingClosestHitLocalRootParamSlot::ResourceIndices];
+        resourceIndicesParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        resourceIndicesParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        resourceIndicesParam.Constants.Num32BitValues = d3d12::kMaxBindlessResources;
+        resourceIndicesParam.Constants.ShaderRegister = d3d12::reservedShaderRegister::kResourceCB.shaderRegister;
+        resourceIndicesParam.Constants.RegisterSpace = d3d12::reservedShaderRegister::kResourceCB.registerSpace;
+
+        // Bindless vertex buffer indices
+        auto& vertexIndicesParam = rootParams[d3d12::RaytracingClosestHitLocalRootParamSlot::VertexIndices];
+        vertexIndicesParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        vertexIndicesParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        vertexIndicesParam.Constants.Num32BitValues = d3d12::kMaxBindlessVertexBuffers;
+        vertexIndicesParam.Constants.ShaderRegister = d3d12::reservedShaderRegister::kVertexCB.shaderRegister;
+        vertexIndicesParam.Constants.RegisterSpace = d3d12::reservedShaderRegister::kVertexCB.registerSpace;
 
         D3D12_VERSIONED_ROOT_SIGNATURE_DESC desc = {};
         desc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
@@ -814,20 +979,35 @@ bool RaytracingScene::createRootSignatures()
             return false;
         }
 
-        mLocalRootSignature = std::move(rootSigResult.value());
+        rootSigResult.value()->SetName(L"Closest Hit Local Root Signature");
+        mClosestHitLocalRootSignature = std::move(rootSigResult.value());
         spdlog::info("Created raytracing local root signature.");
     }
+
+    d3d12::Buffer::SimpleParams frameCbParams;
+    frameCbParams.accessFlags = ResourceAccessFlags::CpuWrite;
+    frameCbParams.byteSize = sizeof(FrameConstantBuffer);
+    frameCbParams.flags = d3d12::BufferFlags::ConstantBuffer;
+
+    auto frameCbBuffer = std::make_unique<d3d12::Buffer>();
+    frameCbBuffer->init(frameCbParams);
+
+    mFrameConstantBuffer = std::move(frameCbBuffer);
 
     return true;
 }
 
 bool RaytracingScene::createPipelineState()
 {
+    SharedString raygenEntryPointName("MyRaygenShader");
+    SharedString closestHitEntryPointName("MyClosestHitShader");
+    SharedString missEntryPointName("MyMissShader");
+    SharedString hitGroupName("MyHitGroup");
+
     std::array<d3d12::RaytracingFixedStageShaderEntryPoint, 3> fixedStageShaderEntryPoints = {
-        d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::RayGen, SharedString("MyRaygenShader")},
-        d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::ClosestHit,
-                                                    SharedString("MyClosestHitShader")},
-        d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::Miss, SharedString("MyMissShader")}};
+        d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::RayGen, raygenEntryPointName},
+        d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::ClosestHit, closestHitEntryPointName},
+        d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::Miss, missEntryPointName}};
 
     d3d12::RaytracingShaderParams shaderParams;
     shaderParams.filepath = "assets/raytracing_basic3d.hlsl";
@@ -838,23 +1018,26 @@ bool RaytracingScene::createPipelineState()
 #endif
     mShader = std::make_shared<d3d12::RaytracingShader>(std::move(shaderParams));
 
-    std::array localRootSignatures = {mLocalRootSignature};
+    std::array localRootSignatures = {mClosestHitLocalRootSignature};
     d3d12::RaytracingPipelineStateParams pipelineStateParams;
     pipelineStateParams.globalRootSignature = mGlobalRootSignature;
     pipelineStateParams.localRootSignatures = localRootSignatures;
     pipelineStateParams.shaders = std::span(&mShader, 1);
 
     pipelineStateParams.fixedStages.raygen.shaderIndex = 0;
-    pipelineStateParams.fixedStages.raygen.shaderEntryPointIndex = 0;
-    pipelineStateParams.fixedStages.raygen.localRootSignatureIndex = 0;
+    pipelineStateParams.fixedStages.raygen.shaderEntryPointIndex =
+        mShader->getFixedStageIndex(RaytracingShaderStage::RayGen, raygenEntryPointName);
 
     pipelineStateParams.fixedStages.closestHit.shaderIndex = 0;
-    pipelineStateParams.fixedStages.closestHit.shaderEntryPointIndex = 1;
+    pipelineStateParams.fixedStages.closestHit.shaderEntryPointIndex =
+        mShader->getFixedStageIndex(RaytracingShaderStage::ClosestHit, closestHitEntryPointName);
+    pipelineStateParams.fixedStages.closestHit.localRootSignatureIndex = 0;
 
     pipelineStateParams.fixedStages.miss.shaderIndex = 0;
-    pipelineStateParams.fixedStages.miss.shaderEntryPointIndex = 2;
+    pipelineStateParams.fixedStages.miss.shaderEntryPointIndex =
+        mShader->getFixedStageIndex(RaytracingShaderStage::Miss, missEntryPointName);
 
-    pipelineStateParams.hitGroupName = "MyHitGroup";
+    pipelineStateParams.hitGroupName = hitGroupName;
     pipelineStateParams.primitiveType = d3d12::RaytracingPipelineStatePrimitiveType::Triangles;
     pipelineStateParams.maxAttributeByteSize = 2 * sizeof(float); // float2 barycentrics
     pipelineStateParams.maxPayloadByteSize = 4 * sizeof(float);   // float4 color
@@ -950,13 +1133,13 @@ bool RaytracingScene::buildShaderTables()
 {
     struct RootArguments
     {
-        RayGenConstantBuffer cb;
+        FrameConstantBuffer cb;
     } rootArguments{};
 
     d3d12::ShaderTableParams params;
-    params.raygen.entryByteStride = sizeof(RootArguments);
+    params.raygen.entryByteStride = 0;
     params.raygen.capacity = 1;
-    params.hitGroup.entryByteStride = 0;
+    params.hitGroup.entryByteStride = sizeof(RootArguments);
     params.hitGroup.capacity = 1;
     params.miss.entryByteStride = 0;
     params.miss.capacity = 1;
@@ -966,9 +1149,7 @@ bool RaytracingScene::buildShaderTables()
     mShaderTable->init(params);
 
     std::array<std::span<const std::byte>, (size_t)RaytracingPipelineStage::Count> localRootArguments{
-        ToByteSpan(rootArguments),
-        {},
-        {}};
+        {{}, ToByteSpan(rootArguments), {}}};
 
     auto shaderTableResult = mShaderTable->addPipelineState(mPipelineState, localRootArguments, mCommandList.get());
 

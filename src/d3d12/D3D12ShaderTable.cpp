@@ -11,8 +11,8 @@ namespace scrap::d3d12
 void ShaderTable::init(const ShaderTableParams& params)
 {
     mParams[(size_t)RaytracingPipelineStage::RayGen] = params.raygen;
-    mParams[(size_t)RaytracingPipelineStage::HitGroup] = params.raygen;
-    mParams[(size_t)RaytracingPipelineStage::Miss] = params.raygen;
+    mParams[(size_t)RaytracingPipelineStage::HitGroup] = params.hitGroup;
+    mParams[(size_t)RaytracingPipelineStage::Miss] = params.miss;
 
     std::array<std::string, (size_t)RaytracingPipelineStage::Count> tableNames{
         fmt::format("{} (Raygen Table)", params.name),

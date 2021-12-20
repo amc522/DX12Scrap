@@ -39,20 +39,18 @@ class Texture;
 class TLAccelerationStructure;
 } // namespace d3d12
 
-struct RayGenConstantBuffer
-{
-    glm::mat4x4 clipToWorld;
-    glm::vec3 cameraWorldPos;
-    float padding;
-};
-
 struct FrameConstantBuffer
 {
     glm::mat4x4 worldToView;
+    glm::mat4x4 viewToWorld;
     glm::mat4x4 viewToClip;
+    glm::mat4x4 clipToView;
     glm::mat4x4 worldToClip;
+    glm::mat4x4 clipToWorld;
+    glm::vec3 cameraWorldPos;
     float time;
     float frameTimeDelta;
+    glm::vec3 padding;
 };
 
 enum class Scene
@@ -131,6 +129,7 @@ public:
     bool isInitialized() { return mInitialized; }
 
 private:
+    void createTexture();
     bool createRenderTargets();
     bool createRootSignatures();
     bool createPipelineState();
@@ -146,12 +145,14 @@ private:
     Camera mCamera;
 
     Microsoft::WRL::ComPtr<ID3D12RootSignature> mGlobalRootSignature;
-    Microsoft::WRL::ComPtr<ID3D12RootSignature> mLocalRootSignature;
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> mClosestHitLocalRootSignature;
     d3d12::GraphicsCommandList mCommandList;
 
     std::unique_ptr<d3d12::Texture> mRenderTarget;
     GpuMesh mCubeMesh;
     glm::mat4x4 mCubeMeshTransform = glm::identity<glm::mat4x4>();
+
+    std::unique_ptr<d3d12::Texture> mTexture;
 
     std::unique_ptr<d3d12::TLAccelerationStructure> mTlas;
     std::shared_ptr<d3d12::BLAccelerationStructure> mBlas;
@@ -163,7 +164,7 @@ private:
     std::shared_ptr<d3d12::ShaderTable> mShaderTable;
     d3d12::ShaderTableAllocation mShaderTableAllocation;
 
-    RayGenConstantBuffer mRayGenCpuConstantBuffer;
+    FrameConstantBuffer mFrameCpuConstantBuffer;
     std::shared_ptr<d3d12::Buffer> mFrameConstantBuffer;
 
     bool mInitialized = false;

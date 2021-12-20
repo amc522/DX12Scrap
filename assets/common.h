@@ -15,9 +15,14 @@ ResourceObjectType<ResourceValueType> get##Name() { return ResourceDescriptorHea
 struct Frame
 {
     float4x4 worldToView;
+    float4x4 viewToWorld;
     float4x4 viewToClip;
+    float4x4 clipToView;
     float4x4 worldToClip;
+    float4x4 clipToWorld;
+    float3 cameraWorldPos;
     float time;
     float frameTimeDelta;
+    float3 padding;
 };
 ConstantBuffer<Frame> gFrame : register(b1, space1);

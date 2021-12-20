@@ -4,6 +4,7 @@
 
 #include "StringUtils.h"
 
+#include <string>
 #include <string_view>
 
 #include <d3d12.h>
@@ -91,6 +92,73 @@ constexpr std::string_view ToStringView(D3D_SHADER_MODEL shaderModel)
 }
 
 template<>
+constexpr std::string_view ToStringView(D3D_SHADER_VARIABLE_TYPE variableType)
+{
+    switch(variableType)
+    {
+    case D3D_SVT_VOID: return "D3D_SVT_VOID";
+    case D3D_SVT_BOOL: return "D3D_SVT_BOOL";
+    case D3D_SVT_INT: return "D3D_SVT_INT";
+    case D3D_SVT_FLOAT: return "D3D_SVT_FLOAT";
+    case D3D_SVT_STRING: return "D3D_SVT_STRING";
+    case D3D_SVT_TEXTURE: return "D3D_SVT_TEXTURE";
+    case D3D_SVT_TEXTURE1D: return "D3D_SVT_TEXTURE1D";
+    case D3D_SVT_TEXTURE2D: return "D3D_SVT_TEXTURE2D";
+    case D3D_SVT_TEXTURE3D: return "D3D_SVT_TEXTURE3D";
+    case D3D_SVT_TEXTURECUBE: return "D3D_SVT_TEXTURECUBE";
+    case D3D_SVT_SAMPLER: return "D3D_SVT_SAMPLER";
+    case D3D_SVT_SAMPLER1D: return "D3D_SVT_SAMPLER1D";
+    case D3D_SVT_SAMPLER2D: return "D3D_SVT_SAMPLER2D";
+    case D3D_SVT_SAMPLER3D: return "D3D_SVT_SAMPLER3D";
+    case D3D_SVT_SAMPLERCUBE: return "D3D_SVT_SAMPLERCUBE";
+    case D3D_SVT_PIXELSHADER: return "D3D_SVT_PIXELSHADER";
+    case D3D_SVT_VERTEXSHADER: return "D3D_SVT_VERTEXSHADER";
+    case D3D_SVT_PIXELFRAGMENT: return "D3D_SVT_PIXELFRAGMENT";
+    case D3D_SVT_VERTEXFRAGMENT: return "D3D_SVT_VERTEXFRAGMENT";
+    case D3D_SVT_UINT: return "D3D_SVT_UINT";
+    case D3D_SVT_UINT8: return "D3D_SVT_UINT8";
+    case D3D_SVT_GEOMETRYSHADER: return "D3D_SVT_GEOMETRYSHADER";
+    case D3D_SVT_RASTERIZER: return "D3D_SVT_RASTERIZER";
+    case D3D_SVT_DEPTHSTENCIL: return "D3D_SVT_DEPTHSTENCIL";
+    case D3D_SVT_BLEND: return "D3D_SVT_BLEND";
+    case D3D_SVT_BUFFER: return "D3D_SVT_BUFFER";
+    case D3D_SVT_CBUFFER: return "D3D_SVT_CBUFFER";
+    case D3D_SVT_TBUFFER: return "D3D_SVT_TBUFFER";
+    case D3D_SVT_TEXTURE1DARRAY: return "D3D_SVT_TEXTURE1DARRAY";
+    case D3D_SVT_TEXTURE2DARRAY: return "D3D_SVT_TEXTURE2DARRAY";
+    case D3D_SVT_RENDERTARGETVIEW: return "D3D_SVT_RENDERTARGETVIEW";
+    case D3D_SVT_DEPTHSTENCILVIEW: return "D3D_SVT_DEPTHSTENCILVIEW";
+    case D3D_SVT_TEXTURE2DMS: return "D3D_SVT_TEXTURE2DMS";
+    case D3D_SVT_TEXTURE2DMSARRAY: return "D3D_SVT_TEXTURE2DMSARRAY";
+    case D3D_SVT_TEXTURECUBEARRAY: return "D3D_SVT_TEXTURECUBEARRAY";
+    case D3D_SVT_HULLSHADER: return "D3D_SVT_HULLSHADER";
+    case D3D_SVT_DOMAINSHADER: return "D3D_SVT_DOMAINSHADER";
+    case D3D_SVT_INTERFACE_POINTER: return "D3D_SVT_INTERFACE_POINTER";
+    case D3D_SVT_COMPUTESHADER: return "D3D_SVT_COMPUTESHADER";
+    case D3D_SVT_DOUBLE: return "D3D_SVT_DOUBLE";
+    case D3D_SVT_RWTEXTURE1D: return "D3D_SVT_RWTEXTURE1D";
+    case D3D_SVT_RWTEXTURE1DARRAY: return "D3D_SVT_RWTEXTURE1DARRAY";
+    case D3D_SVT_RWTEXTURE2D: return "D3D_SVT_RWTEXTURE2D";
+    case D3D_SVT_RWTEXTURE2DARRAY: return "D3D_SVT_RWTEXTURE2DARRAY";
+    case D3D_SVT_RWTEXTURE3D: return "D3D_SVT_RWTEXTURE3D";
+    case D3D_SVT_RWBUFFER: return "D3D_SVT_RWBUFFER";
+    case D3D_SVT_BYTEADDRESS_BUFFER: return "D3D_SVT_BYTEADDRESS_BUFFER";
+    case D3D_SVT_RWBYTEADDRESS_BUFFER: return "D3D_SVT_RWBYTEADDRESS_BUFFER";
+    case D3D_SVT_STRUCTURED_BUFFER: return "D3D_SVT_STRUCTURED_BUFFER";
+    case D3D_SVT_RWSTRUCTURED_BUFFER: return "D3D_SVT_RWSTRUCTURED_BUFFER";
+    case D3D_SVT_APPEND_STRUCTURED_BUFFER: return "D3D_SVT_APPEND_STRUCTURED_BUFFER";
+    case D3D_SVT_CONSUME_STRUCTURED_BUFFER: return "D3D_SVT_CONSUME_STRUCTURED_BUFFER";
+    case D3D_SVT_MIN8FLOAT: return "D3D_SVT_MIN8FLOAT";
+    case D3D_SVT_MIN10FLOAT: return "D3D_SVT_MIN10FLOAT";
+    case D3D_SVT_MIN16FLOAT: return "D3D_SVT_MIN16FLOAT";
+    case D3D_SVT_MIN12INT: return "D3D_SVT_MIN12INT";
+    case D3D_SVT_MIN16INT: return "D3D_SVT_MIN16INT";
+    case D3D_SVT_MIN16UINT: return "D3D_SVT_MIN16UINT";
+    default: return "Unknown D3D_SHADER_VARIABLE_TYPE";
+    }
+}
+
+template<>
 constexpr std::string_view ToStringView(D3D12_COMMAND_LIST_TYPE commandListType)
 {
     switch(commandListType)
@@ -142,6 +210,156 @@ constexpr std::string_view ToStringView(D3D12_RESOURCE_BINDING_TIER resourceBind
     default: assert(false); return "Unknown D3D12_RESOURCE_BIND_TIER";
     }
 }
+
+constexpr std::string_view ToHlslVariableStringView(D3D_SHADER_VARIABLE_TYPE variableType)
+{
+    switch(variableType)
+    {
+    case D3D_SVT_VOID: return "void";
+    case D3D_SVT_BOOL: return "bool";
+    case D3D_SVT_INT: return "int";
+    case D3D_SVT_FLOAT: return "float";
+    case D3D_SVT_STRING: return "string";
+    case D3D_SVT_TEXTURE: return "texture";
+    case D3D_SVT_TEXTURE1D: return "Texture1D";
+    case D3D_SVT_TEXTURE2D: return "Texture2D";
+    case D3D_SVT_TEXTURE3D: return "Texture3D";
+    case D3D_SVT_TEXTURECUBE: return "TextureCube";
+    case D3D_SVT_SAMPLER: return "Sampler";
+    case D3D_SVT_SAMPLER1D: return "Sampler1D";
+    case D3D_SVT_SAMPLER2D: return "Sampler2D";
+    case D3D_SVT_SAMPLER3D: return "Sampler3D";
+    case D3D_SVT_SAMPLERCUBE: return "SamplerCube";
+    case D3D_SVT_UINT: return "uint";
+    case D3D_SVT_BUFFER: return "Buffer";
+    case D3D_SVT_CBUFFER: return "cbuffer";
+    case D3D_SVT_TEXTURE1DARRAY: return "Texture1DArray";
+    case D3D_SVT_TEXTURE2DARRAY: return "Texture2DArray";
+    case D3D_SVT_TEXTURE2DMS: return "Texture2DMS";
+    case D3D_SVT_TEXTURE2DMSARRAY: return "Texture2DMSArray";
+    case D3D_SVT_TEXTURECUBEARRAY: return "TextureCubeArray";
+    case D3D_SVT_DOUBLE: return "double";
+    case D3D_SVT_RWTEXTURE1D: return "RWTexture1D";
+    case D3D_SVT_RWTEXTURE1DARRAY: return "RWTexture1DArray";
+    case D3D_SVT_RWTEXTURE2D: return "RWTexture2D";
+    case D3D_SVT_RWTEXTURE2DARRAY: return "RWTexture2DArray";
+    case D3D_SVT_RWTEXTURE3D: return "RWTexture3D";
+    case D3D_SVT_RWBUFFER: return "RWBuffer";
+    case D3D_SVT_BYTEADDRESS_BUFFER: return "ByteAddressBuffer";
+    case D3D_SVT_RWBYTEADDRESS_BUFFER: return "RWByteAddressBuffer";
+    case D3D_SVT_STRUCTURED_BUFFER: return "StructureBuffer";
+    case D3D_SVT_RWSTRUCTURED_BUFFER: return "RWStructuredBuffer";
+    case D3D_SVT_APPEND_STRUCTURED_BUFFER: return "AppendStructuredBuffer";
+    case D3D_SVT_CONSUME_STRUCTURED_BUFFER: return "ConsumeStructuredBuffer";
+    case D3D_SVT_MIN8FLOAT: return "min8float";
+    case D3D_SVT_MIN10FLOAT: return "min10float";
+    case D3D_SVT_MIN16FLOAT: return "min16float";
+    case D3D_SVT_MIN12INT: return "min12int";
+    case D3D_SVT_MIN16INT: return "min16int";
+    case D3D_SVT_MIN16UINT: return "min16uint";
+    default: return "Unknown hlsl data type";
+    }
+}
+
+constexpr std::string ToHlslVariableString(D3D_SHADER_VARIABLE_TYPE variableType,
+                                           uint32_t rows = 1,
+                                           uint32_t columns = 1,
+                                           uint32_t elements = 1)
+{
+    if(elements <= 1)
+    {
+        if(rows <= 1 && columns <= 1) { return std::string(ToHlslVariableStringView(variableType)); }
+
+        if(rows <= 1 && columns > 1) { return fmt::format("{}{}", ToHlslVariableStringView(variableType), columns); }
+
+        if(rows > 1 && columns <= 1) { return fmt::format("{}{}", ToHlslVariableStringView(variableType), rows); }
+
+        if(rows > 1 && columns > 1)
+        {
+            return fmt::format("{}{}x{}", ToHlslVariableStringView(variableType), rows, columns);
+        }
+
+        return std::string(ToHlslVariableStringView(variableType));
+    }
+    else
+    {
+        if(rows <= 1 && columns <= 1)
+        {
+            return fmt::format("{}[{}]", ToHlslVariableStringView(variableType), elements);
+        }
+
+        if(rows <= 1 && columns > 1)
+        {
+            return fmt::format("{}{}[{}]", ToHlslVariableStringView(variableType), columns, elements);
+        }
+
+        if(rows > 1 && columns <= 1)
+        {
+            return fmt::format("{}{}[{}]", ToHlslVariableStringView(variableType), rows, elements);
+        }
+
+        if(rows > 1 && columns > 1)
+        {
+            return fmt::format("{}{}x{}[{}]", ToHlslVariableStringView(variableType), rows, columns, elements);
+        }
+
+        return fmt::format("{}[{}]", ToHlslVariableStringView(variableType), elements);
+    }
+}
+
+constexpr std::string ToHlslVariableString(D3D_SHADER_VARIABLE_TYPE variableType,
+                                           std::string_view name,
+                                           uint32_t rows = 1,
+                                           uint32_t columns = 1,
+                                           uint32_t elements = 1)
+{
+    if(elements <= 1)
+    {
+        if(rows <= 1 && columns <= 1) { return fmt::format("{} {}", ToHlslVariableStringView(variableType), name); }
+
+        if(rows <= 1 && columns > 1)
+        {
+            return fmt::format("{}{} {}", ToHlslVariableStringView(variableType), columns, name);
+        }
+
+        if(rows > 1 && columns <= 1)
+        {
+            return fmt::format("{}{} {}", ToHlslVariableStringView(variableType), rows, name);
+        }
+
+        if(rows > 1 && columns > 1)
+        {
+            return fmt::format("{}{}x{} {}", ToHlslVariableStringView(variableType), rows, columns, name);
+        }
+
+        return fmt::format("{} {}", ToHlslVariableStringView(variableType), name);
+    }
+    else
+    {
+        if(rows <= 1 && columns <= 1)
+        {
+            return fmt::format("{} {}[{}]", ToHlslVariableStringView(variableType), name, elements);
+        }
+
+        if(rows <= 1 && columns > 1)
+        {
+            return fmt::format("{}{} {}[{}]", ToHlslVariableStringView(variableType), columns, name, elements);
+        }
+
+        if(rows > 1 && columns <= 1)
+        {
+            return fmt::format("{}{} {}[{}]", ToHlslVariableStringView(variableType), rows, name, elements);
+        }
+
+        if(rows > 1 && columns > 1)
+        {
+            return fmt::format("{}{}x{} {}[{}]", ToHlslVariableStringView(variableType), rows, columns, name, elements);
+        }
+
+        return fmt::format("{} {}[{}]", ToHlslVariableStringView(variableType), name, elements);
+    }
+}
+
 } // namespace scrap
 
 template<>
@@ -225,6 +443,10 @@ struct fmt::formatter<D3D_SHADER_INPUT_TYPE> : public scrap::ToStringViewFormatt
 
 template<>
 struct fmt::formatter<D3D_SHADER_MODEL> : public scrap::ToStringViewFormatter<D3D_SHADER_MODEL>
+{};
+
+template<>
+struct fmt::formatter<D3D_SHADER_VARIABLE_TYPE> : public scrap::ToStringViewFormatter<D3D_SHADER_VARIABLE_TYPE>
 {};
 
 template<>

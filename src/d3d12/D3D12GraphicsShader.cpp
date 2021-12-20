@@ -1,6 +1,7 @@
 #include "d3d12/D3D12GraphicsShader.h"
 
 #include "d3d12/D3D12Config.h"
+#include "d3d12/D3D12ShaderReflection.h"
 #include "d3d12/D3D12Strings.h"
 
 #include <charconv>
@@ -36,255 +37,6 @@ GraphicsShader& GraphicsShader::operator=(GraphicsShader&& other) noexcept
     other.mState = GraphicsShaderState::Invalid;
 
     return *this;
-}
-
-constexpr bool IsVertexIndicesRegister(const D3D12_SHADER_INPUT_BIND_DESC& desc)
-{
-    return desc.Type == D3D_SIT_CBUFFER && desc.BindPoint == reservedShaderRegister::kVertexCB.shaderRegister &&
-           desc.Space == reservedShaderRegister::kVertexCB.registerSpace;
-}
-
-constexpr bool IsResourceIndicesRegister(const D3D12_SHADER_INPUT_BIND_DESC& desc)
-{
-    return desc.Type == D3D_SIT_CBUFFER && desc.BindPoint == reservedShaderRegister::kResourceCB.shaderRegister &&
-           desc.Space == reservedShaderRegister::kResourceCB.registerSpace;
-}
-
-ShaderResource ParseBindlessResourceName(std::string_view name,
-                                         std::string_view prefix = "g",
-                                         std::string_view suffix = "DescriptorIndex")
-{
-    ShaderResource resource;
-
-    if(name.empty()) { return {}; }
-
-    if(!StartsWith(name, prefix)) { return {}; }
-
-    name.remove_prefix(prefix.size());
-
-    if(!EndsWith(name, suffix)) { return {}; }
-
-    name.remove_suffix(suffix.size());
-
-    // get the resource type
-    size_t nextSeparatorPos = name.find("_");
-    if(nextSeparatorPos == std::string_view::npos) { return {}; }
-
-    const std::string_view typeName = name.substr(0, nextSeparatorPos);
-    name = name.substr(nextSeparatorPos + 1);
-
-    if(typeName == "AppendStructuredBuffer")
-    {
-        resource.type = ShaderResourceType::AppendBuffer;
-        resource.dimension = ShaderResourceDimension::Buffer;
-    }
-    else if(typeName == "Buffer")
-    {
-        resource.type = ShaderResourceType::Buffer;
-        resource.dimension = ShaderResourceDimension::Buffer;
-    }
-    else if(typeName == "ByteAddressBuffer")
-    {
-        resource.type = ShaderResourceType::ByteAddressBuffer;
-        resource.dimension = ShaderResourceDimension::Buffer;
-    }
-    else if(typeName == "ConsumeStructuredBuffer")
-    {
-        resource.type = ShaderResourceType::ConsumeBuffer;
-        resource.dimension = ShaderResourceDimension::Buffer;
-    }
-    else if(typeName == "RWBuffer")
-    {
-        resource.type = ShaderResourceType::RwBuffer;
-        resource.dimension = ShaderResourceDimension::Buffer;
-    }
-    else if(typeName == "RWByteAddressBuffer")
-    {
-        resource.type = ShaderResourceType::RwByteAddressBuffer;
-        resource.dimension = ShaderResourceDimension::Buffer;
-    }
-    else if(typeName == "RWStructuredBuffer")
-    {
-        resource.type = ShaderResourceType::RwStructuredBuffer;
-        resource.dimension = ShaderResourceDimension::Buffer;
-    }
-    else if(typeName == "RWTexture1D")
-    {
-        resource.type = ShaderResourceType::RwTexture;
-        resource.dimension = ShaderResourceDimension::Texture1d;
-    }
-    else if(typeName == "RWTexture1DArray")
-    {
-        resource.type = ShaderResourceType::RwTexture;
-        resource.dimension = ShaderResourceDimension::Texture1dArray;
-    }
-    else if(typeName == "RWTexture2D")
-    {
-        resource.type = ShaderResourceType::RwTexture;
-        resource.dimension = ShaderResourceDimension::Texture2d;
-    }
-    else if(typeName == "RWTexture2DArray")
-    {
-        resource.type = ShaderResourceType::RwTexture;
-        resource.dimension = ShaderResourceDimension::Texture2dArray;
-    }
-    else if(typeName == "RWTexture3D")
-    {
-        resource.type = ShaderResourceType::RwTexture;
-        resource.dimension = ShaderResourceDimension::Texture3d;
-    }
-    else if(typeName == "StructuredBuffer")
-    {
-        resource.type = ShaderResourceType::StructuredBuffer;
-        resource.dimension = ShaderResourceDimension::Buffer;
-    }
-    else if(typeName == "Texture1D")
-    {
-        resource.type = ShaderResourceType::Texture;
-        resource.dimension = ShaderResourceDimension::Texture1d;
-    }
-    else if(typeName == "Texture1DArray")
-    {
-        resource.type = ShaderResourceType::Texture;
-        resource.dimension = ShaderResourceDimension::Texture1dArray;
-    }
-    else if(typeName == "Texture2D")
-    {
-        resource.type = ShaderResourceType::Texture;
-        resource.dimension = ShaderResourceDimension::Texture2d;
-    }
-    else if(typeName == "Texture2DArray")
-    {
-        resource.type = ShaderResourceType::Texture;
-        resource.dimension = ShaderResourceDimension::Texture2dArray;
-    }
-    else if(typeName == "Texture2DMS")
-    {
-        resource.type = ShaderResourceType::Texture;
-        resource.dimension = ShaderResourceDimension::Texture2d;
-        resource.multisample = true;
-    }
-    else if(typeName == "Texture2DMSArray")
-    {
-        resource.type = ShaderResourceType::Texture;
-        resource.dimension = ShaderResourceDimension::Texture2dArray;
-        resource.multisample = true;
-    }
-    else if(typeName == "Texture3D")
-    {
-        resource.type = ShaderResourceType::Texture;
-        resource.dimension = ShaderResourceDimension::Texture3d;
-    }
-    else if(typeName == "TextureCube")
-    {
-        resource.type = ShaderResourceType::Texture;
-        resource.dimension = ShaderResourceDimension::TextureCube;
-    }
-    else if(typeName == "TextureCubeArray")
-    {
-        resource.type = ShaderResourceType::Texture;
-        resource.dimension = ShaderResourceDimension::TextureCubeArray;
-    }
-
-    // get the resource type
-    nextSeparatorPos = name.find("_");
-    if(nextSeparatorPos == std::string_view::npos) { return {}; }
-
-    std::string_view returnTypeStr = name.substr(0, nextSeparatorPos);
-
-    const size_t componentCountPos = name.find_first_of("1234");
-
-    std::string_view componentCountStr;
-    if(componentCountPos != std::string_view::npos)
-    {
-        componentCountStr = returnTypeStr.substr(componentCountPos);
-        returnTypeStr = returnTypeStr.substr(0, componentCountPos);
-
-        std::from_chars(componentCountStr.data(), componentCountStr.data() + componentCountStr.size(),
-                        resource.returnTypeComponentCount);
-    }
-
-    if(returnTypeStr == "unorm") { resource.returnType = ShaderResourceReturnType::Unorm; }
-    else if(returnTypeStr == "snorm")
-    {
-        resource.returnType = ShaderResourceReturnType::Snorm;
-    }
-    else if(returnTypeStr == "int")
-    {
-        resource.returnType = ShaderResourceReturnType::Int;
-    }
-    else if(returnTypeStr == "uint")
-    {
-        resource.returnType = ShaderResourceReturnType::UInt;
-    }
-    else if(returnTypeStr == "float")
-    {
-        resource.returnType = ShaderResourceReturnType::Float;
-    }
-    else if(returnTypeStr == "double")
-    {
-        resource.returnType = ShaderResourceReturnType::Double;
-    }
-
-    name = name.substr(nextSeparatorPos + 1);
-    resource.name = name;
-    resource.nameHash = std::hash<std::string_view>()(resource.name);
-
-    return resource;
-}
-
-ShaderVertexElement ParseBindlessVertexBufferName(std::string_view name,
-                                                  std::string_view prefix = "g",
-                                                  std::string_view suffix = "DescriptorIndex")
-{
-    ShaderVertexElement vertexElement{ParseBindlessResourceName(name, prefix, suffix)};
-
-    if(vertexElement.name.empty()) { return {}; }
-
-    name = vertexElement.name;
-
-    if(StartsWith(name, std::string_view("Vertex"))) { name.remove_prefix(6); }
-
-    const size_t digitIndex = name.find_first_of("0123456789");
-
-    if(digitIndex != std::string_view::npos)
-    {
-        const std::string_view semanticIndexStr = name.substr(digitIndex);
-        name = name.substr(0, digitIndex);
-
-        const std::from_chars_result result = std::from_chars(
-            semanticIndexStr.data(), semanticIndexStr.data() + semanticIndexStr.size(), vertexElement.semanticIndex);
-
-        if(result.ec != std::errc()) { return {}; }
-    }
-    else
-    {
-        vertexElement.semanticIndex = 0;
-    }
-
-    if(name == "Positions" || name == "Position") { vertexElement.semantic = ShaderVertexSemantic::Position; }
-    else if(name == "Normals" || name == "Normal")
-    {
-        vertexElement.semantic = ShaderVertexSemantic::Normal;
-    }
-    else if(name == "Tangents" || name == "Tangent")
-    {
-        vertexElement.semantic = ShaderVertexSemantic::Tangent;
-    }
-    else if(name == "Binormals" || name == "Binormal")
-    {
-        vertexElement.semantic = ShaderVertexSemantic::Binormal;
-    }
-    else if(name == "TexCoords" || name == "TexCoord" || name == "Uvs" || name == "Uv")
-    {
-        vertexElement.semantic = ShaderVertexSemantic::TexCoord;
-    }
-    else if(name == "Colors" || name == "Color")
-    {
-        vertexElement.semantic = ShaderVertexSemantic::Color;
-    }
-
-    return vertexElement;
 }
 
 void GraphicsShader::create()
@@ -435,43 +187,110 @@ void GraphicsShader::create()
                shaderInputBindDesc.Type == D3D_SIT_UAV_CONSUME_STRUCTURED ||
                shaderInputBindDesc.Type == D3D_SIT_UAV_RWSTRUCTURED_WITH_COUNTER)
             {
-                spdlog::error(
-                    "{}({}): Global resource '{}' is not supported. Global resources (Texture, Buffer, etc.) are not "
+                logShaderError(
+                    stage,
+                    "Global resource '{}' is not supported. Global resources (Texture, Buffer, etc.) are not "
                     "supported. Only ressources accessed through the ResourceDescriptorHeap array are supported.",
-                    filepath.generic_string(), stage, shaderInputBindDesc.Name);
+                    shaderInputBindDesc.Name);
+
                 compiled = false;
                 continue;
             }
 
-            if(IsVertexIndicesRegister(shaderInputBindDesc))
+            if(ShaderReflection::IsVertexIndicesRegister(shaderInputBindDesc))
             {
-                if(shaderInputBindDesc.Type != D3D_SIT_CBUFFER)
+                tl::expected<VertexInputsCbInfo, ShaderReflectionErrorInfo> result =
+                    ShaderReflection::CollectVertexInputs(reflection.Get(), shaderInputBindDesc);
+
+                if(result) { mShaderInputs.vertexElements = std::move(result->vertexElements); }
+                else
                 {
-                    spdlog::error(
-                        "{}({}): Found {} resource '{}' at register {}, space {}. This is reserved for a constant "
-                        "buffer that holds the vertex buffer descriptor indices.",
-                        filepath.generic_string(), stage, shaderInputBindDesc.Type, shaderInputBindDesc.Name,
-                        shaderInputBindDesc.BindPoint, shaderInputBindDesc.Space);
+                    switch(result.error().error)
+                    {
+                    case ShaderReflectionError::ResourceInReservedRegisterSpace:
+                        logShaderError(stage,
+                                       "Found {} resource '{}' at register {}, space {}. This is reserved for a constant "
+                                       "buffer that holds the vertex buffer descriptor indices.",
+                                       shaderInputBindDesc.Type, shaderInputBindDesc.Name, shaderInputBindDesc.BindPoint,
+                                       shaderInputBindDesc.Space);
+                        break;
+                    case ShaderReflectionError::GetConstantBufferFailure:
+                        logShaderError(stage, "Failed to retrieve reflection data for constant buffer '{}'.",
+                                       result.error().constantBufferName);
+                        break;
+                    case ShaderReflectionError::GetConstantBufferDescFailure:
+                        logShaderError(stage, "Failed to retrieve reflection data for '{}' constant buffer.",
+
+                                       result.error().constantBufferName);
+                        break;
+                    case ShaderReflectionError::InvalidMemberType:
+                        logShaderError(stage,
+                                       "Member '{}' in constant buffer '{}' must be a uint. This constant buffer is "
+                                       "reserved for bindless vertex buffer indices.",
+                                       ToHlslVariableString(result.error().variableType, result.error().memberName,
+                                                            result.error().variableTypeRows,
+                                                            result.error().variableTypeColumns,
+                                                            result.error().variableElements),
+                                       result.error().constantBufferName);
+                        break;
+                    case ShaderReflectionError::ExceededMaxResourceCount:
+                        logShaderError(
+                            stage,
+                            "Exceeded the maximum allowed number of vertex buffers ({}). Found {} vertex buffers.",
+                            d3d12::kMaxBindlessVertexBuffers, result.error().resourceOverflowCount);
+                        break;
+                    default: break;
+                    }
 
                     continue;
                 }
-
-                collectVertexInputs(stage, reflection.Get(), shaderInputBindDesc);
             }
-            else if(IsResourceIndicesRegister(shaderInputBindDesc))
+            else if(ShaderReflection::IsResourceIndicesRegister(shaderInputBindDesc))
             {
-                if(shaderInputBindDesc.Type != D3D_SIT_CBUFFER)
+                tl::expected<ResourcesCbInfo, ShaderReflectionErrorInfo> result =
+                    ShaderReflection::CollectResourceInputs(reflection.Get(), shaderInputBindDesc);
+
+                if(result) { mShaderInputs.resources = std::move(result->resources); }
+                else
                 {
-                    spdlog::error(
-                        "{}({}): Found {} resource '{}' at register {}, space {}. This is reserved for a constant "
-                        "buffer that holds resource descriptor indices.",
-                        filepath.generic_string(), stage, shaderInputBindDesc.Type, shaderInputBindDesc.Name,
-                        shaderInputBindDesc.BindPoint, shaderInputBindDesc.Space);
+                    switch(result.error().error)
+                    {
+                    case ShaderReflectionError::ResourceInReservedRegisterSpace:
+                        logShaderError(stage,
+                                       "Found {} resource '{}' at register {}, space {}. This is reserved for a constant "
+                                       "buffer that holds the resource descriptor indices.",
+                                       shaderInputBindDesc.Type, shaderInputBindDesc.Name, shaderInputBindDesc.BindPoint,
+                                       shaderInputBindDesc.Space);
+                        break;
+                    case ShaderReflectionError::GetConstantBufferFailure:
+                        logShaderError(stage, "Failed to retrieve reflection data for constant buffer '{}'.",
+                                       result.error().constantBufferName);
+                        break;
+                    case ShaderReflectionError::GetConstantBufferDescFailure:
+                        logShaderError(stage, "Failed to retrieve reflection data for '{}' constant buffer.",
+
+                                       result.error().constantBufferName);
+                        break;
+                    case ShaderReflectionError::InvalidMemberType:
+                        logShaderError(stage,
+                                       "Member '{}' in constant buffer '{}' must be a uint. This constant buffer is "
+                                       "reserved for bindless resournce indices.",
+                                       ToHlslVariableString(result.error().variableType, result.error().memberName,
+                                                            result.error().variableTypeRows,
+                                                            result.error().variableTypeColumns,
+                                                            result.error().variableElements),
+                                       result.error().constantBufferName);
+                        break;
+                    case ShaderReflectionError::ExceededMaxResourceCount:
+                        logShaderError(stage,
+                                       "Exceeded the maximum allowed number of resources ({}). Found {} resources.",
+                                       d3d12::kMaxBindlessResources, result.error().resourceOverflowCount);
+                        break;
+                    default: break;
+                    }
 
                     continue;
                 }
-
-                collectResourceInputs(stage, reflection.Get(), shaderInputBindDesc);
             }
         }
     }
@@ -514,184 +333,8 @@ std::optional<uint32_t> GraphicsShader::getResourceIndex(uint64_t nameHash,
     return std::nullopt;
 }
 
-template<class Pred>
-bool ParseBindlessConstantBufferVariable(const GraphicsShaderParams& params,
-                                         GraphicsShaderStage stage,
-                                         const D3D12_SHADER_BUFFER_DESC& constantBufferDesc,
-                                         ID3D12ShaderReflectionType* shaderVariableType,
-                                         std::string_view name,
-                                         uint32_t byteOffset,
-                                         Pred pred)
+void GraphicsShader::logShaderErrorImpl(GraphicsShaderStage stage, std::string_view message)
 {
-    D3D12_SHADER_TYPE_DESC variableTypeDesc;
-    shaderVariableType->GetDesc(&variableTypeDesc);
-
-    if(variableTypeDesc.Class == D3D_SVC_SCALAR && variableTypeDesc.Type == D3D_SVT_UINT)
-    {
-        pred(name, byteOffset / sizeof(uint32_t));
-    }
-    else if(variableTypeDesc.Class == D3D_SVC_STRUCT)
-    {
-        EnumerateBindlessConstantBufferVariables(params, stage, constantBufferDesc, shaderVariableType, byteOffset,
-                                                 pred);
-    }
-    else
-    {
-        spdlog::error("{}({}): '{}' in cbuffer '{}' must be a uint.", params.filepaths[(size_t)stage].generic_string(),
-                      stage, variableTypeDesc.Name, constantBufferDesc.Name);
-        return false;
-    }
-
-    return true;
-}
-
-template<class Pred>
-bool EnumerateBindlessConstantBufferVariables(const GraphicsShaderParams& params,
-                                              GraphicsShaderStage stage,
-                                              const D3D12_SHADER_BUFFER_DESC& constantBufferDesc,
-                                              ID3D12ShaderReflectionType* structType,
-                                              uint32_t byteOffset,
-                                              Pred pred)
-{
-    D3D12_SHADER_TYPE_DESC structTypeDesc;
-    structType->GetDesc(&structTypeDesc);
-
-    for(uint32_t memberIndex = 0; memberIndex < structTypeDesc.Members; ++memberIndex)
-    {
-        ID3D12ShaderReflectionType* memberType = structType->GetMemberTypeByIndex(memberIndex);
-
-        D3D12_SHADER_TYPE_DESC memberTypeDesc;
-        memberType->GetDesc(&memberTypeDesc);
-
-        const std::string_view name = structType->GetMemberTypeName(memberIndex);
-
-        const bool success = ParseBindlessConstantBufferVariable(params, stage, constantBufferDesc, memberType, name,
-                                                                 byteOffset + memberTypeDesc.Offset, pred);
-        if(!success) { return false; }
-    }
-
-    return true;
-}
-
-template<class Pred>
-bool EnumerateBindlessConstantBufferVariables(const GraphicsShaderParams& params,
-                                              GraphicsShaderStage stage,
-                                              ID3D12ShaderReflectionConstantBuffer* shaderConstantBuffer,
-                                              Pred pred)
-{
-    D3D12_SHADER_BUFFER_DESC constantBufferDesc;
-    shaderConstantBuffer->GetDesc(&constantBufferDesc);
-
-    for(uint32_t variableIndex = 0; variableIndex < constantBufferDesc.Variables; ++variableIndex)
-    {
-        ID3D12ShaderReflectionVariable* shaderVariable = shaderConstantBuffer->GetVariableByIndex(variableIndex);
-
-        D3D12_SHADER_VARIABLE_DESC shaderVariableDesc;
-        shaderVariable->GetDesc(&shaderVariableDesc);
-
-        const bool success =
-            ParseBindlessConstantBufferVariable(params, stage, constantBufferDesc, shaderVariable->GetType(),
-                                                shaderVariableDesc.Name, shaderVariableDesc.StartOffset, pred);
-        if(!success) { return false; }
-    }
-
-    return true;
-}
-
-void GraphicsShader::collectVertexInputs(GraphicsShaderStage stage,
-                                         ID3D12ShaderReflection* reflection,
-                                         const D3D12_SHADER_INPUT_BIND_DESC& shaderInputBindDesc)
-{
-    ID3D12ShaderReflectionConstantBuffer* constantBufferReflection =
-        reflection->GetConstantBufferByIndex(shaderInputBindDesc.uID);
-
-    if(constantBufferReflection == nullptr)
-    {
-        spdlog::error("{}({}): Failed to retrieve reflection data for '{}' constant buffer.",
-                      mParams.filepaths[(size_t)stage].generic_string(), stage, shaderInputBindDesc.Name);
-        return;
-    }
-
-    D3D12_SHADER_BUFFER_DESC vertexCbDesc;
-    if(FAILED(constantBufferReflection->GetDesc(&vertexCbDesc)))
-    {
-        spdlog::error("{}({}): Failed to retrieve reflection data for '{}' constant buffer.",
-                      mParams.filepaths[(size_t)stage].generic_string(), stage, shaderInputBindDesc.Name);
-        return;
-    }
-
-    mVertexConstantBufferFound = true;
-
-    // First enumerate the variables and count them up
-    size_t vertexBufferCount = 0;
-    EnumerateBindlessConstantBufferVariables(mParams, stage, constantBufferReflection,
-                                             [&vertexBufferCount](std::string_view, uint32_t) { ++vertexBufferCount; });
-
-    if(vertexBufferCount > d3d12::kMaxBindlessVertexBuffers)
-    {
-        spdlog::error("{}({}): Exceeded the maximum allowed number of vertex buffers ({}). Found {} vertex buffers.",
-                      mParams.filepaths[(size_t)stage].generic_string(), stage, d3d12::kMaxBindlessVertexBuffers,
-                      vertexBufferCount);
-        return;
-    }
-
-    // Now actually parse each variable
-    mShaderInputs.vertexElements.reserve(vertexBufferCount);
-
-    EnumerateBindlessConstantBufferVariables(
-        mParams, stage, constantBufferReflection, [&](std::string_view name, uint32_t index) {
-            ShaderVertexElement vertexElement = ParseBindlessVertexBufferName(name);
-            vertexElement.index = index;
-
-            mShaderInputs.vertexElements.push_back(std::move(vertexElement));
-        });
-}
-
-void GraphicsShader::collectResourceInputs(GraphicsShaderStage stage,
-                                           ID3D12ShaderReflection* reflection,
-                                           const D3D12_SHADER_INPUT_BIND_DESC& shaderInputBindDesc)
-{
-    ID3D12ShaderReflectionConstantBuffer* constantBufferReflection =
-        reflection->GetConstantBufferByIndex(shaderInputBindDesc.uID);
-
-    if(constantBufferReflection == nullptr)
-    {
-        spdlog::error("{}({}): Failed to retrieve reflection data for '{}' constant buffer.",
-                      mParams.filepaths[(size_t)stage].generic_string(), stage, shaderInputBindDesc.Name);
-        return;
-    }
-
-    D3D12_SHADER_BUFFER_DESC resourceCbDesc;
-    if(FAILED(constantBufferReflection->GetDesc(&resourceCbDesc)))
-    {
-        spdlog::error("{}({}): Failed to retrieve reflection data for '{}' constant buffer.",
-                      mParams.filepaths[(size_t)stage].generic_string(), stage, shaderInputBindDesc.Name);
-        return;
-    }
-
-    // First enumerate the variables and count them up
-    size_t resourceCount = 0;
-    EnumerateBindlessConstantBufferVariables(mParams, stage, constantBufferReflection,
-                                             [&resourceCount](std::string_view, uint32_t) { ++resourceCount; });
-
-    if(resourceCount > d3d12::kMaxBindlessResources)
-    {
-        spdlog::error("{}({}): Exceeded the maximum allowed number of bindless resources ({}). Found {} "
-                      "bindless resources.",
-                      mParams.filepaths[(size_t)stage].generic_string(), stage, d3d12::kMaxBindlessResources,
-                      resourceCount);
-        return;
-    }
-
-    // Now actually parse each variable
-    mShaderInputs.resources.reserve(resourceCount);
-
-    EnumerateBindlessConstantBufferVariables(mParams, stage, constantBufferReflection,
-                                             [&](std::string_view name, uint32_t index) {
-                                                 ShaderResource resource = ParseBindlessResourceName(name);
-                                                 resource.index = index;
-
-                                                 mShaderInputs.resources.push_back(std::move(resource));
-                                             });
+    spdlog::error("{}({}): {}", mParams.filepaths[(size_t)stage].generic_string(), stage, message);
 }
 } // namespace scrap::d3d12

@@ -25,7 +25,6 @@ constexpr ShaderRegisterSlot kFrameCB{1};
 constexpr ShaderRegisterSlot kResourceCB{2};
 constexpr ShaderRegisterSlot kOutputBuffer{3};
 constexpr ShaderRegisterSlot kAccelerationStructure{4};
-constexpr ShaderRegisterSlot kRaygenCB{5};
 } // namespace reservedShaderRegister
 
 namespace RasterRootParamSlot
@@ -45,16 +44,51 @@ enum Value
 {
     OutputView,
     AccelerationStructure,
+    FrameCB,
     Count
 };
 }
 
-namespace RaytracingLocalRootParamSlot
+namespace RaytracingRayGenLocalRootParamSlot
 {
 enum Value
 {
-    RayGenCb,
     Count
 };
 }
+
+namespace RaytracingAnyHitLocalRootParamSlot
+{
+enum Value
+{
+    Count
+};
+}
+
+namespace RaytracingIntersectionLocalRootParamSlot
+{
+enum Value
+{
+    Count
+};
+}
+
+namespace RaytracingClosestHitLocalRootParamSlot
+{
+enum Value
+{
+    ResourceIndices,
+    VertexIndices,
+    Count
+};
+}
+
+namespace RaytracingMissLocalRootParamSlot
+{
+enum Value
+{
+    Count
+};
+}
+
 } // namespace scrap::d3d12

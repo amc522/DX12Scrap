@@ -1,13 +1,23 @@
-struct RayGenConstantBuffer
+#include "common.h"
+
+struct VertexIndices
 {
-    float4x4 clipToWorld;
-    float3 cameraWorldPos;
-    float padding;
+    DECLARE_VERTEX_BUFFER(float3, Position)
+    DECLARE_VERTEX_BUFFER(float2, Uv)
+};
+
+struct ResourceIndices
+{
+    DECLARE_RESOURCE(Texture2D, float4, Texture)
+    DECLARE_RESOURCE(Buffer, uint16_t, IndexBuffer)
 };
 
 RaytracingAccelerationStructure Scene : register(t4, space1);
 RWTexture2D<float4> RenderTarget : register(u3, space1);
-ConstantBuffer<RayGenConstantBuffer> g_rayGenCB : register(b5, space1);
+ConstantBuffer<VertexIndices> gVertexBuffers : register(VERTEX_INDICES_CBUFFER_REGISTER);
+ConstantBuffer<ResourceIndices> gResources : register(RESOURCE_INDICES_CBUFFER_REGISTER);
+
+SamplerState gSampler : register(s0);
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 struct RayPayload
@@ -20,11 +30,25 @@ inline void generateCameraRay(out float3 origin, out float3 direction)
     float2 clipPos = ((DispatchRaysIndex().xy + 0.5f) / DispatchRaysDimensions().xy) * 2.0 - 1.0;
     clipPos.y = -clipPos.y;
 
-    float4 worldPos = mul(float4(clipPos, 0, 1), g_rayGenCB.clipToWorld);
+    float4 worldPos = mul(gFrame.clipToWorld, float4(clipPos, 0, 1));
     worldPos.xyz /= worldPos.w;
 
-    origin = g_rayGenCB.cameraWorldPos.xyz;
+    origin = gFrame.cameraWorldPos.xyz;
     direction = normalize(worldPos.xyz - origin);
+}
+
+inline float2 interpolateHit(in float2 vertexElements[3], BuiltInTriangleIntersectionAttributes intersectionAttr)
+{
+    return vertexElements[0] +
+        intersectionAttr.barycentrics.x * (vertexElements[1] - vertexElements[0]) +
+        intersectionAttr.barycentrics.y * (vertexElements[2] - vertexElements[0]);
+}
+
+inline float3 interpolateHit(in float3 vertexElements[3], BuiltInTriangleIntersectionAttributes intersectionAttr)
+{
+    return vertexElements[0] +
+        intersectionAttr.barycentrics.x * (vertexElements[1] - vertexElements[0]) +
+        intersectionAttr.barycentrics.y * (vertexElements[2] - vertexElements[0]);
 }
 
 [shader("raygeneration")]
@@ -52,12 +76,26 @@ void MyRaygenShader()
 [shader("closesthit")]
 void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
-    float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
-    payload.color = float4(RayTCurrent()/10.0, RayTCurrent()/10.0, RayTCurrent()/10.0, 1);
+    const uint startVertexIndex = PrimitiveIndex() * 3;
+    Buffer<uint16_t> indexBuffer = gResources.getIndexBuffer();
+    Buffer<float3> positions = gVertexBuffers.getPosition();
+    Buffer<float2> uvs = gVertexBuffers.getUv();
+
+    float2 vertexUvs[3];
+    for(uint i = 0; i < 3; ++i)
+    {
+        vertexUvs[i] = uvs[indexBuffer[startVertexIndex + i]];
+    }
+
+    const float2 uv = interpolateHit(vertexUvs, attr);
+
+    Texture2D<float4> texture = gResources.getTexture();
+    float4 color = texture.SampleGrad(gSampler, uv, 0.0, 0.0);
+    payload.color = float4(color.rgb, 1.0);
 }
 
 [shader("miss")]
 void MyMissShader(inout RayPayload payload)
 {
-    payload.color = float4(0, 0, 0, 1);
+    payload.color = float4(0.0f, 0.2f, 0.4f, 1.0f);
 }
