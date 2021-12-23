@@ -29,6 +29,7 @@
     <ClCompile Include="src\d3d12\D3D12Context.cpp" />
     <ClCompile Include="src\d3d12\D3D12CopyContext.cpp" />
     <ClCompile Include="src\d3d12\D3D12Debug.cpp" />
+    <ClCompile Include="src\d3d12\D3D12Execute.cpp" />
     <ClCompile Include="src\d3d12\D3D12FixedDescriptorHeap.cpp" />
     <ClCompile Include="src\d3d12\D3D12GraphicsContext.cpp" />
     <ClCompile Include="src\d3d12\D3D12MonotonicDescriptorHeap.cpp" />
@@ -66,6 +67,7 @@
     <ClInclude Include="src\d3d12\D3D12Config.h" />
     <ClInclude Include="src\d3d12\D3D12Context.h" />
     <ClInclude Include="src\d3d12\D3D12Debug.h" />
+    <ClInclude Include="src\d3d12\D3D12Execute.h" />
     <ClInclude Include="src\d3d12\D3D12FixedDescriptorHeap.h" />
     <ClInclude Include="src\d3d12\D3D12GraphicsContext.h" />
     <ClInclude Include="src\d3d12\D3D12MonotonicDescriptorHeap.h" />

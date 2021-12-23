@@ -9,6 +9,7 @@
 #include "d3d12/D3D12Buffer.h"
 #include "d3d12/D3D12Context.h"
 #include "d3d12/D3D12Debug.h"
+#include "d3d12/D3D12Execute.h"
 #include "d3d12/D3D12GraphicsPipelineState.h"
 #include "d3d12/D3D12GraphicsShader.h"
 #include "d3d12/D3D12RaytracingPipelineState.h"
@@ -671,7 +672,7 @@ void RaytracingScene::preRender(const FrameInfo& frameInfo)
             std::array<uint32_t, d3d12::kMaxBindlessVertexBuffers> vertexBufferIndices = {};
         } bindlessIndices;
 
-        {   // bind vertex buffers
+        { // bind vertex buffers
             // creating an array with one more than necessary to give a slot to assign buffers not used by the
             // shader.
             for(const GpuMesh::VertexElement& vertexElement : mCubeMesh.getVertexElements())
@@ -695,13 +696,14 @@ void RaytracingScene::preRender(const FrameInfo& frameInfo)
                 bindlessIndices.resourceIndices[textureIndex.value()] = mTexture->getSrvDescriptorHeapIndex();
             }
 
-            const std::optional<uint32_t> indexBufferIndex =
-                mShader->getResourceIndex(RaytracingShaderStage::ClosestHit, std::hash<std::string_view>()("IndexBuffer"),
-                                          ShaderResourceType::Buffer, ShaderResourceDimension::Buffer);
+            const std::optional<uint32_t> indexBufferIndex = mShader->getResourceIndex(
+                RaytracingShaderStage::ClosestHit, std::hash<std::string_view>()("IndexBuffer"),
+                ShaderResourceType::Buffer, ShaderResourceDimension::Buffer);
 
             if(indexBufferIndex)
             {
-                bindlessIndices.resourceIndices[indexBufferIndex.value()] = mCubeMesh.getIndexBuffer()->getSrvDescriptorHeapIndex();
+                bindlessIndices.resourceIndices[indexBufferIndex.value()] =
+                    mCubeMesh.getIndexBuffer()->getSrvDescriptorHeapIndex();
             }
         }
 
@@ -721,40 +723,26 @@ void RaytracingScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d
     mTlas->build(mCommandList);
 
     auto DispatchRays = [&](ID3D12GraphicsCommandList4* commandList, ID3D12StateObject* stateObject,
-                            D3D12_DISPATCH_RAYS_DESC* dispatchDesc) {
-        mShaderTable->markAsUsed(commandList);
-
-        dispatchDesc->HitGroupTable = mShaderTable->getHitGroupTableAddressRangeAndStride(0);
-        dispatchDesc->MissShaderTable = mShaderTable->getMissTableAddressRangeAndStride(0);
-        dispatchDesc->RayGenerationShaderRecord = mShaderTable->getRaygenRecordAddressAndStride(0);
-        dispatchDesc->Width = frameInfo.mainWindow->getSize().x;
-        dispatchDesc->Height = frameInfo.mainWindow->getSize().y;
-        dispatchDesc->Depth = 1;
-        commandList->SetPipelineState1(stateObject);
-        commandList->DispatchRays(dispatchDesc);
-    };
+                            D3D12_DISPATCH_RAYS_DESC* dispatchDesc) { mShaderTable->markAsUsed(commandList); };
 
     mCommandList.get()->SetComputeRootSignature(mGlobalRootSignature.Get());
 
-    // Bind the heaps, acceleration structure and dispatch rays.
-    D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
-    std::array<ID3D12DescriptorHeap*, 1> descriptorHeaps = {d3d12Context.getCbvSrvUavHeap().getGpuDescriptorHeap()};
-    mCommandList.get()->SetDescriptorHeaps((uint32_t)descriptorHeaps.size(), descriptorHeaps.data());
-    mCommandList.get()->SetComputeRootDescriptorTable(d3d12::RaytracingGlobalRootParamSlot::OutputView,
-                                                      mRenderTarget->getUavGpu());
-    mCommandList.get()->SetComputeRootShaderResourceView(
-        d3d12::RaytracingGlobalRootParamSlot::AccelerationStructure,
-        mTlas->getAccelerationStructureBuffer().getResource()->GetGPUVirtualAddress());
+    {
+        std::array<d3d12::TLAccelerationStructure*, 1> accelerationStructures{mTlas.get()};
+        std::array<d3d12::Texture*, 1> rwTextures{mRenderTarget.get()};
 
-    mCommandList.get()->SetComputeRootConstantBufferView(d3d12::RaytracingGlobalRootParamSlot::FrameCB,
-                                                         mFrameConstantBuffer->getResource()->GetGPUVirtualAddress());
+        d3d12::EngineConstantBuffers engineConstantBuffers;
+        engineConstantBuffers.frame = mFrameConstantBuffer.get();
 
-    mPipelineState->markAsUsed(mCommandList.get());
-    mTlas->markAsUsed(mCommandList);
-    mRenderTarget->markAsUsed(mCommandList.get());
-    mFrameConstantBuffer->markAsUsed(mCommandList.get());
+        auto windowSize = frameInfo.mainWindow->getSize();
 
-    DispatchRays(mCommandList.get4(), mPipelineState->getPipelineState(), &dispatchDesc);
+        d3d12::dispatchRays(mCommandList, d3d12::DispatchRaysParams{.pipelineState = mPipelineState.get(),
+                                                                    .accelerationStructures = accelerationStructures,
+                                                                    .shaderTable = mShaderTable.get(),
+                                                                    .constantBuffers = engineConstantBuffers,
+                                                                    .rwTextures = rwTextures,
+                                                                    .dimensions = {windowSize.x, windowSize.y, 1}});
+    }
 
     D3D12_RESOURCE_BARRIER preCopyBarriers[2];
     preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(
