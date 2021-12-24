@@ -91,7 +91,7 @@ private:
     void createCube();
     void createTexture();
 
-    void drawIndexed(d3d12::GraphicsPipelineState& pso, GpuMesh& mesh, std::span<TextureBindingDesc> textures);
+    void bindTextures(d3d12::GraphicsPipelineState& pso, std::span<TextureBindingDesc> textures);
 
     Camera mCamera;
 
@@ -187,6 +187,6 @@ public:
 private:
     std::unique_ptr<RasterScene> mRasterScene;
     std::unique_ptr<RaytracingScene> mRaytraceScene;
-    Scene mActiveScene = Scene::Raytracing;
+    Scene mActiveScene = Scene::Raster;
 };
 } // namespace scrap

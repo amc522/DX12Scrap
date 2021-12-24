@@ -82,10 +82,10 @@ void GpuMesh::createVertexElement(ShaderVertexSemantic semantic,
 {
     if(bufferParams.numElements == 0) { return; }
 
-    std::vector<VertexElement>::iterator elementItr;
+    std::vector<d3d12::VertexBuffer>::iterator elementItr;
 
     elementItr = std::find_if(mVertexElements.begin(), mVertexElements.end(),
-                              [semantic, semanticIndex](const VertexElement& element) {
+                              [semantic, semanticIndex](const d3d12::VertexBuffer& element) {
                                   return element.semantic == semantic && element.semanticIndex == semanticIndex;
                               });
 
@@ -112,10 +112,10 @@ void GpuMesh::createVertexElement(ShaderVertexSemantic semantic,
     const size_t bufferByteSize = bufferParams.numElements * gpufmt::formatInfo(bufferParams.format).blockByteSize;
     if(data.size_bytes() > bufferByteSize) { return; }
 
-    std::vector<VertexElement>::iterator elementItr;
+    std::vector<d3d12::VertexBuffer>::iterator elementItr;
 
     elementItr = std::find_if(mVertexElements.begin(), mVertexElements.end(),
-                              [semantic, semanticIndex](const VertexElement& element) {
+                              [semantic, semanticIndex](const d3d12::VertexBuffer& element) {
                                   return element.semantic == semantic && element.semanticIndex == semanticIndex;
                               });
 

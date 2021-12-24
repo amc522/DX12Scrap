@@ -180,6 +180,11 @@ void TLAccelerationStructure::markAsUsed(const GraphicsCommandList& commandList)
     }
 }
 
+bool TLAccelerationStructure::isReady() const
+{
+    return mAccelerationStructureGpuBuffer != nullptr && mAccelerationStructureGpuBuffer->isReady();
+}
+
 bool TLAccelerationStructure::doesInstanceDescsNeedResize(uint32_t newCapacity)
 {
     uint32_t requiredByteSize = AlignInteger((uint32_t)sizeof(D3D12_RAYTRACING_INSTANCE_DESC),

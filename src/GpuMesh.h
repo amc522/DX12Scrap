@@ -2,6 +2,7 @@
 
 #include "RenderDefs.h"
 #include "d3d12/D3D12Buffer.h"
+#include "d3d12/D3D12VertexBuffer.h"
 
 #include <memory>
 #include <span>
@@ -23,13 +24,6 @@ public:
         std::string_view name;
         IndexBufferFormat format = IndexBufferFormat::UInt32;
         uint32_t numIndices = 0;
-    };
-
-    struct VertexElement
-    {
-        ShaderVertexSemantic semantic;
-        uint32_t semanticIndex;
-        std::shared_ptr<d3d12::Buffer> buffer;
     };
 
     GpuMesh() = default;
@@ -55,7 +49,7 @@ public:
     [[nodiscard]] const std::shared_ptr<d3d12::Buffer>& getVertexBuffer(ShaderVertexSemantic semantic,
                                                                         uint32_t semanticIndex) const;
 
-    [[nodiscard]] std::span<const VertexElement> getVertexElements() const { return mVertexElements; }
+    [[nodiscard]] std::span<const d3d12::VertexBuffer> getVertexElements() const { return mVertexElements; }
 
     [[nodiscard]] bool isReady() const;
     void markAsUsed(ID3D12CommandList* commandList);
@@ -63,7 +57,7 @@ public:
 private:
     PrimitiveTopology mPrimitiveTopology = PrimitiveTopology::Undefined;
     std::shared_ptr<d3d12::Buffer> mIndexBuffer;
-    std::vector<VertexElement> mVertexElements;
+    std::vector<d3d12::VertexBuffer> mVertexElements;
     uint32_t mIndexCount = 0;
 };
 } // namespace scrap

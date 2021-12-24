@@ -7,9 +7,9 @@
 #include "Window.h"
 #include "d3d12/D3D12BLAccelerationStructure.h"
 #include "d3d12/D3D12Buffer.h"
+#include "d3d12/D3D12Command.h"
 #include "d3d12/D3D12Context.h"
 #include "d3d12/D3D12Debug.h"
-#include "d3d12/D3D12Execute.h"
 #include "d3d12/D3D12GraphicsPipelineState.h"
 #include "d3d12/D3D12GraphicsShader.h"
 #include "d3d12/D3D12RaytracingPipelineState.h"
@@ -438,40 +438,11 @@ void RasterScene::preRender(const FrameInfo& frameInfo)
     }
 }
 
-void RasterScene::drawIndexed(d3d12::GraphicsPipelineState& pso, GpuMesh& mesh, std::span<TextureBindingDesc> textures)
+void RasterScene::bindTextures(d3d12::GraphicsPipelineState& pso, std::span<TextureBindingDesc> textures)
 {
-    if(!pso.isReady() || !mesh.isReady()) { return; }
-
-    if(textures.size() > d3d12::kMaxBindlessResources)
-    {
-        spdlog::warn("Binding more textures than bindless slots available.");
-    }
-
     const d3d12::GraphicsShader& shader = *pso.getShader();
 
-    { // bind vertex buffers
-        // creating an array with one more than necessary to give a slot to assign buffers not used by the
-        // shader.
-        std::array<uint32_t, d3d12::kMaxBindlessVertexBuffers + 1> vertexBufferDescriptorIndices;
-
-        for(const GpuMesh::VertexElement& vertexElement : mesh.getVertexElements())
-        {
-            const uint32_t constantBufferIndex =
-                shader.getVertexElementIndex(vertexElement.semantic, vertexElement.semanticIndex)
-                    .value_or(d3d12::kMaxBindlessVertexBuffers);
-
-            vertexBufferDescriptorIndices[constantBufferIndex] = vertexElement.buffer->getSrvDescriptorHeapIndex();
-        }
-
-        mCommandList.get()->SetGraphicsRoot32BitConstants(
-            d3d12::RasterRootParamSlot::VertexIndices,
-            std::min(d3d12::kMaxBindlessVertexBuffers, (uint32_t)shader.getShaderInputs().vertexElements.size()),
-            vertexBufferDescriptorIndices.data(), 0);
-    }
-
     { // bind resources
-        std::array<uint32_t, d3d12::kMaxBindlessResources + 1> resourceIndices;
-
         for(const TextureBindingDesc& textureBindingDesc : textures)
         {
             const uint32_t textureIndex =
@@ -479,26 +450,9 @@ void RasterScene::drawIndexed(d3d12::GraphicsPipelineState& pso, GpuMesh& mesh, 
                     .getResourceIndex(textureBindingDesc.nameHash, ShaderResourceType::Texture,
                                       textureBindingDesc.texture->getShaderResourceDimension())
                     .value_or(d3d12::kMaxBindlessResources);
-            resourceIndices[textureIndex] = mTexture->getSrvDescriptorHeapIndex();
+            mCommandList.setBindlessResource(textureIndex, mTexture->getSrvDescriptorHeapIndex());
         }
-
-        mCommandList.get()->SetGraphicsRoot32BitConstants(
-            d3d12::RasterRootParamSlot::ResourceIndices,
-            std::min(d3d12::kMaxBindlessResources, (uint32_t)shader.getShaderInputs().resources.size()),
-            resourceIndices.data(), 0);
     }
-
-    pso.markAsUsed(mCommandList.get());
-    mesh.markAsUsed(mCommandList.get());
-    mTexture->markAsUsed(mCommandList.get());
-
-    const D3D_PRIMITIVE_TOPOLOGY primitiveTopology = d3d12::TranslatePrimitiveTopology(mesh.getPrimitiveTopology());
-    const D3D12_INDEX_BUFFER_VIEW ibv = mesh.getIndexBuffer()->getIndexView();
-
-    mCommandList.get()->SetPipelineState(pso.getPipelineState());
-    mCommandList.get()->IASetPrimitiveTopology(primitiveTopology);
-    mCommandList.get()->IASetIndexBuffer(&ibv);
-    mCommandList.get()->DrawIndexedInstanced(mesh.getIndexCount(), 1, 0, 0, 0);
 }
 
 void RasterScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context)
@@ -555,9 +509,13 @@ void RasterScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12
 
         std::array<TextureBindingDesc, 1> textureBindings = {
             TextureBindingDesc{std::hash<std::string_view>()("Texture"), mTexture.get()}};
-
-        // drawIndexed(*mHelloTrianglePso, mTriangleMesh, textureBindings);
-        drawIndexed(*mHelloCubePso, mCubeMesh, textureBindings);
+        bindTextures(*mHelloCubePso, textureBindings);
+        d3d12::drawIndexed(mCommandList, d3d12::DrawIndexedParams{.indexBuffer = mCubeMesh.getIndexBuffer().get(),
+                                                                  .pipelineState = mHelloCubePso.get(),
+                                                                  .vertexBuffers = mCubeMesh.getVertexElements(),
+                                                                  .primitiveTopology = mCubeMesh.getPrimitiveTopology(),
+                                                                  .indexCount = mCubeMesh.getIndexCount(),
+                                                                  .instanceCount = 1});
 
         // Indicate that the back buffer will now be used to present.
         renderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
@@ -675,7 +633,7 @@ void RaytracingScene::preRender(const FrameInfo& frameInfo)
         { // bind vertex buffers
             // creating an array with one more than necessary to give a slot to assign buffers not used by the
             // shader.
-            for(const GpuMesh::VertexElement& vertexElement : mCubeMesh.getVertexElements())
+            for(const d3d12::VertexBuffer& vertexElement : mCubeMesh.getVertexElements())
             {
                 const std::optional<uint32_t> constantBufferIndex = mShader->getVertexElementIndex(
                     RaytracingShaderStage::ClosestHit, vertexElement.semantic, vertexElement.semanticIndex);

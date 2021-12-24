@@ -95,6 +95,8 @@ public:
 
     void markAsUsed(const GraphicsCommandList& commandList);
 
+    bool isReady() const;
+
 private:
     bool doesInstanceDescsNeedResize(uint32_t newCapacity);
     void resizeInstanceDescsBuffer(uint32_t capacity);

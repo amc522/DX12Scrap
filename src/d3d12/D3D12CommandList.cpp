@@ -93,6 +93,26 @@ void GraphicsCommandList::endFrame()
     mFrameIndex = (mFrameIndex + 1) % kFrameBufferCount;
 }
 
+void GraphicsCommandList::setBindlessResource(uint32_t constantBufferIndex, uint32_t descriptorHeapIndex)
+{
+    mBindlessChangeBegin = std::min(mBindlessChangeBegin, constantBufferIndex);
+    mBindlessChangeEnd = std::max(mBindlessChangeEnd, constantBufferIndex + 1);
+
+    mBindlessResourceIndices[constantBufferIndex] = descriptorHeapIndex;
+}
+
+void GraphicsCommandList::commitBindlessResources()
+{
+    if(mBindlessChangeBegin > mBindlessChangeEnd) { return; }
+
+    mCommandList->SetGraphicsRoot32BitConstants(
+        d3d12::RasterRootParamSlot::ResourceIndices, mBindlessChangeEnd - mBindlessChangeBegin,
+        mBindlessResourceIndices.data() + mBindlessChangeBegin, mBindlessChangeBegin);
+
+    mBindlessChangeBegin = d3d12::kMaxBindlessResources;
+    mBindlessChangeEnd = 0;
+}
+
 HRESULT GraphicsCommandList::appendNewAllocator(uint32_t frameIndex)
 {
     DeviceContext& deviceContext = DeviceContext::instance();

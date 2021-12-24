@@ -4,6 +4,7 @@
 #include "d3d12/D3D12TrackedGpuObject.h"
 
 #include <array>
+#include <span>
 
 #include <wrl/client.h>
 
@@ -34,6 +35,12 @@ public:
 
     void endFrame();
 
+    void setBindlessResource(uint32_t constantBufferIndex, uint32_t descriptorHeapIndex);
+
+    [[nodiscard]] std::span<const uint32_t> getBindlessResourceIndices() const { return mBindlessResourceIndices; }
+
+    void commitBindlessResources();
+
 private:
     HRESULT appendNewAllocator(uint32_t frameIndex);
 
@@ -44,5 +51,8 @@ private:
     uint32_t mFrameIndex = 0;
     std::wstring mDebugNameBase;
     std::wstring mDebugNameBuffer;
+    std::array<uint32_t, d3d12::kMaxBindlessResources> mBindlessResourceIndices;
+    uint32_t mBindlessChangeBegin = d3d12::kMaxBindlessResources;
+    uint32_t mBindlessChangeEnd = 0;
 };
 } // namespace scrap::d3d12
