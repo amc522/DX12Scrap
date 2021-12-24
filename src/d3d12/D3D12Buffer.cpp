@@ -205,7 +205,14 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, std::span<const
     if(!buffer.empty())
     {
         postCopyState = initialResourceState;
-        initialResourceState = D3D12_RESOURCE_STATE_COPY_DEST;
+
+        // The initial resource state was originally D3D12_RESOURCE_STATE_COPY_DEST, but a D3D12 warning started popping
+        // up.
+        //
+        // D3D12 WARNING: ID3D12Device::CreateCommittedResource2: Ignoring InitialState
+        //                D3D12_RESOURCE_STATE_COPY_DEST. Buffers are effectively created in state
+        //                D3D12_RESOURCE_STATE_COMMON. [STATE_CREATION WARNING #1328: CREATERESOURCE_STATE_IGNORED]
+        initialResourceState = D3D12_RESOURCE_STATE_COMMON;
     }
 
     // The destination heap of the buffer. This is the heap where the buffer will be for its lifetime on the
