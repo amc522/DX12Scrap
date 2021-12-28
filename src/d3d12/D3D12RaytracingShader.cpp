@@ -51,6 +51,52 @@ RaytracingShader::RaytracingShader(RaytracingShaderParams&& params)
     }
 }
 
+RaytracingShaderType getRaytracingShaderType(uint32_t shaderVersion)
+{
+    switch(D3D12_SHVER_GET_TYPE(shaderVersion))
+    {
+    case D3D12_SHVER_RAY_GENERATION_SHADER: [[fallthrough]];
+    case D3D12_SHVER_INTERSECTION_SHADER: [[fallthrough]];
+    case D3D12_SHVER_ANY_HIT_SHADER: [[fallthrough]];
+    case D3D12_SHVER_CLOSEST_HIT_SHADER: [[fallthrough]];
+    case D3D12_SHVER_MISS_SHADER: return RaytracingShaderType::FixedStage;
+    case D3D12_SHVER_CALLABLE_SHADER: return RaytracingShaderType::Callable;
+    case D3D12_SHVER_LIBRARY: [[fallthrough]];
+    case D3D12_SHVER_MESH_SHADER: [[fallthrough]];
+    case D3D12_SHVER_AMPLIFICATION_SHADER: [[fallthrough]];
+    case D3D12_SHVER_PIXEL_SHADER: [[fallthrough]];
+    case D3D12_SHVER_VERTEX_SHADER: [[fallthrough]];
+    case D3D12_SHVER_GEOMETRY_SHADER: [[fallthrough]];
+    case D3D12_SHVER_HULL_SHADER: [[fallthrough]];
+    case D3D12_SHVER_DOMAIN_SHADER: [[fallthrough]];
+    case D3D12_SHVER_COMPUTE_SHADER: [[fallthrough]];
+    default: return RaytracingShaderType::Unknown;
+    }
+}
+
+RaytracingShaderStage getRaytracingFixedShaderStage(uint32_t shaderVersion)
+{
+    switch(D3D12_SHVER_GET_TYPE(shaderVersion))
+    {
+    case D3D12_SHVER_RAY_GENERATION_SHADER: return RaytracingShaderStage::RayGen;
+    case D3D12_SHVER_INTERSECTION_SHADER: return RaytracingShaderStage::Intersection;
+    case D3D12_SHVER_ANY_HIT_SHADER: return RaytracingShaderStage::AnyHit;
+    case D3D12_SHVER_CLOSEST_HIT_SHADER: return RaytracingShaderStage::ClosestHit;
+    case D3D12_SHVER_MISS_SHADER: return RaytracingShaderStage::Miss;
+    case D3D12_SHVER_CALLABLE_SHADER: [[fallthrough]];
+    case D3D12_SHVER_LIBRARY: [[fallthrough]];
+    case D3D12_SHVER_MESH_SHADER: [[fallthrough]];
+    case D3D12_SHVER_AMPLIFICATION_SHADER: [[fallthrough]];
+    case D3D12_SHVER_PIXEL_SHADER: [[fallthrough]];
+    case D3D12_SHVER_VERTEX_SHADER: [[fallthrough]];
+    case D3D12_SHVER_GEOMETRY_SHADER: [[fallthrough]];
+    case D3D12_SHVER_HULL_SHADER: [[fallthrough]];
+    case D3D12_SHVER_DOMAIN_SHADER: [[fallthrough]];
+    case D3D12_SHVER_COMPUTE_SHADER: [[fallthrough]];
+    default: return RaytracingShaderStage::None;
+    }
+}
+
 void RaytracingShader::create()
 {
     std::lock_guard lockGuard(mCreationMutex);
@@ -91,7 +137,8 @@ void RaytracingShader::create()
 
     UINT compileFlags = 0;
 
-    LPCWSTR compilerArgs[] = {mFilepath.c_str(), L"-T lib_6_6", (mDebug) ? L"-Zi" : L"", (mDebug) ? L"-Od" : L"O3", L"-enable-16bit-types"};
+    LPCWSTR compilerArgs[] = {mFilepath.c_str(), L"-T lib_6_6", (mDebug) ? L"-Zi" : L"", (mDebug) ? L"-Od" : L"O3",
+                              L"-enable-16bit-types"};
 
     ComPtr<IDxcBlobEncoding> sourceBlob;
     if(FAILED(utils->LoadFile(mFilepath.c_str(), nullptr, &sourceBlob)))
@@ -165,6 +212,12 @@ void RaytracingShader::create()
 
             D3D12_FUNCTION_DESC functionDesc;
             functionReflection->GetDesc(&functionDesc);
+
+            RaytracingShaderType shaderType = getRaytracingShaderType(functionDesc.Version);
+            if(shaderType == RaytracingShaderType::Callable) { continue; }
+
+            RaytracingShaderStage stage = getRaytracingFixedShaderStage(functionDesc.Version);
+            if(shaderInfo.stage != stage) { continue; }
 
             std::string_view functionName(functionDesc.Name, std::strlen(functionDesc.Name));
 
@@ -324,7 +377,7 @@ RaytracingShader::getFixedStageShaders(RaytracingShaderStage stage) const
 }
 
 const RaytracingFixedStageShaderInfo* RaytracingShader::getFixedStageShader(RaytracingShaderStage stage,
-                                                                                          size_t index) const
+                                                                            size_t index) const
 {
     auto shaders = getFixedStageShaders(stage);
 
@@ -379,7 +432,9 @@ size_t RaytracingShader::getFixedStageIndex(RaytracingShaderStage stage, const W
     return getFixedStageIndex(stage, entryPointName.hash());
 }
 
-std::optional<uint32_t> RaytracingShader::getVertexElementIndex(RaytracingShaderStage stage, ShaderVertexSemantic semantic, uint32_t semanticIndex) const
+std::optional<uint32_t> RaytracingShader::getVertexElementIndex(RaytracingShaderStage stage,
+                                                                ShaderVertexSemantic semantic,
+                                                                uint32_t semanticIndex) const
 {
     const RaytracingFixedStageShaderInfo* shaderInfo = getFixedStageShader(stage, 0);
 
@@ -393,7 +448,10 @@ std::optional<uint32_t> RaytracingShader::getVertexElementIndex(RaytracingShader
     return std::nullopt;
 }
 
-std::optional<uint32_t> RaytracingShader::getResourceIndex(RaytracingShaderStage stage, uint64_t nameHash, ShaderResourceType resourceType, ShaderResourceDimension resourceDimension) const
+std::optional<uint32_t> RaytracingShader::getResourceIndex(RaytracingShaderStage stage,
+                                                           uint64_t nameHash,
+                                                           ShaderResourceType resourceType,
+                                                           ShaderResourceDimension resourceDimension) const
 {
     const RaytracingFixedStageShaderInfo* shaderInfo = getFixedStageShader(stage, 0);
 
