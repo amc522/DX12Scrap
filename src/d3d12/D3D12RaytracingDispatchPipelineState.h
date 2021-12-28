@@ -1,5 +1,6 @@
 #pragma once
 
+#include "d3d12/D3D12Fwd.h"
 #include "d3d12/D3D12TrackedGpuObject.h"
 
 #include <d3d12.h>
@@ -7,10 +8,6 @@
 
 namespace scrap::d3d12
 {
-class GraphicsCommandList;
-class RaytracingPipelineState;
-class RaytracingShader;
-
 struct RaytracingDispatchPipelineStateParams
 {
     Microsoft::WRL::ComPtr<ID3D12RootSignature> globalRootSignature;
@@ -45,4 +42,4 @@ private:
     uint32_t mMaxPayloadByteSize = 0;
     uint32_t mMaxAttributeByteSize = 0;
 };
-}
+} // namespace scrap::d3d12

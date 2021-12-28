@@ -21,6 +21,7 @@
 #pragma once
 
 #include "FreeBlockTracker.h"
+#include "d3d12/D3D12Fwd.h"
 
 #include <array>
 #include <cstdint>
@@ -30,24 +31,8 @@
 #include <tl/expected.hpp>
 #include <wrl/client.h>
 
-struct D3D12_CONSTANT_BUFFER_VIEW_DESC;
-struct D3D12_CPU_DESCRIPTOR_HANDLE;
-struct D3D12_DEPTH_STENCIL_VIEW_DESC;
-struct D3D12_DESCRIPTOR_HEAP_DESC;
-struct D3D12_GPU_DESCRIPTOR_HANDLE;
-struct D3D12_RENDER_TARGET_VIEW_DESC;
-struct D3D12_SAMPLER_DESC;
-struct D3D12_SHADER_RESOURCE_VIEW_DESC;
-struct D3D12_UNORDERED_ACCESS_VIEW_DESC;
-struct ID3D12DescriptorHeap;
-struct ID3D12Resource;
-
-enum D3D12_DESCRIPTOR_HEAP_TYPE;
-
 namespace scrap::d3d12
 {
-class DeviceContext;
-
 class FixedDescriptorHeapReservation;
 class FixedDescriptorHeapSubAllocator;
 class FixedDescriptorHeapMonotonicSubAllocator;

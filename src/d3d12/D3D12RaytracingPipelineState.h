@@ -3,6 +3,7 @@
 #include "D3D12RaytracingShader.h"
 #include "EASTL/fixed_vector.h"
 #include "RenderDefs.h"
+#include "d3d12/D3D12Fwd.h"
 #include "d3d12/D3D12TrackedGpuObject.h"
 
 #include <memory>
@@ -13,8 +14,6 @@
 
 namespace scrap::d3d12
 {
-class RaytracingShader;
-
 enum class RaytracingPipelineStatePrimitiveType
 {
     Procedural,

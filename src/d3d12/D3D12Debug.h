@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Utility.h"
+#include "d3d12/D3D12Fwd.h"
 
 #include <filesystem>
 #include <string>
@@ -9,11 +10,6 @@
 #include <fmt/format.h>
 #include <tl/expected.hpp>
 #include <wrl/client.h>
-
-struct ID3D12CommandList;
-struct ID3D12CommandQueue;
-struct ID3D12Device;
-struct ID3D12GraphicsCommandList;
 
 namespace scrap::d3d12
 {

@@ -10,6 +10,7 @@
 #include "d3d12/D3D12CommandList.h"
 #include "d3d12/D3D12Config.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
+#include "d3d12/D3D12Fwd.h"
 #include "d3d12/D3D12ShaderTable.h"
 #include "d3d12/D3D12TLAccelerationStructure.h"
 
@@ -19,26 +20,9 @@
 #include <glm/vec2.hpp>
 #include <wrl/client.h>
 
-struct ID3D12CommandAllocator;
-struct ID3D12GraphicsCommandList;
-struct ID3D12RootSignature;
-
 namespace scrap
 {
 struct FrameInfo;
-
-namespace d3d12
-{
-class BLAccelerationStructure;
-class Buffer;
-class DeviceContext;
-class GraphicsPipelineState;
-class RaytracingPipelineState;
-class RaytracingShader;
-class RaytracingDispatchPipelineState;
-class Texture;
-class TLAccelerationStructure;
-} // namespace d3d12
 
 struct FrameConstantBuffer
 {

@@ -1,18 +1,13 @@
 #pragma once
 
 #include "d3d12/D3D12Config.h"
+#include "d3d12/D3D12Fwd.h"
 #include "d3d12/D3D12TrackedGpuObject.h"
 
 #include <array>
 #include <span>
 
 #include <wrl/client.h>
-
-enum D3D12_COMMAND_LIST_TYPE;
-struct ID3D12CommandAllocator;
-struct ID3D12GraphicsCommandList;
-struct ID3D12GraphicsCommandList4;
-struct ID3D12CommandQueue;
 
 namespace scrap::d3d12
 {

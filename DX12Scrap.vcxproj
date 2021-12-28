@@ -70,6 +70,7 @@
     <ClInclude Include="src\d3d12\D3D12Debug.h" />
     <ClInclude Include="src\d3d12\D3D12Command.h" />
     <ClInclude Include="src\d3d12\D3D12FixedDescriptorHeap.h" />
+    <ClInclude Include="src\d3d12\D3D12Fwd.h" />
     <ClInclude Include="src\d3d12\D3D12GraphicsContext.h" />
     <ClInclude Include="src\d3d12\D3D12MonotonicDescriptorHeap.h" />
     <ClInclude Include="src\d3d12\D3D12GraphicsPipelineState.h" />

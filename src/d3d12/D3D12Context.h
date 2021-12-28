@@ -10,6 +10,7 @@
 #include "d3d12/D3D12Debug.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
 #include "d3d12/D3D12FrameCodes.h"
+#include "d3d12/D3D12Fwd.h"
 #include "d3d12/D3D12GraphicsContext.h"
 #include "d3d12/D3D12MonotonicDescriptorHeap.h"
 
@@ -21,35 +22,12 @@
 #include <glm/vec2.hpp>
 #include <wrl/client.h>
 
-enum D3D_FEATURE_LEVEL;
-enum D3D_ROOT_SIGNATURE_VERSION;
-struct ID3D12CommandQueue;
-struct ID3D12DescriptorHeap;
-struct ID3D12Device;
-struct ID3D12Device1;
-struct ID3D12Device2;
-struct ID3D12Device3;
-struct ID3D12Device4;
-struct ID3D12Device5;
-struct ID3D12Device6;
-struct ID3D12DeviceChild;
-struct ID3D12Fence;
-struct ID3D12PipelineState;
-struct ID3D12Resource;
-struct IDXGIAdapter4;
-struct IDXGIFactory4;
-struct IDXGISwapChain3;
-struct D3D12_CPU_DESCRIPTOR_HANDLE;
-
 namespace scrap
 {
 class Window;
 
 namespace d3d12
 {
-class GraphicsPipelineState;
-struct GraphicsPipelineStateParams;
-
 class DeviceContext
 {
 private:
