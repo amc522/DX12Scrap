@@ -34,7 +34,7 @@ GpuMesh::GpuMesh(const CpuMesh& cpuMesh, ResourceAccessFlags accessFlags, std::s
         bufferName.clear();
         fmt::format_to(std::back_inserter(bufferName), "{}_{}{}", name, element.semantic, element.semanticIndex);
 
-        d3d12::Buffer::FormattedParams params;
+        d3d12::BufferFormattedParams params;
         params.accessFlags = accessFlags;
         params.format = element.format;
         params.numElements =
@@ -46,7 +46,7 @@ GpuMesh::GpuMesh(const CpuMesh& cpuMesh, ResourceAccessFlags accessFlags, std::s
 
 void GpuMesh::initIndices(const IndexBufferParams& params)
 {
-    d3d12::Buffer::FormattedParams bufferParams;
+    d3d12::BufferFormattedParams bufferParams;
     bufferParams.accessFlags = params.accessFlags;
     bufferParams.flags = params.flags | d3d12::BufferFlags::IndexBuffer;
     bufferParams.format = TranslateIndexBufferFormat(params.format);
@@ -62,7 +62,7 @@ void GpuMesh::initIndices(const IndexBufferParams& params)
 
 void GpuMesh::initIndices(const IndexBufferParams& params, std::span<const std::byte> data)
 {
-    d3d12::Buffer::FormattedParams bufferParams;
+    d3d12::BufferFormattedParams bufferParams;
     bufferParams.accessFlags = params.accessFlags;
     bufferParams.flags = params.flags | d3d12::BufferFlags::IndexBuffer;
     bufferParams.format = TranslateIndexBufferFormat(params.format);
@@ -78,7 +78,7 @@ void GpuMesh::initIndices(const IndexBufferParams& params, std::span<const std::
 
 void GpuMesh::createVertexElement(ShaderVertexSemantic semantic,
                                   uint32_t semanticIndex,
-                                  const d3d12::Buffer::FormattedParams& bufferParams)
+                                  const d3d12::BufferFormattedParams& bufferParams)
 {
     if(bufferParams.numElements == 0) { return; }
 
@@ -104,7 +104,7 @@ void GpuMesh::createVertexElement(ShaderVertexSemantic semantic,
 
 void GpuMesh::createVertexElement(ShaderVertexSemantic semantic,
                                   uint32_t semanticIndex,
-                                  const d3d12::Buffer::FormattedParams& bufferParams,
+                                  const d3d12::BufferFormattedParams& bufferParams,
                                   std::span<const std::byte> data)
 {
     if(bufferParams.numElements == 0) { return; }

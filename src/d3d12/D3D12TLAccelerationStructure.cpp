@@ -13,7 +13,8 @@ TLAccelerationStructure::TLAccelerationStructure(const TLAccelerationStructurePa
     resizeInstanceDescsBuffer((uint32_t)params.initialReservedObjects);
 }
 
-tl::expected<TlasInstanceAllocation, TlasError> TLAccelerationStructure::addInstance(const InstanceParams& params)
+tl::expected<TlasInstanceAllocation, TlasError>
+TLAccelerationStructure::addInstance(const TLAccelerationStructureInstanceParams& params)
 {
     const glm::mat3x4 transposedTransform = glm::transpose(params.transform);
 
@@ -121,7 +122,7 @@ bool TLAccelerationStructure::build(const GraphicsCommandList& commandList)
         mScratchGpuBuffer = std::make_unique<Buffer>();
         std::string scratchBufferName = fmt::format("{} (Scratch Buffer)", mParams.name);
 
-        Buffer::SimpleParams params;
+        BufferSimpleParams params;
         params.accessFlags = ResourceAccessFlags::None;
         params.byteSize = prebuildInfo.ScratchDataSizeInBytes;
         params.flags = BufferFlags::UavEnabled;
@@ -135,7 +136,7 @@ bool TLAccelerationStructure::build(const GraphicsCommandList& commandList)
     {
         mAccelerationStructureGpuBuffer = std::make_unique<Buffer>();
 
-        Buffer::SimpleParams accelerationStructureParams;
+        BufferSimpleParams accelerationStructureParams;
         accelerationStructureParams.accessFlags = ResourceAccessFlags::None;
         accelerationStructureParams.byteSize = prebuildInfo.ResultDataMaxSizeInBytes;
         accelerationStructureParams.flags = BufferFlags::AccelerationStructure;
@@ -200,7 +201,7 @@ void TLAccelerationStructure::resizeInstanceDescsBuffer(uint32_t capacity)
 
     std::string instanceDescsName = fmt::format("{} (InstanceDescs)", mParams.name);
 
-    Buffer::StructuredParams instanceDescsParams;
+    BufferStructuredParams instanceDescsParams;
     instanceDescsParams.accessFlags = mParams.instanceDescs.accessFlags | ResourceAccessFlags::CpuWrite;
     instanceDescsParams.elementByteSize = AlignInteger((uint32_t)sizeof(D3D12_RAYTRACING_INSTANCE_DESC),
                                                        uint32_t(D3D12_RAYTRACING_INSTANCE_DESCS_BYTE_ALIGNMENT));

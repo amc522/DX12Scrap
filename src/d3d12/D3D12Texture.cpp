@@ -15,15 +15,15 @@ using namespace Microsoft::WRL;
 
 namespace scrap::d3d12
 {
-std::optional<Texture::Error> Texture::initUninitialized(const Params& params)
+std::optional<TextureError> Texture::initUninitialized(const TextureParams& params)
 {
     return init(params, nullptr);
 }
 
-std::optional<Texture::Error>
+std::optional<TextureError>
 Texture::initFromMemory(const cputex::TextureView& texture, ResourceAccessFlags accessFlags, std::string_view name)
 {
-    Params params;
+    TextureParams params;
     params.dimension = texture.dimension();
     params.format = texture.format();
     params.extents = texture.extent();
@@ -89,35 +89,35 @@ void Texture::markAsUsed(ID3D12CommandList* commandList)
     mResource.markAsUsed(commandList);
 }
 
-std::optional<Texture::Error> Texture::init(const Params& params, const cputex::TextureView* texture)
+std::optional<TextureError> Texture::init(const TextureParams& params, const cputex::TextureView* texture)
 {
     DeviceContext& deviceContext = DeviceContext::instance();
     ID3D12GraphicsCommandList* commandList = deviceContext.getCopyContext().getCommandList();
 
     const auto formatTranslation = gpufmt::dxgi::translateFormat(params.format);
 
-    if(!formatTranslation || !formatTranslation.exact) { return Error::InvalidFormat; }
+    if(!formatTranslation || !formatTranslation.exact) { return TextureError::InvalidFormat; }
 
     const gpufmt::FormatInfo& formatInfo = gpufmt::formatInfo(params.format);
 
     const bool isDepthStencil = formatInfo.depth || formatInfo.stencil;
 
     // VALIDATION
-    if(params.isRenderTarget && isDepthStencil) { return Error::CannotUseDepthStencilFormatForRenderTarget; }
+    if(params.isRenderTarget && isDepthStencil) { return TextureError::CannotUseDepthStencilFormatForRenderTarget; }
 
     if(params.isRenderTarget && !deviceContext.isSupportedRenderTargetFormat(formatTranslation.exact.value()))
     {
-        return Error::InvalidRenderTargetFormat;
+        return TextureError::InvalidRenderTargetFormat;
     }
 
     if(isDepthStencil && !deviceContext.isSupportedDepthStencilFormat(formatTranslation.exact.value()))
     {
-        return Error::InvalidDepthStencilFormat;
+        return TextureError::InvalidDepthStencilFormat;
     }
 
     if(isDepthStencil && ((params.accessFlags & ResourceAccessFlags::GpuWrite) == ResourceAccessFlags::GpuWrite))
     {
-        return Error::UavNotSupportForDepthStencil;
+        return TextureError::UavNotSupportForDepthStencil;
     }
 
     // Setup formats
@@ -137,19 +137,19 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
     if(isDepthStencil)
     {
         const auto depthFormat = gpufmt::dxgi::depthShaderResourceViewFormat(formatTranslation.exact.value());
-        if(!depthFormat.has_value()) { return Error::NoValidDepthSrvFormat; }
+        if(!depthFormat.has_value()) { return TextureError::NoValidDepthSrvFormat; }
 
         srvFormatPlane0 = depthFormat.value();
 
         const auto stencilFormat = gpufmt::dxgi::stencilShaderResourceViewFormat(formatTranslation.exact.value());
-        if(!stencilFormat.has_value()) { return Error::NoValidStencilSrvFormat; }
+        if(!stencilFormat.has_value()) { return TextureError::NoValidStencilSrvFormat; }
 
         srvFormatPlane1 = stencilFormat.value();
 
         dsvFormat = formatTranslation.exact.value();
 
         const auto typelessFormat = gpufmt::dxgi::typelessFormat(formatTranslation.exact.value());
-        if(!typelessFormat.has_value()) { return Error::NoValidDepthStencilTypelessFormat; }
+        if(!typelessFormat.has_value()) { return TextureError::NoValidDepthStencilTypelessFormat; }
 
         textureFormat = typelessFormat.value();
     }
@@ -264,7 +264,7 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
                                                                 initialResourceState, clearValuePtr,
                                                                 IID_PPV_ARGS(&resource));
 
-        if(FAILED(hr)) { return Error::FailedToCreateResource; }
+        if(FAILED(hr)) { return TextureError::FailedToCreateResource; }
 
         mResource = TrackedShaderResource(std::move(resource));
     }
@@ -310,7 +310,7 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
         if(FAILED(hr))
         {
             spdlog::critical("Failed to create texture upload resource.");
-            return Error::FailedToCreateUploadResource;
+            return TextureError::FailedToCreateUploadResource;
         }
 
         mUploadResource = TrackedGpuObject(std::move(uploadResource));
@@ -398,7 +398,7 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
     if(cbvSrvUavdescriptorCount > 0)
     {
         auto descriptorHeapReservation = deviceContext.getCbvSrvUavHeap().reserve(cbvSrvUavdescriptorCount);
-        if(!descriptorHeapReservation) { return Texture::Error::InsufficientDescriptorHeapSpace; }
+        if(!descriptorHeapReservation) { return TextureError::InsufficientDescriptorHeapSpace; }
 
         mResource.setCbvSrvUavDescriptorHeapReservation(std::move(descriptorHeapReservation.value()));
 
@@ -509,7 +509,7 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
     if(needsRtv)
     {
         auto descriptorHeapReservation = deviceContext.getRtvHeap().reserve(rtvDescriptorCount);
-        if(!descriptorHeapReservation) { return Texture::Error::InsufficientDescriptorHeapSpace; }
+        if(!descriptorHeapReservation) { return TextureError::InsufficientDescriptorHeapSpace; }
 
         mResource.setRtvDescriptorHeapReservation(std::move(descriptorHeapReservation.value()));
 
@@ -557,7 +557,7 @@ std::optional<Texture::Error> Texture::init(const Params& params, const cputex::
     if(needsDsv)
     {
         auto descriptorHeapReservation = deviceContext.getDsvHeap().reserve(dsvDescriptorCount);
-        if(!descriptorHeapReservation) { return Texture::Error::InsufficientDescriptorHeapSpace; }
+        if(!descriptorHeapReservation) { return TextureError::InsufficientDescriptorHeapSpace; }
 
         mResource.setDsvDescriptorHeapReservation(std::move(descriptorHeapReservation.value()));
 
