@@ -14,7 +14,7 @@ class Buffer;
 class GpuMesh;
 class GraphicsCommandList;
 class GraphicsPipelineState;
-class RaytracingPipelineState;
+class RaytracingDispatchPipelineState;
 class ShaderTable;
 class Texture;
 class TLAccelerationStructure;
@@ -33,7 +33,7 @@ struct EngineConstantBuffers
 
 struct DispatchRaysParams
 {
-    d3d12::RaytracingPipelineState* pipelineState = nullptr;
+    d3d12::RaytracingDispatchPipelineState* pipelineState = nullptr;
     std::span<d3d12::TLAccelerationStructure*> accelerationStructures;
     d3d12::ShaderTable* shaderTable = nullptr;
     EngineConstantBuffers constantBuffers;

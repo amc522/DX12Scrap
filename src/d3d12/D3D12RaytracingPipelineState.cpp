@@ -1,5 +1,6 @@
 #include "d3d12/D3D12RaytracingPipelineState.h"
 
+#include "EnumIterator.h"
 #include "d3d12/D3D12Context.h"
 #include "d3d12/D3D12RaytracingShader.h"
 
@@ -10,9 +11,6 @@ namespace scrap::d3d12
 RaytracingPipelineState::RaytracingPipelineState(RaytracingPipelineStateParams&& params)
     : mHitGroupName(Utf8ToWideString(params.hitGroupName))
     , mPrimitiveType(params.primitiveType)
-    , mMaxAttributeByteSize(params.maxAttributeByteSize)
-    , mMaxPayloadByteSize(params.maxPayloadByteSize)
-    , mGlobalRootSignature(std::move(params.globalRootSignature))
     , mMaxRecursionDepth(params.maxRecursionDepth)
 {
     mShaders.assign(params.shaders.begin(), params.shaders.end());
@@ -22,6 +20,18 @@ RaytracingPipelineState::RaytracingPipelineState(RaytracingPipelineStateParams&&
     mFixedStageShaderParams[(size_t)RaytracingShaderStage::AnyHit] = params.fixedStages.anyHit;
     mFixedStageShaderParams[(size_t)RaytracingShaderStage::ClosestHit] = params.fixedStages.closestHit;
     mFixedStageShaderParams[(size_t)RaytracingShaderStage::Miss] = params.fixedStages.miss;
+
+    RaytracingShaderStageMask shaderStageMask = RaytracingShaderStageMask::None;
+
+    for(RaytracingShaderStage stage : Enumerator<RaytracingShaderStage>())
+    {
+        shaderStageMask = (mFixedStageShaderParams[(size_t)RaytracingShaderStage::RayGen].shaderIndex !=
+                           RaytracingPipelineStateShaderParams::kInvalidIndex)
+                              ? RaytracingShaderStageToMask(stage)
+                              : RaytracingShaderStageMask::None;
+    }
+
+    mPipelineStages = RaytracingShaderStageMaskToPipelineMask(shaderStageMask);
 
     mValidFixedStageExportCount =
         (uint32_t)std::count_if(mFixedStageShaderParams.cbegin(), mFixedStageShaderParams.cend(),
@@ -34,6 +44,15 @@ RaytracingPipelineState::RaytracingPipelineState(RaytracingPipelineStateParams&&
     {
         mLocalRootSignatures.emplace_back(std::move(localRootSignature));
     }
+}
+
+template<class T>
+using MonotonicVector = eastl::vector<T, MonotonicBufferEastlAllocator<T>>;
+
+template<class T>
+inline MonotonicVector<T> makeMonotonicVector(MonotonicBuffer& buffer)
+{
+    return MonotonicVector<T>{MonotonicBufferEastlAllocator<T>(buffer)};
 }
 
 void RaytracingPipelineState::create()
@@ -55,23 +74,42 @@ void RaytracingPipelineState::create()
         if(shader->status() == RaytracingShaderState::Failed) { return; }
     }
 
+    struct LocalRootSignatureStructures
+    {
+        D3D12_LOCAL_ROOT_SIGNATURE signature;
+        D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION exportsAssociation;
+    };
+
     const size_t subObjectCount = mShaders.size()                   // dxil libraries
                                   + 1                               // hit group
-                                  + 1                               // shader config
-                                  + 1                               // global root signature
                                   + mLocalRootSignatures.size() * 2 // local root signatures and associations
                                   + 1;                              // pipeline config
 
-    std::vector<D3D12_STATE_SUBOBJECT> subObjects;
+    const size_t dxilLibraryDescCount = mShaders.size();
+    const size_t exportDescsCount = mValidFixedStageExportCount + mCallableShaderParams.size();
+    const size_t localRootSignatureStructureCount = mLocalRootSignatures.size();
+    const size_t localRootSignatureExportsCount = mValidFixedStageExportCount + mCallableShaderParams.size();
+
+    MemoryCalculator memoryCalc;
+    memoryCalc.add<D3D12_STATE_SUBOBJECT>(subObjectCount);
+    memoryCalc.add<D3D12_DXIL_LIBRARY_DESC>(dxilLibraryDescCount);
+    memoryCalc.add<D3D12_EXPORT_DESC>(exportDescsCount);
+    memoryCalc.add<D3D12_HIT_GROUP_DESC>(1);
+    memoryCalc.add<LocalRootSignatureStructures>(localRootSignatureStructureCount);
+    memoryCalc.add<LPCWSTR>(localRootSignatureExportsCount);
+    memoryCalc.add<D3D12_RAYTRACING_PIPELINE_CONFIG1>(1);
+
+    mMonotonicBuffer = MonotonicBuffer(memoryCalc.getByteSize());
+
+    auto subObjects = makeMonotonicVector<D3D12_STATE_SUBOBJECT>(mMonotonicBuffer);
     subObjects.reserve(subObjectCount);
 
 #pragma region dxil_libraries
     // DXIL LIBRARIES
-    std::vector<D3D12_DXIL_LIBRARY_DESC> dxilLibDescs;
-    dxilLibDescs.reserve(mShaders.size());
-
-    std::vector<D3D12_EXPORT_DESC> exportDescs;
-    exportDescs.reserve(mValidFixedStageExportCount + mCallableShaderParams.size());
+    auto dxilLibDescs = makeMonotonicVector<D3D12_DXIL_LIBRARY_DESC>(mMonotonicBuffer);
+    dxilLibDescs.reserve(dxilLibraryDescCount);
+    auto exportDescs = makeMonotonicVector<D3D12_EXPORT_DESC>(mMonotonicBuffer);
+    exportDescs.reserve(exportDescsCount);
 
     ptrdiff_t exportOffset = 0;
 
@@ -122,48 +160,29 @@ void RaytracingPipelineState::create()
         return fixedStageShaders[shaderParams.shaderEntryPointIndex].wideEntryPoint.c_str();
     };
 
-    D3D12_HIT_GROUP_DESC hitGroupDesc = {};
-    hitGroupDesc.IntersectionShaderImport = GetFixedStageEntryPointName(RaytracingShaderStage::Intersection);
-    hitGroupDesc.AnyHitShaderImport = GetFixedStageEntryPointName(RaytracingShaderStage::AnyHit);
-    hitGroupDesc.ClosestHitShaderImport = GetFixedStageEntryPointName(RaytracingShaderStage::ClosestHit);
-    hitGroupDesc.HitGroupExport = mHitGroupName.c_str();
-    hitGroupDesc.Type = (mPrimitiveType == RaytracingPipelineStatePrimitiveType::Triangles)
-                            ? D3D12_HIT_GROUP_TYPE_TRIANGLES
-                            : D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE;
+    auto* hitGroupDesc = mMonotonicBuffer.allocate<D3D12_HIT_GROUP_DESC>(1);
+    hitGroupDesc->IntersectionShaderImport = GetFixedStageEntryPointName(RaytracingShaderStage::Intersection);
+    hitGroupDesc->AnyHitShaderImport = GetFixedStageEntryPointName(RaytracingShaderStage::AnyHit);
+    hitGroupDesc->ClosestHitShaderImport = GetFixedStageEntryPointName(RaytracingShaderStage::ClosestHit);
+    hitGroupDesc->HitGroupExport = mHitGroupName.c_str();
+    hitGroupDesc->Type = (mPrimitiveType == RaytracingPipelineStatePrimitiveType::Triangles)
+                             ? D3D12_HIT_GROUP_TYPE_TRIANGLES
+                             : D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE;
 
     {
         D3D12_STATE_SUBOBJECT& subObject = subObjects.emplace_back();
         subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
-        subObject.pDesc = &hitGroupDesc;
-    }
-#pragma endregion
-
-#pragma region shader_config
-    // SHADER CONFIG
-    D3D12_RAYTRACING_SHADER_CONFIG shaderConfig = {};
-    shaderConfig.MaxPayloadSizeInBytes = mMaxPayloadByteSize;
-    shaderConfig.MaxAttributeSizeInBytes = mMaxAttributeByteSize;
-
-    {
-        D3D12_STATE_SUBOBJECT& subObject = subObjects.emplace_back();
-        subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
-        subObject.pDesc = &shaderConfig;
+        subObject.pDesc = hitGroupDesc;
     }
 #pragma endregion
 
 #pragma region local_root_signatures
     // LOCAL ROOT SIGNATURES
-    struct LocalRootSignatureStructures
-    {
-        D3D12_LOCAL_ROOT_SIGNATURE signature;
-        D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION exportsAssociation;
-    };
+    auto localRootSignatureStructures = makeMonotonicVector<LocalRootSignatureStructures>(mMonotonicBuffer);
+    localRootSignatureStructures.reserve(localRootSignatureStructureCount);
 
-    eastl::fixed_vector<LocalRootSignatureStructures, 1> localRootSignatureStructures;
-    localRootSignatureStructures.reserve(mLocalRootSignatures.size());
-
-    eastl::fixed_vector<LPCWSTR, (size_t)RaytracingShaderStage::Count> localRootSignatureExports;
-    localRootSignatureExports.reserve(mValidFixedStageExportCount + mCallableShaderParams.size());
+    auto localRootSignatureExports = makeMonotonicVector<LPCWSTR>(mMonotonicBuffer);
+    localRootSignatureExports.reserve(localRootSignatureExportsCount);
     size_t localRootSignatureExportsOffset = 0;
 
     for(size_t localRootSignatureIndex = 0; localRootSignatureIndex < mLocalRootSignatures.size();
@@ -212,81 +231,22 @@ void RaytracingPipelineState::create()
     }
 #pragma endregion
 
-#pragma region global_root_signature
-    // GLOBAL ROOT SIGNATURE
-    D3D12_GLOBAL_ROOT_SIGNATURE globalRootSignatureDesc = {};
-    globalRootSignatureDesc.pGlobalRootSignature = mGlobalRootSignature.get();
-
-    {
-        D3D12_STATE_SUBOBJECT& globalRootSignatureSubObject = subObjects.emplace_back();
-        globalRootSignatureSubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
-        globalRootSignatureSubObject.pDesc = &globalRootSignatureDesc;
-    }
-#pragma endregion
-
 #pragma region pipeline_config
     // PIPELINE CONFIG
-    D3D12_RAYTRACING_PIPELINE_CONFIG1 raytracingPipelineConfig = {};
-    raytracingPipelineConfig.MaxTraceRecursionDepth = mMaxRecursionDepth;
-    raytracingPipelineConfig.Flags = D3D12_RAYTRACING_PIPELINE_FLAG_NONE;
+    auto* raytracingPipelineConfig = mMonotonicBuffer.allocate<D3D12_RAYTRACING_PIPELINE_CONFIG1>(1);
+    raytracingPipelineConfig->MaxTraceRecursionDepth = mMaxRecursionDepth;
+    raytracingPipelineConfig->Flags = D3D12_RAYTRACING_PIPELINE_FLAG_NONE;
 
     {
         D3D12_STATE_SUBOBJECT& configSubObject = subObjects.emplace_back();
         configSubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
-        configSubObject.pDesc = &raytracingPipelineConfig;
-    }
-#pragma endregion
-
-#pragma region state_object_desc
-    // CREATE STATE OBJECT
-    D3D12_STATE_OBJECT_DESC raytracingPipelineDesc = {};
-    raytracingPipelineDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
-    raytracingPipelineDesc.NumSubobjects = (uint32_t)subObjects.size();
-    raytracingPipelineDesc.pSubobjects = subObjects.data();
-#pragma endregion
-
-    ComPtr<ID3D12StateObject> stateObject;
-    HRESULT hr = d3d12::DeviceContext::instance().getDevice5()->CreateStateObject(&raytracingPipelineDesc,
-                                                                                  IID_PPV_ARGS(&stateObject));
-
-    if(FAILED(hr)) { return; }
-
-    mStateObject = TrackedGpuObject(std::move(stateObject));
-
-#pragma region collect_shader_identifiers
-    {
-        ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
-
-        if(FAILED(mStateObject->QueryInterface(IID_PPV_ARGS(&stateObjectProperties)))) { return; }
-
-        auto makeShaderIdentifier = [&](std::wstring_view entryPointName) {
-            return RaytracingShaderIdentifier(
-                reinterpret_cast<std::byte*>(stateObjectProperties->GetShaderIdentifier(entryPointName.data())),
-                detail::kShaderIdentifierSize);
-        };
-
-        mFixedStageShaderIdentifiers[(size_t)RaytracingPipelineStage::RayGen] =
-            makeShaderIdentifier(getFixedStageShaderEntryPointName(RaytracingShaderStage::RayGen));
-        mFixedStageShaderIdentifiers[(size_t)RaytracingPipelineStage::HitGroup] = makeShaderIdentifier(mHitGroupName);
-        mFixedStageShaderIdentifiers[(size_t)RaytracingPipelineStage::Miss] =
-            makeShaderIdentifier(getFixedStageShaderEntryPointName(RaytracingShaderStage::Miss));
-
-        for(CallableShaderParams& shaderInfo : mCallableShaderParams)
-        {
-            if(!shaderInfo.hasValidShaderEntryPoint()) { continue; }
-
-            std::wstring_view entryPointName = getShaderEntryPointName(shaderInfo);
-            shaderInfo.shaderIdentifier = makeShaderIdentifier(entryPointName.data());
-        }
+        configSubObject.pDesc = raytracingPipelineConfig;
     }
 #pragma endregion
 }
 
 void RaytracingPipelineState::markAsUsed(ID3D12CommandQueue* commandQueue)
 {
-    mStateObject.markAsUsed(commandQueue);
-    mGlobalRootSignature.markAsUsed(commandQueue);
-
     for(auto& localRootSignature : mLocalRootSignatures)
     {
         localRootSignature.markAsUsed(commandQueue);
@@ -295,13 +255,23 @@ void RaytracingPipelineState::markAsUsed(ID3D12CommandQueue* commandQueue)
 
 void RaytracingPipelineState::markAsUsed(ID3D12CommandList* commandList)
 {
-    mStateObject.markAsUsed(commandList);
-    mGlobalRootSignature.markAsUsed(commandList);
-
     for(auto& localRootSignature : mLocalRootSignatures)
     {
         localRootSignature.markAsUsed(commandList);
     }
+}
+
+void RaytracingPipelineState::setShaderIdentifier(RaytracingPipelineStage stage,
+                                                  const RaytracingShaderIdentifier& shaderId)
+{
+    mFixedStageShaderIdentifiers[(size_t)stage] = shaderId;
+}
+
+void RaytracingPipelineState::setShaderIdentifier(size_t callableShaderIndex,
+                                                  const RaytracingShaderIdentifier& shaderId)
+{
+    if(callableShaderIndex >= mCallableShaderParams.size()) { return; }
+    mCallableShaderParams[callableShaderIndex].shaderIdentifier = shaderId;
 }
 
 RaytracingShaderIdentifier RaytracingPipelineState::getShaderIdentifier(RaytracingPipelineStage stage) const
@@ -310,9 +280,17 @@ RaytracingShaderIdentifier RaytracingPipelineState::getShaderIdentifier(Raytraci
 }
 
 std::wstring_view
-scrap::d3d12::RaytracingPipelineState::getFixedStageShaderEntryPointName(const RaytracingShaderStage stage) const
+scrap::d3d12::RaytracingPipelineState::getFixedStageEntryPointName(const RaytracingPipelineStage stage) const
 {
-    return getShaderEntryPointName(mFixedStageShaderParams[(size_t)stage]);
+    switch(stage)
+    {
+    case RaytracingPipelineStage::RayGen:
+        return getShaderEntryPointName(mFixedStageShaderParams[(size_t)RaytracingShaderStage::RayGen]);
+    case RaytracingPipelineStage::HitGroup: return mHitGroupName;
+    case RaytracingPipelineStage::Miss:
+        return getShaderEntryPointName(mFixedStageShaderParams[(size_t)RaytracingShaderStage::Miss]);
+    default: return {};
+    }
 }
 
 std::wstring_view scrap::d3d12::RaytracingPipelineState::getCallableShaderEntryPointName(size_t index) const

@@ -35,6 +35,7 @@ class DeviceContext;
 class GraphicsPipelineState;
 class RaytracingPipelineState;
 class RaytracingShader;
+class RaytracingDispatchPipelineState;
 class Texture;
 class TLAccelerationStructure;
 } // namespace d3d12
@@ -159,6 +160,7 @@ private:
     d3d12::TlasInstanceAllocation mTlasInstance;
 
     std::shared_ptr<d3d12::RaytracingShader> mShader;
+    std::unique_ptr<d3d12::RaytracingDispatchPipelineState> mDispatchPipelineState;
     std::shared_ptr<d3d12::RaytracingPipelineState> mPipelineState;
 
     std::shared_ptr<d3d12::ShaderTable> mShaderTable;

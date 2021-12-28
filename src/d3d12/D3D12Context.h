@@ -75,6 +75,7 @@ public:
     [[nodiscard]] ID3D12Device4* getDevice4() { return mDevice4.Get(); }
     [[nodiscard]] ID3D12Device5* getDevice5() { return mDevice5.Get(); }
     [[nodiscard]] ID3D12Device6* getDevice6() { return mDevice6.Get(); }
+    [[nodiscard]] ID3D12Device7* getDevice7() { return mDevice7.Get(); }
 
     [[nodiscard]] uint32_t getFrameIndex() const { return mFrameIndex; }
 
@@ -131,6 +132,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D12Device4> mDevice4;
     Microsoft::WRL::ComPtr<ID3D12Device5> mDevice5;
     Microsoft::WRL::ComPtr<ID3D12Device6> mDevice6;
+    Microsoft::WRL::ComPtr<ID3D12Device7> mDevice7;
     Microsoft::WRL::ComPtr<IDXGISwapChain3> mSwapChain;
     std::unique_ptr<MonotonicDescriptorHeap_RTV> mSwapChainRtvHeap;
     d3d12::MonotonicDescriptorHeapAllocation mSwapChainRtvs;

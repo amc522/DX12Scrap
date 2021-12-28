@@ -421,6 +421,11 @@ HRESULT DeviceContext::createDevice(D3D_FEATURE_LEVEL featureLevel)
     mDevice6 = std::move(device6);
     spdlog::info("Create d3d12 device6");
 
+    ComPtr<ID3D12Device7> device7;
+    if(FAILED(mDevice->QueryInterface(IID_PPV_ARGS(&device7)))) { return S_OK; }
+    mDevice7 = std::move(device7);
+    spdlog::info("Create d3d12 device7");
+
     return S_OK;
 }
 

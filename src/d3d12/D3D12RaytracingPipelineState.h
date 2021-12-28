@@ -7,7 +7,6 @@
 
 #include <memory>
 #include <span>
-#include <variant>
 
 #include <d3d12.h>
 #include <wrl/client.h>
@@ -24,22 +23,22 @@ enum class RaytracingPipelineStatePrimitiveType
 
 struct RaytracingPipelineStateShaderParams
 {
-    size_t shaderIndex = std::numeric_limits<size_t>::max();
-    size_t shaderEntryPointIndex = std::numeric_limits<size_t>::max();
+    static constexpr size_t kInvalidIndex = std::numeric_limits<size_t>::max();
 
-    size_t localRootSignatureIndex = std::numeric_limits<size_t>::max();
+    size_t shaderIndex = kInvalidIndex;
+    size_t shaderEntryPointIndex = kInvalidIndex;
+
+    size_t localRootSignatureIndex = kInvalidIndex;
 
     constexpr bool hasValidShaderEntryPoint() const
     {
-        return shaderIndex != std::numeric_limits<size_t>::max() &&
-               shaderEntryPointIndex != std::numeric_limits<size_t>::max();
+        return shaderIndex != kInvalidIndex && shaderEntryPointIndex != kInvalidIndex;
     }
 };
 
 struct RaytracingPipelineStateParams
 {
     std::span<Microsoft::WRL::ComPtr<ID3D12RootSignature>> localRootSignatures;
-    Microsoft::WRL::ComPtr<ID3D12RootSignature> globalRootSignature;
 
     std::span<std::shared_ptr<RaytracingShader>> shaders;
     struct
@@ -57,8 +56,6 @@ struct RaytracingPipelineStateParams
 
     RaytracingPipelineStatePrimitiveType primitiveType = RaytracingPipelineStatePrimitiveType::Triangles;
 
-    uint32_t maxPayloadByteSize = 0;
-    uint32_t maxAttributeByteSize = 0;
     uint32_t maxRecursionDepth = 1;
 };
 
@@ -89,20 +86,25 @@ public:
     RaytracingPipelineState& operator=(RaytracingPipelineState&& other) = default;
 
     void create();
-    bool isReady() const { return mStateObject != nullptr; }
-
-    ID3D12StateObject* getPipelineState() const { return mStateObject.get(); }
 
     void markAsUsed(ID3D12CommandQueue* commandQueue);
     void markAsUsed(ID3D12CommandList* commandList);
 
+    [[nodiscard]] RaytracingPipelineStageMask getPipelineStages() const { return mPipelineStages; }
     [[nodiscard]] size_t getCallableShaderCount() const { return mCallableShaderParams.size(); }
 
+    void setShaderIdentifier(RaytracingPipelineStage stage, const RaytracingShaderIdentifier& shaderId);
+    void setShaderIdentifier(size_t callableShaderIndex, const RaytracingShaderIdentifier& shaderId);
     [[nodiscard]] RaytracingShaderIdentifier getShaderIdentifier(RaytracingPipelineStage stage) const;
     [[nodiscard]] RaytracingShaderIdentifier getCallableShaderIdentifier(size_t index) const
     {
         return mCallableShaderParams[index].shaderIdentifier;
     }
+
+    std::span<const D3D12_STATE_SUBOBJECT> getStateSubObjects() { return mStateSubObjects; }
+
+    std::wstring_view getFixedStageEntryPointName(const RaytracingPipelineStage stage) const;
+    std::wstring_view getCallableShaderEntryPointName(size_t index) const;
 
 private:
     struct CallableShaderParams : RaytracingPipelineStateShaderParams
@@ -114,22 +116,20 @@ private:
         RaytracingShaderIdentifier shaderIdentifier = detail::kEmptyShaderIdentifier;
     };
 
-    std::wstring_view getFixedStageShaderEntryPointName(const RaytracingShaderStage stage) const;
-    std::wstring_view getCallableShaderEntryPointName(size_t index) const;
     std::wstring_view getShaderEntryPointName(const RaytracingPipelineStateShaderParams& shaderParams) const;
 
-    TrackedGpuObject<ID3D12StateObject> mStateObject;
+    RaytracingPipelineStageMask mPipelineStages = RaytracingPipelineStageMask::None;
     std::vector<std::shared_ptr<RaytracingShader>> mShaders;
     std::array<RaytracingPipelineStateShaderParams, (size_t)RaytracingShaderStage::Count> mFixedStageShaderParams;
     std::vector<CallableShaderParams> mCallableShaderParams;
     uint32_t mValidFixedStageExportCount = 0;
     std::wstring mHitGroupName;
     RaytracingPipelineStatePrimitiveType mPrimitiveType;
-    uint32_t mMaxPayloadByteSize = 0;
-    uint32_t mMaxAttributeByteSize = 0;
     uint32_t mMaxRecursionDepth = 1;
 
-    TrackedGpuObject<ID3D12RootSignature> mGlobalRootSignature;
+    MonotonicBuffer mMonotonicBuffer;
+    std::vector<D3D12_STATE_SUBOBJECT> mStateSubObjects = {};
+
     eastl::fixed_vector<TrackedGpuObject<ID3D12RootSignature>, 1> mLocalRootSignatures;
 
     std::array<RaytracingShaderIdentifier, (size_t)RaytracingPipelineStage::Count> mFixedStageShaderIdentifiers = {

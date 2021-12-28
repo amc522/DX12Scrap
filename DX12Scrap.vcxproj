@@ -36,6 +36,7 @@
     <ClCompile Include="src\d3d12\D3D12GraphicsPipelineState.cpp" />
     <ClCompile Include="src\d3d12\D3D12RaytracingPipelineState.cpp" />
     <ClCompile Include="src\d3d12\D3D12RaytracingShader.cpp" />
+    <ClCompile Include="src\d3d12\D3D12RaytracingDispatchPipelineState.cpp" />
     <ClCompile Include="src\d3d12\D3D12ShaderReflection.cpp" />
     <ClCompile Include="src\d3d12\D3D12ShaderTable.cpp" />
     <ClCompile Include="src\d3d12\D3D12Texture.cpp" />
@@ -74,6 +75,7 @@
     <ClInclude Include="src\d3d12\D3D12GraphicsPipelineState.h" />
     <ClInclude Include="src\d3d12\D3D12RaytracingPipelineState.h" />
     <ClInclude Include="src\d3d12\D3D12RaytracingShader.h" />
+    <ClInclude Include="src\d3d12\D3D12RaytracingDispatchPipelineState.h" />
     <ClInclude Include="src\d3d12\D3D12ShaderReflection.h" />
     <ClInclude Include="src\d3d12\D3D12ShaderTable.h" />
     <ClInclude Include="src\d3d12\D3D12Strings.h" />
