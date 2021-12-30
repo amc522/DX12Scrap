@@ -161,10 +161,11 @@ private:
 
     std::shared_ptr<d3d12::RaytracingShader> mShader;
     std::shared_ptr<d3d12::RaytracingDispatchPipelineState> mDispatchPipelineState;
-    std::shared_ptr<d3d12::RaytracingPipelineState> mPipelineState;
-
+    std::shared_ptr<d3d12::RaytracingPipelineState> mHitGroupPipelineState;
+    std::shared_ptr<d3d12::RaytracingPipelineState> mMainPassPipelineState;
     std::shared_ptr<d3d12::ShaderTable> mShaderTable;
-    d3d12::ShaderTableAllocation mShaderTableAllocation;
+    d3d12::ShaderTableAllocation mMainPassShaderTableAllocation;
+    d3d12::ShaderTableAllocation mHitGroupShaderTableAllocation;
 
     FrameConstantBuffer mFrameCpuConstantBuffer;
     std::shared_ptr<d3d12::Buffer> mFrameConstantBuffer;

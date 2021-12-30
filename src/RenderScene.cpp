@@ -666,7 +666,7 @@ void RaytracingScene::preRender(const FrameInfo& frameInfo)
             }
         }
 
-        mShaderTableAllocation.updateLocalRootArguments(
+        mHitGroupShaderTableAllocation.updateLocalRootArguments(
             RaytracingPipelineStage::HitGroup, ToByteSpan(bindlessIndices),
             d3d12::DeviceContext::instance().getCopyContext().getCommandList());
     }
@@ -946,58 +946,89 @@ bool RaytracingScene::createRootSignatures()
 
 bool RaytracingScene::createPipelineState()
 {
-    mDispatchPipelineState = std::make_unique<d3d12::RaytracingDispatchPipelineState>();
-    mDispatchPipelineState->init(d3d12::RaytracingDispatchPipelineStateParams{
-        .globalRootSignature = mGlobalRootSignature,
-        .maxPayloadByteSize = 4 * sizeof(float),   // float4 color
-        .maxAttributeByteSize = 2 * sizeof(float), // float2 barycentrics
-    });
+    { // Dispatch pipeline state
+        mDispatchPipelineState = std::make_unique<d3d12::RaytracingDispatchPipelineState>();
+        mDispatchPipelineState->init(d3d12::RaytracingDispatchPipelineStateParams{
+            .globalRootSignature = mGlobalRootSignature,
+            .maxPayloadByteSize = 4 * sizeof(float),   // float4 color
+            .maxAttributeByteSize = 2 * sizeof(float), // float2 barycentrics
+        });
+    }
 
-    SharedString raygenEntryPointName("MyRaygenShader");
-    SharedString closestHitEntryPointName("MyClosestHitShader");
-    SharedString missEntryPointName("MyMissShader");
-    SharedString hitGroupName("MyHitGroup");
+    { // Main pass pipeline state
+        SharedString raygenEntryPointName("mainPassRaygen");
+        SharedString missEntryPointName("mainPassMiss");
 
-    std::array<d3d12::RaytracingFixedStageShaderEntryPoint, 3> fixedStageShaderEntryPoints = {
-        d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::RayGen, raygenEntryPointName},
-        d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::ClosestHit, closestHitEntryPointName},
-        d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::Miss, missEntryPointName}};
+        std::array<d3d12::RaytracingFixedStageShaderEntryPoint, 2> fixedStageShaderEntryPoints = {
+            d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::RayGen, raygenEntryPointName},
+            d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::Miss, missEntryPointName}};
 
-    d3d12::RaytracingShaderParams shaderParams;
-    shaderParams.filepath = "assets/raytracing_basic3d.hlsl";
-    shaderParams.fixedStageEntryPoints = fixedStageShaderEntryPoints;
+        d3d12::RaytracingShaderParams shaderParams;
+        shaderParams.filepath = "assets/raytracing_mainpass.hlsl";
+        shaderParams.fixedStageEntryPoints = fixedStageShaderEntryPoints;
 
 #ifdef _DEBUG
-    shaderParams.debug = true;
+        shaderParams.debug = true;
 #endif
-    mShader = std::make_shared<d3d12::RaytracingShader>(std::move(shaderParams));
+        mShader = std::make_shared<d3d12::RaytracingShader>(std::move(shaderParams));
 
-    std::array localRootSignatures = {mClosestHitLocalRootSignature};
-    d3d12::RaytracingPipelineStateParams pipelineStateParams;
-    pipelineStateParams.localRootSignatures = localRootSignatures;
-    pipelineStateParams.shaders = std::span(&mShader, 1);
+        std::array localRootSignatures = {mClosestHitLocalRootSignature};
+        d3d12::RaytracingPipelineStateParams pipelineStateParams;
+        pipelineStateParams.shaders = std::span(&mShader, 1);
 
-    pipelineStateParams.fixedStages.raygen.shaderIndex = 0;
-    pipelineStateParams.fixedStages.raygen.shaderEntryPointIndex =
-        mShader->getFixedStageIndex(RaytracingShaderStage::RayGen, raygenEntryPointName);
+        pipelineStateParams.fixedStages.raygen.shaderIndex = 0;
+        pipelineStateParams.fixedStages.raygen.shaderEntryPointIndex =
+            mShader->getFixedStageIndex(RaytracingShaderStage::RayGen, raygenEntryPointName);
 
-    pipelineStateParams.fixedStages.closestHit.shaderIndex = 0;
-    pipelineStateParams.fixedStages.closestHit.shaderEntryPointIndex =
-        mShader->getFixedStageIndex(RaytracingShaderStage::ClosestHit, closestHitEntryPointName);
-    pipelineStateParams.fixedStages.closestHit.localRootSignatureIndex = 0;
+        pipelineStateParams.fixedStages.miss.shaderIndex = 0;
+        pipelineStateParams.fixedStages.miss.shaderEntryPointIndex =
+            mShader->getFixedStageIndex(RaytracingShaderStage::Miss, missEntryPointName);
 
-    pipelineStateParams.fixedStages.miss.shaderIndex = 0;
-    pipelineStateParams.fixedStages.miss.shaderEntryPointIndex =
-        mShader->getFixedStageIndex(RaytracingShaderStage::Miss, missEntryPointName);
+        // pipelineStateParams.hitGroupName = hitGroupName;
+        pipelineStateParams.primitiveType = d3d12::RaytracingPipelineStatePrimitiveType::Triangles;
+        pipelineStateParams.maxRecursionDepth = 1;
 
-    pipelineStateParams.hitGroupName = hitGroupName;
-    pipelineStateParams.primitiveType = d3d12::RaytracingPipelineStatePrimitiveType::Triangles;
-    pipelineStateParams.maxRecursionDepth = 1;
+        mMainPassPipelineState = std::make_shared<d3d12::RaytracingPipelineState>(std::move(pipelineStateParams));
+        mMainPassPipelineState->create();
 
-    mPipelineState = std::make_shared<d3d12::RaytracingPipelineState>(std::move(pipelineStateParams));
-    mPipelineState->create();
+        mDispatchPipelineState->addPipelineState(mMainPassPipelineState);
+    }
 
-    mDispatchPipelineState->addPipelineState(mPipelineState);
+    { // Hit group pipeline state
+        SharedString closestHitEntryPointName("MyClosestHitShader");
+        SharedString hitGroupName("MyHitGroup");
+
+        std::array<d3d12::RaytracingFixedStageShaderEntryPoint, 1> fixedStageShaderEntryPoints = {
+            d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::ClosestHit, closestHitEntryPointName}};
+
+        d3d12::RaytracingShaderParams shaderParams;
+        shaderParams.filepath = "assets/raytracing_basic3d.hlsl";
+        shaderParams.fixedStageEntryPoints = fixedStageShaderEntryPoints;
+
+#ifdef _DEBUG
+        shaderParams.debug = true;
+#endif
+        mShader = std::make_shared<d3d12::RaytracingShader>(std::move(shaderParams));
+
+        std::array localRootSignatures = {mClosestHitLocalRootSignature};
+        d3d12::RaytracingPipelineStateParams pipelineStateParams;
+        pipelineStateParams.localRootSignatures = localRootSignatures;
+        pipelineStateParams.shaders = std::span(&mShader, 1);
+
+        pipelineStateParams.fixedStages.closestHit.shaderIndex = 0;
+        pipelineStateParams.fixedStages.closestHit.shaderEntryPointIndex =
+            mShader->getFixedStageIndex(RaytracingShaderStage::ClosestHit, closestHitEntryPointName);
+        pipelineStateParams.fixedStages.closestHit.localRootSignatureIndex = 0;
+
+        pipelineStateParams.hitGroupName = hitGroupName;
+        pipelineStateParams.primitiveType = d3d12::RaytracingPipelineStatePrimitiveType::Triangles;
+        pipelineStateParams.maxRecursionDepth = 1;
+
+        mHitGroupPipelineState = std::make_shared<d3d12::RaytracingPipelineState>(std::move(pipelineStateParams));
+        mHitGroupPipelineState->create();
+
+        mDispatchPipelineState->addPipelineState(mHitGroupPipelineState);
+    }
 
     return true;
 }
@@ -1104,11 +1135,18 @@ bool RaytracingScene::buildShaderTables()
     std::array<std::span<const std::byte>, (size_t)RaytracingPipelineStage::Count> localRootArguments{
         {{}, ToByteSpan(rootArguments), {}}};
 
-    auto shaderTableResult = mShaderTable->addPipelineState(mPipelineState, localRootArguments, mCommandList.get());
+    {
+        auto shaderTableResult = mShaderTable->addPipelineState(mMainPassPipelineState, {}, mCommandList.get());
+        if(!shaderTableResult) { return false; }
+        mMainPassShaderTableAllocation = std::move(shaderTableResult.value());
+    }
 
-    if(!shaderTableResult) { return false; }
-
-    mShaderTableAllocation = std::move(shaderTableResult.value());
+    {
+        auto shaderTableResult =
+            mShaderTable->addPipelineState(mHitGroupPipelineState, localRootArguments, mCommandList.get());
+        if(!shaderTableResult) { return false; }
+        mHitGroupShaderTableAllocation = std::move(shaderTableResult.value());
+    }
 
     return true;
 }

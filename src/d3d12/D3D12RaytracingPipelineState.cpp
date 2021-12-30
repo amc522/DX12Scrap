@@ -152,28 +152,31 @@ void RaytracingPipelineState::create()
 
 #pragma region hit_group
         // HIT GROUP
-        auto GetFixedStageEntryPointName = [&](RaytracingShaderStage stage) -> LPCWSTR {
-            const RaytracingPipelineStateShaderParams shaderParams = mFixedStageShaderParams[(size_t)stage];
-            if(!shaderParams.hasValidShaderEntryPoint()) { return nullptr; }
-
-            std::span fixedStageShaders = mShaders[shaderParams.shaderIndex]->getFixedStageShaders();
-
-            return fixedStageShaders[shaderParams.shaderEntryPointIndex].wideEntryPoint.c_str();
-        };
-
-        D3D12_HIT_GROUP_DESC* hitGroupDesc = mMonotonicBuffer.allocate<D3D12_HIT_GROUP_DESC>(1);
-        hitGroupDesc->IntersectionShaderImport = GetFixedStageEntryPointName(RaytracingShaderStage::Intersection);
-        hitGroupDesc->AnyHitShaderImport = GetFixedStageEntryPointName(RaytracingShaderStage::AnyHit);
-        hitGroupDesc->ClosestHitShaderImport = GetFixedStageEntryPointName(RaytracingShaderStage::ClosestHit);
-        hitGroupDesc->HitGroupExport = mHitGroupName.c_str();
-        hitGroupDesc->Type = (mPrimitiveType == RaytracingPipelineStatePrimitiveType::Triangles)
-                                 ? D3D12_HIT_GROUP_TYPE_TRIANGLES
-                                 : D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE;
-
+        if((mPipelineStages & RaytracingPipelineStageMask::HitGroup) != RaytracingPipelineStageMask::None)
         {
-            D3D12_STATE_SUBOBJECT& subObject = subObjects.emplace_back();
-            subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
-            subObject.pDesc = hitGroupDesc;
+            auto GetFixedStageEntryPointName = [&](RaytracingShaderStage stage) -> LPCWSTR {
+                const RaytracingPipelineStateShaderParams shaderParams = mFixedStageShaderParams[(size_t)stage];
+                if(!shaderParams.hasValidShaderEntryPoint()) { return nullptr; }
+
+                std::span fixedStageShaders = mShaders[shaderParams.shaderIndex]->getFixedStageShaders();
+
+                return fixedStageShaders[shaderParams.shaderEntryPointIndex].wideEntryPoint.c_str();
+            };
+
+            D3D12_HIT_GROUP_DESC* hitGroupDesc = mMonotonicBuffer.allocate<D3D12_HIT_GROUP_DESC>(1);
+            hitGroupDesc->IntersectionShaderImport = GetFixedStageEntryPointName(RaytracingShaderStage::Intersection);
+            hitGroupDesc->AnyHitShaderImport = GetFixedStageEntryPointName(RaytracingShaderStage::AnyHit);
+            hitGroupDesc->ClosestHitShaderImport = GetFixedStageEntryPointName(RaytracingShaderStage::ClosestHit);
+            hitGroupDesc->HitGroupExport = mHitGroupName.c_str();
+            hitGroupDesc->Type = (mPrimitiveType == RaytracingPipelineStatePrimitiveType::Triangles)
+                                     ? D3D12_HIT_GROUP_TYPE_TRIANGLES
+                                     : D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE;
+
+            {
+                D3D12_STATE_SUBOBJECT& subObject = subObjects.emplace_back();
+                subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+                subObject.pDesc = hitGroupDesc;
+            }
         }
 #pragma endregion
 

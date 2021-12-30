@@ -56,6 +56,8 @@ tl::expected<ShaderTableAllocation, ShaderTable::Error> ShaderTable::addPipeline
         const auto& stageArguments = localRootArguments[(size_t)stage];
         const auto stageIdentifier = pipelineState->getShaderIdentifier(stage);
 
+        if(std::ranges::equal(stageIdentifier, detail::kEmptyShaderIdentifier)) { continue; }
+
         StageShaderTable& stageShaderTable = mShaderTables[(size_t)stage];
         auto result = stageShaderTable.freeBlocks.reserve();
 
