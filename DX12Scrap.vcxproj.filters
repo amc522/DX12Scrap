@@ -112,6 +112,9 @@
     <ClCompile Include="src\d3d12\D3D12Command.cpp">
       <Filter>Source Files\d3d12</Filter>
     </ClCompile>
+    <ClCompile Include="src\d3d12\D3D12RaytracingDispatchPipelineState.cpp">
+      <Filter>Source Files\d3d12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application.h">
@@ -256,6 +259,9 @@
       <Filter>Source Files\d3d12</Filter>
     </ClInclude>
     <ClInclude Include="src\d3d12\D3D12VertexBuffer.h">
+      <Filter>Source Files\d3d12</Filter>
+    </ClInclude>
+    <ClInclude Include="src\d3d12\D3D12RaytracingDispatchPipelineState.h">
       <Filter>Source Files\d3d12</Filter>
     </ClInclude>
   </ItemGroup>

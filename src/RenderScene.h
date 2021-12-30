@@ -33,6 +33,7 @@ class BLAccelerationStructure;
 class Buffer;
 class DeviceContext;
 class GraphicsPipelineState;
+class RaytracingDispatchPipelineState;
 class RaytracingPipelineState;
 class RaytracingShader;
 class Texture;
@@ -159,6 +160,7 @@ private:
     d3d12::TlasInstanceAllocation mTlasInstance;
 
     std::shared_ptr<d3d12::RaytracingShader> mShader;
+    std::shared_ptr<d3d12::RaytracingDispatchPipelineState> mDispatchPipelineState;
     std::shared_ptr<d3d12::RaytracingPipelineState> mPipelineState;
 
     std::shared_ptr<d3d12::ShaderTable> mShaderTable;
@@ -187,6 +189,6 @@ public:
 private:
     std::unique_ptr<RasterScene> mRasterScene;
     std::unique_ptr<RaytracingScene> mRaytraceScene;
-    Scene mActiveScene = Scene::Raster;
+    Scene mActiveScene = Scene::Raytracing;
 };
 } // namespace scrap

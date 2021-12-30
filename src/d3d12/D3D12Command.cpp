@@ -5,7 +5,7 @@
 #include "d3d12/D3D12FixedDescriptorHeap.h"
 #include "d3d12/D3D12GraphicsPipelineState.h"
 #include "d3d12/D3D12GraphicsShader.h"
-#include "d3d12/D3D12RaytracingPipelineState.h"
+#include "d3d12/D3D12RaytracingDispatchPipelineState.h"
 #include "d3d12/D3D12ShaderTable.h"
 #include "d3d12/D3D12TLAccelerationStructure.h"
 #include "d3d12/D3D12Texture.h"
@@ -78,7 +78,7 @@ std::optional<CommandError> drawIndexed(d3d12::GraphicsCommandList& commandList,
 
 std::optional<CommandError> dispatchRays(d3d12::GraphicsCommandList& commandList, const DispatchRaysParams& params)
 {
-    if(!params.pipelineState->isReady()) { return CommandError::ResourcesNotReady; }
+    //if(!params.pipelineState->isReady()) { return CommandError::ResourcesNotReady; }
 
     for(d3d12::TLAccelerationStructure* tlas : params.accelerationStructures)
     {
@@ -119,8 +119,8 @@ std::optional<CommandError> dispatchRays(d3d12::GraphicsCommandList& commandList
     bindEngineConstantBuffers(commandList, params.constantBuffers);
 
     // Pipeline state
-    params.pipelineState->markAsUsed(commandList.get());
-    commandList.get4()->SetPipelineState1(params.pipelineState->getPipelineState());
+    params.pipelineState->markAsUsed(commandList);
+    commandList.get4()->SetPipelineState1(params.pipelineState->getStateObject());
 
     // Dispatch
     D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};

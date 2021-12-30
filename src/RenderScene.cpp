@@ -12,6 +12,7 @@
 #include "d3d12/D3D12Debug.h"
 #include "d3d12/D3D12GraphicsPipelineState.h"
 #include "d3d12/D3D12GraphicsShader.h"
+#include "d3d12/D3D12RaytracingDispatchPipelineState.h"
 #include "d3d12/D3D12RaytracingPipelineState.h"
 #include "d3d12/D3D12RaytracingShader.h"
 #include "d3d12/D3D12Strings.h"
@@ -694,7 +695,7 @@ void RaytracingScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d
 
         auto windowSize = frameInfo.mainWindow->getSize();
 
-        d3d12::dispatchRays(mCommandList, d3d12::DispatchRaysParams{.pipelineState = mPipelineState.get(),
+        d3d12::dispatchRays(mCommandList, d3d12::DispatchRaysParams{.pipelineState = mDispatchPipelineState.get(),
                                                                     .accelerationStructures = accelerationStructures,
                                                                     .shaderTable = mShaderTable.get(),
                                                                     .constantBuffers = engineConstantBuffers,
@@ -945,6 +946,13 @@ bool RaytracingScene::createRootSignatures()
 
 bool RaytracingScene::createPipelineState()
 {
+    mDispatchPipelineState = std::make_unique<d3d12::RaytracingDispatchPipelineState>();
+    mDispatchPipelineState->init(d3d12::RaytracingDispatchPipelineStateParams{
+        .globalRootSignature = mGlobalRootSignature,
+        .maxPayloadByteSize = 4 * sizeof(float),   // float4 color
+        .maxAttributeByteSize = 2 * sizeof(float), // float2 barycentrics
+    });
+
     SharedString raygenEntryPointName("MyRaygenShader");
     SharedString closestHitEntryPointName("MyClosestHitShader");
     SharedString missEntryPointName("MyMissShader");
@@ -966,7 +974,6 @@ bool RaytracingScene::createPipelineState()
 
     std::array localRootSignatures = {mClosestHitLocalRootSignature};
     d3d12::RaytracingPipelineStateParams pipelineStateParams;
-    pipelineStateParams.globalRootSignature = mGlobalRootSignature;
     pipelineStateParams.localRootSignatures = localRootSignatures;
     pipelineStateParams.shaders = std::span(&mShader, 1);
 
@@ -985,12 +992,12 @@ bool RaytracingScene::createPipelineState()
 
     pipelineStateParams.hitGroupName = hitGroupName;
     pipelineStateParams.primitiveType = d3d12::RaytracingPipelineStatePrimitiveType::Triangles;
-    pipelineStateParams.maxAttributeByteSize = 2 * sizeof(float); // float2 barycentrics
-    pipelineStateParams.maxPayloadByteSize = 4 * sizeof(float);   // float4 color
     pipelineStateParams.maxRecursionDepth = 1;
 
     mPipelineState = std::make_shared<d3d12::RaytracingPipelineState>(std::move(pipelineStateParams));
     mPipelineState->create();
+
+    mDispatchPipelineState->addPipelineState(mPipelineState);
 
     return true;
 }
