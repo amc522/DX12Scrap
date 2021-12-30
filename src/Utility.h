@@ -45,13 +45,13 @@
 
 namespace scrap
 {
-template<class EnumT>
+template<class EnumT> requires std::is_enum_v<EnumT>
 constexpr std::enable_if_t<std::is_enum_v<EnumT>, std::underlying_type_t<EnumT>> ToUnderlying(EnumT e)
 {
     return static_cast<std::underlying_type_t<EnumT>>(e);
 }
 
-template<class EnumT>
+template<class EnumT> requires std::is_enum_v<EnumT>
 constexpr std::enable_if_t<std::is_enum_v<EnumT>, EnumT> IncrementEnum(EnumT e)
 {
     return static_cast<EnumT>(ToUnderlying(e) + std::underlying_type_t<EnumT>(1));
@@ -71,10 +71,9 @@ constexpr size_t GetArraySize(const T (&)[N])
     return N;
 }
 
-template<typename T>
+template<std::integral T>
 constexpr T AlignInteger(T value, T alignment)
 {
-    static_assert(std::is_integral_v<T>);
     return (value + (alignment - T(1))) & (~(alignment - T(1)));
 }
 

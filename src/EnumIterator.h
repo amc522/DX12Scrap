@@ -6,12 +6,19 @@
 
 namespace scrap
 {
-template<class EnumT>
+template<class T>
+concept RangeEnum = std::is_enum_v<T> && requires
+{
+    T::First;
+    T::Last;
+    T::Count;
+        requires(ToUnderlying(T::Last) - ToUnderlying(T::First) + 1) == ToUnderlying(T::Count);
+};
+
+template<class EnumT> requires std::is_enum_v<EnumT>
 class EnumIterator
 {
 public:
-    static_assert(std::is_enum_v<EnumT>);
-
     using iterator_category = std::random_access_iterator_tag;
     using value_type = EnumT;
     using difference_type = std::underlying_type_t<EnumT>;
@@ -89,15 +96,6 @@ public:
 
 private:
     std::underlying_type_t<EnumT> mIndex = 0;
-};
-
-template<class T>
-concept RangeEnum = std::is_enum_v<T> && requires
-{
-    T::First;
-    T::Last;
-    T::Count;
-    requires(ToUnderlying(T::Last) - ToUnderlying(T::First) + 1) == ToUnderlying(T::Count);
 };
 
 template<RangeEnum EnumT, EnumT First = EnumT::First, EnumT Last = EnumT::Last>
