@@ -2,6 +2,7 @@
 
 #include "RenderDefs.h"
 #include "Utility.h"
+#include "d3d12/D3D12Fwd.h"
 
 #include <array>
 #include <filesystem>
@@ -10,13 +11,6 @@
 #include <span>
 
 #include <wrl/client.h>
-
-struct D3D12_SHADER_BYTECODE;
-struct _D3D12_SHADER_INPUT_BIND_DESC;
-using D3D12_SHADER_INPUT_BIND_DESC = _D3D12_SHADER_INPUT_BIND_DESC;
-struct ID3D10Blob;
-using ID3DBlob = ID3D10Blob;
-struct ID3D12ShaderReflection;
 
 namespace scrap::d3d12
 {

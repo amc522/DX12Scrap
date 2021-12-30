@@ -17,7 +17,7 @@ void BLAccelerationStructure::reserve(size_t count)
     mGeometryBuffers.reserve(count * 2);
 }
 
-void BLAccelerationStructure::addMesh(const GeometryParams& geometryParams)
+void BLAccelerationStructure::addMesh(const BLAccelerationStructureGeometryParams& geometryParams)
 {
     D3D12_RAYTRACING_GEOMETRY_FLAGS flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
 
@@ -47,11 +47,11 @@ void BLAccelerationStructure::addMesh(const GeometryParams& geometryParams)
     mGeometryBuffers.push_back(geometryParams.vertexBuffer);
 }
 
-void BLAccelerationStructure::addMesh(std::span<const GeometryParams> geometries)
+void BLAccelerationStructure::addMesh(std::span<const BLAccelerationStructureGeometryParams> geometries)
 {
     mGeometryDescs.reserve(geometries.size() + mGeometryDescs.size());
 
-    for(const GeometryParams& geometryParams : geometries)
+    for(const BLAccelerationStructureGeometryParams& geometryParams : geometries)
     {
         addMesh(geometryParams);
     }
@@ -76,7 +76,7 @@ bool BLAccelerationStructure::build(const GraphicsCommandList& commandList)
     {
         std::string scratchBufferName = fmt::format("{} (Scratch Buffer)", mParams.name);
 
-        Buffer::SimpleParams scratchBufferParams;
+        BufferSimpleParams scratchBufferParams;
         scratchBufferParams.accessFlags = ResourceAccessFlags::None;
         scratchBufferParams.byteSize = prebuildInfo.ScratchDataSizeInBytes;
         scratchBufferParams.flags = BufferFlags::UavEnabled;
@@ -86,7 +86,7 @@ bool BLAccelerationStructure::build(const GraphicsCommandList& commandList)
     }
 
     {
-        Buffer::SimpleParams accelerationStructureParams;
+        BufferSimpleParams accelerationStructureParams;
         accelerationStructureParams.accessFlags = ResourceAccessFlags::None;
         accelerationStructureParams.byteSize = prebuildInfo.ResultDataMaxSizeInBytes;
         accelerationStructureParams.flags = BufferFlags::AccelerationStructure;

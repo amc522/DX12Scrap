@@ -1,13 +1,12 @@
 #pragma once
 
 #include "RenderDefs.h"
+#include "d3d12/D3D12Fwd.h"
 
 #include <memory>
 
 namespace scrap::d3d12
 {
-class Buffer;
-
 struct VertexBuffer
 {
     ShaderVertexSemantic semantic = ShaderVertexSemantic::Unknown;

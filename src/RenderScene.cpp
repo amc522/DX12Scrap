@@ -240,7 +240,7 @@ bool RasterScene::loadShaders()
 void RasterScene::createRenderTargets()
 {
     // Currently using the swap chain as our render targets. Just need the depth/stencil buffer
-    d3d12::Texture::Params params = {};
+    d3d12::TextureParams params = {};
     params.format = gpufmt::Format::D32_SFLOAT_S8_UINT;
     params.dimension = cputex::TextureDimension::Texture2D;
     params.arraySize = 1;
@@ -266,7 +266,7 @@ void RasterScene::createRenderTargets()
 
 void RasterScene::createFrameConstantBuffer()
 {
-    d3d12::Buffer::SimpleParams params;
+    d3d12::BufferSimpleParams params;
     params.accessFlags = ResourceAccessFlags::CpuWrite | ResourceAccessFlags::GpuRead;
     params.byteSize = sizeof(FrameConstantBuffer);
     params.flags = d3d12::BufferFlags::ConstantBuffer;
@@ -281,7 +281,7 @@ void RasterScene::createFrameConstantBuffer()
 void RasterScene::createTriangle()
 {
     { // Positions
-        d3d12::Buffer::FormattedParams params;
+        d3d12::BufferFormattedParams params;
         params.format = gpufmt::Format::R32G32_SFLOAT;
         params.numElements = 3;
         params.accessFlags = ResourceAccessFlags::GpuRead;
@@ -293,7 +293,7 @@ void RasterScene::createTriangle()
     }
 
     { // UVs
-        d3d12::Buffer::FormattedParams params;
+        d3d12::BufferFormattedParams params;
         params.format = gpufmt::Format::R32G32_SFLOAT;
         params.numElements = 3;
         params.accessFlags = ResourceAccessFlags::GpuRead;
@@ -305,7 +305,7 @@ void RasterScene::createTriangle()
     }
 
     { // Colors
-        d3d12::Buffer::FormattedParams params;
+        d3d12::BufferFormattedParams params;
         params.format = gpufmt::Format::R32G32B32A32_SFLOAT;
         params.numElements = 3;
         params.accessFlags = ResourceAccessFlags::GpuRead;
@@ -788,7 +788,7 @@ bool RaytracingScene::createRenderTargets()
 {
     d3d12::DeviceContext& deviceContext = d3d12::DeviceContext::instance();
 
-    d3d12::Texture::Params textureParams = {};
+    d3d12::TextureParams textureParams = {};
     textureParams.format = gpufmt::Format::R8G8B8A8_UNORM;
     textureParams.dimension = cputex::TextureDimension::Texture2D;
     textureParams.extents = cputex::Extent(deviceContext.getFrameSize(), 1);
@@ -931,7 +931,7 @@ bool RaytracingScene::createRootSignatures()
         spdlog::info("Created raytracing local root signature.");
     }
 
-    d3d12::Buffer::SimpleParams frameCbParams;
+    d3d12::BufferSimpleParams frameCbParams;
     frameCbParams.accessFlags = ResourceAccessFlags::CpuWrite;
     frameCbParams.byteSize = sizeof(FrameConstantBuffer);
     frameCbParams.flags = d3d12::BufferFlags::ConstantBuffer;
@@ -1070,7 +1070,7 @@ bool RaytracingScene::buildAccelerationStructures()
 
         mBlas = std::make_shared<d3d12::BLAccelerationStructure>(blasParams);
 
-        d3d12::BLAccelerationStructure::GeometryParams geomParams;
+        d3d12::BLAccelerationStructureGeometryParams geomParams;
         geomParams.flags = d3d12::RaytracingGeometryFlags::None;
         geomParams.indexBuffer = mCubeMesh.getIndexBuffer();
         geomParams.vertexBuffer = mCubeMesh.getVertexBuffer(ShaderVertexSemantic::Position, 0);
@@ -1090,7 +1090,7 @@ bool RaytracingScene::buildAccelerationStructures()
 
         mTlas = std::make_unique<d3d12::TLAccelerationStructure>(tlasParams);
 
-        d3d12::TLAccelerationStructure::InstanceParams instanceParams;
+        d3d12::TLAccelerationStructureInstanceParams instanceParams;
         instanceParams.accelerationStructure = mBlas;
         instanceParams.flags = d3d12::TlasInstanceFlags::TriangleFrontCcw;
         instanceParams.instanceContributionToHitGroupIndex = 0;

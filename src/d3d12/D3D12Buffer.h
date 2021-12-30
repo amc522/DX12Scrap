@@ -57,30 +57,30 @@ struct BufferStructuredSpecificParams
 };
 } // namespace detail
 
+enum class BufferError
+{
+    InvalidFormat,
+    FailedToCreateGpuResource,
+    FailedToCreateUploadResource,
+    InsufficientDescriptorHeapSpace
+};
+
+struct BufferSimpleParams : detail::BufferCommonParams, detail::BufferByteParams
+{};
+
+struct BufferFormattedParams : detail::BufferCommonParams,
+                               detail::BufferElementParams,
+                               detail::BufferFormattedSpecificParams
+{};
+
+struct BufferStructuredParams : detail::BufferCommonParams,
+                                detail::BufferElementParams,
+                                detail::BufferStructuredSpecificParams
+{};
+
 class Buffer
 {
 public:
-    enum class Error
-    {
-        InvalidFormat,
-        FailedToCreateGpuResource,
-        FailedToCreateUploadResource,
-        InsufficientDescriptorHeapSpace
-    };
-
-    struct SimpleParams : detail::BufferCommonParams, detail::BufferByteParams
-    {};
-
-    struct FormattedParams : detail::BufferCommonParams,
-                             detail::BufferElementParams,
-                             detail::BufferFormattedSpecificParams
-    {};
-
-    struct StructuredParams : detail::BufferCommonParams,
-                              detail::BufferElementParams,
-                              detail::BufferStructuredSpecificParams
-    {};
-
     Buffer() = default;
     Buffer(const Buffer&) = delete;
     Buffer(Buffer&&) = delete;
@@ -89,9 +89,9 @@ public:
     Buffer& operator=(const Buffer&) = delete;
     Buffer& operator=(Buffer&&) = delete;
 
-    std::optional<Error> init(const SimpleParams& params, std::span<const std::byte> buffer = {});
-    std::optional<Error> init(const FormattedParams& params, std::span<const std::byte> buffer = {});
-    std::optional<Error> init(const StructuredParams& params, std::span<const std::byte> buffer = {});
+    std::optional<BufferError> init(const BufferSimpleParams& params, std::span<const std::byte> buffer = {});
+    std::optional<BufferError> init(const BufferFormattedParams& params, std::span<const std::byte> buffer = {});
+    std::optional<BufferError> init(const BufferStructuredParams& params, std::span<const std::byte> buffer = {});
 
     ID3D12Resource* getResource() const { return mResource.getResource(); }
 
@@ -156,20 +156,20 @@ private:
                     detail::BufferStructuredSpecificParams
     {
         Params() = default;
-        Params(const SimpleParams& params)
+        Params(const BufferSimpleParams& params)
             : detail::BufferCommonParams(params)
             , detail::BufferByteParams(params)
             , type(Type::Simple)
         {}
 
-        Params(const FormattedParams& params)
+        Params(const BufferFormattedParams& params)
             : detail::BufferCommonParams(params)
             , detail::BufferElementParams(params)
             , detail::BufferFormattedSpecificParams(params)
             , type(Type::Formatted)
         {}
 
-        Params(const StructuredParams& params)
+        Params(const BufferStructuredParams& params)
             : detail::BufferCommonParams(params)
             , detail::BufferElementParams(params)
             , detail::BufferStructuredSpecificParams(params)
@@ -180,7 +180,7 @@ private:
         Type type = Type::Unknown;
     };
 
-    std::optional<Error> initInternal(Params params, std::span<const std::byte> buffer);
+    std::optional<BufferError> initInternal(Params params, std::span<const std::byte> buffer);
 
     Params mParams;
     TrackedShaderResource mResource;

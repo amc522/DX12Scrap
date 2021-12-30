@@ -2,15 +2,11 @@
 
 #include "d3d12/D3D12FixedDescriptorHeap.h"
 #include "d3d12/D3D12FrameCodes.h"
+#include "d3d12/D3D12Fwd.h"
 
 #include <type_traits>
 
 #include <wrl/client.h>
-
-struct ID3D12CommandList;
-struct ID3D12CommandQueue;
-struct ID3D12DeviceChild;
-struct ID3D12Resource;
 
 namespace scrap::d3d12
 {

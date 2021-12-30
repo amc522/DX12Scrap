@@ -40,10 +40,10 @@ public:
     [[nodiscard]] uint32_t getIndexCount() const { return mIndexCount; }
     void createVertexElement(ShaderVertexSemantic semantic,
                              uint32_t semanticIndex,
-                             const d3d12::Buffer::FormattedParams& bufferParams);
+                             const d3d12::BufferFormattedParams& bufferParams);
     void createVertexElement(ShaderVertexSemantic semantic,
                              uint32_t semanticIndex,
-                             const d3d12::Buffer::FormattedParams& bufferParams,
+                             const d3d12::BufferFormattedParams& bufferParams,
                              std::span<const std::byte> data);
 
     [[nodiscard]] const std::shared_ptr<d3d12::Buffer>& getVertexBuffer(ShaderVertexSemantic semantic,

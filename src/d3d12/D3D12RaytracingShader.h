@@ -3,6 +3,7 @@
 #include "EastlFixedVectorExt.h"
 #include "RenderDefs.h"
 #include "SharedString.h"
+#include "d3d12/D3D12Fwd.h"
 
 #include <filesystem>
 #include <mutex>
@@ -10,10 +11,6 @@
 
 #include <EASTL/fixed_vector.h>
 #include <wrl/client.h>
-
-struct D3D12_SHADER_BYTECODE;
-struct ID3D10Blob;
-using ID3DBlob = ID3D10Blob;
 
 namespace scrap::d3d12
 {
@@ -92,8 +89,7 @@ public:
     std::span<const RaytracingFixedStageShaderInfo> getFixedStageShaders() const { return ToSpan(mFixedStageShaders); }
 
     std::span<const RaytracingFixedStageShaderInfo> getFixedStageShaders(RaytracingShaderStage stage) const;
-    const RaytracingFixedStageShaderInfo* getFixedStageShader(RaytracingShaderStage stage,
-                                                                            size_t index) const;
+    const RaytracingFixedStageShaderInfo* getFixedStageShader(RaytracingShaderStage stage, size_t index) const;
     std::span<const RaytracingCallableShaderInfo> getCallableShaders() const { return mCallableShaders; }
 
     size_t getFixedStageIndex(RaytracingShaderStage stage, std::string_view entryPointName) const;
@@ -103,8 +99,10 @@ public:
     size_t getFixedStageIndex(RaytracingShaderStage stage, const SharedString& entryPointName) const;
     size_t getFixedStageIndex(RaytracingShaderStage stage, const WSharedString& entryPointName) const;
 
-    std::optional<uint32_t> getVertexElementIndex(RaytracingShaderStage stage, ShaderVertexSemantic semantic, uint32_t semanticIndex) const;
-    std::optional<uint32_t> getResourceIndex(RaytracingShaderStage stage, uint64_t nameHash,
+    std::optional<uint32_t>
+    getVertexElementIndex(RaytracingShaderStage stage, ShaderVertexSemantic semantic, uint32_t semanticIndex) const;
+    std::optional<uint32_t> getResourceIndex(RaytracingShaderStage stage,
+                                             uint64_t nameHash,
                                              ShaderResourceType resourceType,
                                              ShaderResourceDimension resourceDimension) const;
 

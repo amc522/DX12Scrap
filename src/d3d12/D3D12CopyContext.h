@@ -4,22 +4,15 @@
 #include "d3d12/D3D12CommandList.h"
 #include "d3d12/D3D12Config.h"
 #include "d3d12/D3D12FrameCodes.h"
+#include "d3d12/D3D12Fwd.h"
 
 #include <array>
 #include <vector>
 
 #include <wrl/client.h>
 
-struct ID3D12CommandAllocator;
-struct ID3D12GraphicsCommandList;
-struct ID3D12CommandQueue;
-struct ID3D12Fence;
-struct ID3D12Resource;
-
 namespace scrap::d3d12
 {
-class DeviceContext;
-
 class CopyContext : public BaseCommandContext<CopyFrameCode>
 {
 public:

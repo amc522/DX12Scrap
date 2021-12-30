@@ -3,19 +3,17 @@
 #include "D3D12RaytracingShader.h"
 #include "EASTL/fixed_vector.h"
 #include "RenderDefs.h"
+#include "d3d12/D3D12Fwd.h"
 #include "d3d12/D3D12TrackedGpuObject.h"
 
 #include <memory>
 #include <span>
-#include <variant>
 
 #include <d3d12.h>
 #include <wrl/client.h>
 
 namespace scrap::d3d12
 {
-class RaytracingShader;
-
 enum class RaytracingPipelineStatePrimitiveType
 {
     Procedural,
@@ -24,15 +22,16 @@ enum class RaytracingPipelineStatePrimitiveType
 
 struct RaytracingPipelineStateShaderParams
 {
-    size_t shaderIndex = std::numeric_limits<size_t>::max();
-    size_t shaderEntryPointIndex = std::numeric_limits<size_t>::max();
+    static constexpr size_t kInvalidIndex = std::numeric_limits<size_t>::max();
 
-    size_t localRootSignatureIndex = std::numeric_limits<size_t>::max();
+    size_t shaderIndex = kInvalidIndex;
+    size_t shaderEntryPointIndex = kInvalidIndex;
+
+    size_t localRootSignatureIndex = kInvalidIndex;
 
     constexpr bool hasValidShaderEntryPoint() const
     {
-        return shaderIndex != std::numeric_limits<size_t>::max() &&
-               shaderEntryPointIndex != std::numeric_limits<size_t>::max();
+        return shaderIndex != kInvalidIndex && shaderEntryPointIndex != kInvalidIndex;
     }
 };
 
@@ -86,7 +85,6 @@ public:
     RaytracingPipelineState& operator=(RaytracingPipelineState&& other) = default;
 
     void create();
-    bool isReady() const { return true; }
 
     void markAsUsed(ID3D12CommandQueue* commandQueue);
     void markAsUsed(ID3D12CommandList* commandList);

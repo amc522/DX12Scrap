@@ -18,47 +18,47 @@ namespace scrap
 {
 namespace d3d12
 {
+enum class TextureError
+{
+    InvalidExtent,
+    InvalidFormat,
+    InvalidArraySize,
+    NoValidDepthSrvFormat,
+    NoValidStencilSrvFormat,
+    NoValidDepthStencilTypelessFormat,
+    UavNotSupportForDepthStencil,
+    CannotUseDepthStencilFormatForRenderTarget,
+    InvalidDepthStencilFormat,
+    InvalidRenderTargetFormat,
+    FailedToCreateResource,
+    FailedToCreateUploadResource,
+    InsufficientDescriptorHeapSpace,
+};
+
+struct TextureParams
+{
+    cputex::TextureDimension dimension;
+    gpufmt::Format format;
+    cputex::Extent extents;
+    uint32_t arraySize;
+    uint8_t mipCount;
+
+    // accessFlags:
+    // For render targets and depth stencil targets, GpuRead and GpuWrite do not need to be specified. If GpuRead is
+    // specified, srvs are created for the render target or depth and stencil planes. For render targets, if
+    // GpuWrite is specified, a uav will be created. GpuWrite is not valid for depth stencil targets.
+    ResourceAccessFlags accessFlags;
+    std::optional<D3D12_RESOURCE_STATES> initialResourceState;
+    std::string_view name;
+    glm::vec4 colorClearValue{0.0f, 0.0f, 0.0f, 1.0f};
+    float depthClearValue = 0.0f;
+    uint8_t stencilClearValue = 0;
+    bool isRenderTarget = false;
+};
+
 class Texture
 {
 public:
-    enum class Error
-    {
-        InvalidExtent,
-        InvalidFormat,
-        InvalidArraySize,
-        NoValidDepthSrvFormat,
-        NoValidStencilSrvFormat,
-        NoValidDepthStencilTypelessFormat,
-        UavNotSupportForDepthStencil,
-        CannotUseDepthStencilFormatForRenderTarget,
-        InvalidDepthStencilFormat,
-        InvalidRenderTargetFormat,
-        FailedToCreateResource,
-        FailedToCreateUploadResource,
-        InsufficientDescriptorHeapSpace,
-    };
-
-    struct Params
-    {
-        cputex::TextureDimension dimension;
-        gpufmt::Format format;
-        cputex::Extent extents;
-        uint32_t arraySize;
-        uint8_t mipCount;
-
-        // accessFlags:
-        // For render targets and depth stencil targets, GpuRead and GpuWrite do not need to be specified. If GpuRead is
-        // specified, srvs are created for the render target or depth and stencil planes. For render targets, if
-        // GpuWrite is specified, a uav will be created. GpuWrite is not valid for depth stencil targets.
-        ResourceAccessFlags accessFlags;
-        std::optional<D3D12_RESOURCE_STATES> initialResourceState;
-        std::string_view name;
-        glm::vec4 colorClearValue{0.0f, 0.0f, 0.0f, 1.0f};
-        float depthClearValue = 0.0f;
-        uint8_t stencilClearValue = 0;
-        bool isRenderTarget = false;
-    };
-
     Texture() = default;
     Texture(const Texture&) = delete;
     Texture(Texture&&) = delete;
@@ -67,8 +67,8 @@ public:
     Texture& operator=(const Texture&) = delete;
     Texture& operator=(Texture&&) = delete;
 
-    std::optional<Error> initUninitialized(const Params& params);
-    std::optional<Error>
+    std::optional<TextureError> initUninitialized(const TextureParams& params);
+    std::optional<TextureError>
     initFromMemory(const cputex::TextureView& texture, ResourceAccessFlags accessFlags, std::string_view name);
 
     ID3D12Resource* getResource() const { return mResource.getResource(); }
@@ -100,7 +100,7 @@ public:
     void markAsUsed(ID3D12CommandList* commandList);
 
 private:
-    std::optional<Error> init(const Params& params, const cputex::TextureView* texture);
+    std::optional<TextureError> init(const TextureParams& params, const cputex::TextureView* texture);
 
     // Q: Why use two different GPU resource for the texture?
     // A: GPUs have different kinds of memory that are made faster for certain tasks but are slower for others. The
@@ -123,30 +123,30 @@ private:
 } // namespace d3d12
 
 template<>
-constexpr std::string_view ToStringView(d3d12::Texture::Error error)
+constexpr std::string_view ToStringView(d3d12::TextureError error)
 {
     switch(error)
     {
-    case d3d12::Texture::Error::InvalidExtent: return "InvalidExtent";
-    case d3d12::Texture::Error::InvalidFormat: return "InvalidFormat";
-    case d3d12::Texture::Error::InvalidArraySize: return "InvalidArraySize";
-    case d3d12::Texture::Error::NoValidDepthSrvFormat: return "NoValidDepthSrvFormat";
-    case d3d12::Texture::Error::NoValidStencilSrvFormat: return "NoValidStencilSrvFormat";
-    case d3d12::Texture::Error::NoValidDepthStencilTypelessFormat: return "NoValidDepthStencilTypelessFormat";
-    case d3d12::Texture::Error::UavNotSupportForDepthStencil: return "UavNotSupportForDepthStencil";
-    case d3d12::Texture::Error::CannotUseDepthStencilFormatForRenderTarget:
+    case d3d12::TextureError::InvalidExtent: return "InvalidExtent";
+    case d3d12::TextureError::InvalidFormat: return "InvalidFormat";
+    case d3d12::TextureError::InvalidArraySize: return "InvalidArraySize";
+    case d3d12::TextureError::NoValidDepthSrvFormat: return "NoValidDepthSrvFormat";
+    case d3d12::TextureError::NoValidStencilSrvFormat: return "NoValidStencilSrvFormat";
+    case d3d12::TextureError::NoValidDepthStencilTypelessFormat: return "NoValidDepthStencilTypelessFormat";
+    case d3d12::TextureError::UavNotSupportForDepthStencil: return "UavNotSupportForDepthStencil";
+    case d3d12::TextureError::CannotUseDepthStencilFormatForRenderTarget:
         return "CannotUseDepthStencilFormatForRenderTarget";
-    case d3d12::Texture::Error::InvalidDepthStencilFormat: return "InvalidDepthStencilFormat";
-    case d3d12::Texture::Error::InvalidRenderTargetFormat: return "InvalidRenderTargetFormat";
-    case d3d12::Texture::Error::FailedToCreateResource: return "FailedToCreateResource";
-    case d3d12::Texture::Error::FailedToCreateUploadResource: return "FailedToCreateUploadResource";
-    case d3d12::Texture::Error::InsufficientDescriptorHeapSpace: return "InsufficientDescriptorHeapSpace";
-    default: return "Unknown Texture::Error";
+    case d3d12::TextureError::InvalidDepthStencilFormat: return "InvalidDepthStencilFormat";
+    case d3d12::TextureError::InvalidRenderTargetFormat: return "InvalidRenderTargetFormat";
+    case d3d12::TextureError::FailedToCreateResource: return "FailedToCreateResource";
+    case d3d12::TextureError::FailedToCreateUploadResource: return "FailedToCreateUploadResource";
+    case d3d12::TextureError::InsufficientDescriptorHeapSpace: return "InsufficientDescriptorHeapSpace";
+    default: return "Unknown TextureError";
     }
 }
 
 } // namespace scrap
 
 template<>
-struct fmt::formatter<scrap::d3d12::Texture::Error> : public scrap::ToStringViewFormatter<scrap::d3d12::Texture::Error>
+struct fmt::formatter<scrap::d3d12::TextureError> : public scrap::ToStringViewFormatter<scrap::d3d12::TextureError>
 {};

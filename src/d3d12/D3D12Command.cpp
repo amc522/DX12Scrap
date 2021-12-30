@@ -78,8 +78,6 @@ std::optional<CommandError> drawIndexed(d3d12::GraphicsCommandList& commandList,
 
 std::optional<CommandError> dispatchRays(d3d12::GraphicsCommandList& commandList, const DispatchRaysParams& params)
 {
-    //if(!params.pipelineState->isReady()) { return CommandError::ResourcesNotReady; }
-
     for(d3d12::TLAccelerationStructure* tlas : params.accelerationStructures)
     {
         if(!tlas->isReady()) { return CommandError::ResourcesNotReady; }

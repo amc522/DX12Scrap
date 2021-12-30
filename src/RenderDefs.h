@@ -21,7 +21,7 @@ enum class GpuPreference
 };
 
 template<>
-constexpr std::string_view ToStringView(GpuPreference gpuPreference)
+[[nodiscard]] constexpr std::string_view ToStringView(GpuPreference gpuPreference)
 {
     switch(gpuPreference)
     {
@@ -48,7 +48,7 @@ enum class GraphicsShaderStage
 };
 
 template<>
-constexpr std::string_view ToStringView(GraphicsShaderStage shaderStage)
+[[nodiscard]] constexpr std::string_view ToStringView(GraphicsShaderStage shaderStage)
 {
     switch(shaderStage)
     {
@@ -79,7 +79,7 @@ enum class GraphicsShaderStageMask
 };
 DEFINE_ENUM_BITWISE_OPERATORS(GraphicsShaderStageMask);
 
-constexpr GraphicsShaderStageMask GraphicsShaderStageToMask(GraphicsShaderStage stage)
+[[nodiscard]] constexpr GraphicsShaderStageMask GraphicsShaderStageToMask(GraphicsShaderStage stage)
 {
     switch(stage)
     {
@@ -105,7 +105,7 @@ enum class RaytracingShaderStage
     None,
 };
 
-constexpr std::string_view ToStringView(RaytracingShaderStage stage)
+[[nodiscard]] constexpr std::string_view ToStringView(RaytracingShaderStage stage)
 {
     switch(stage)
     {
@@ -132,7 +132,7 @@ enum class RaytracingShaderStageMask
 };
 DEFINE_ENUM_BITWISE_OPERATORS(RaytracingShaderStageMask);
 
-constexpr RaytracingShaderStageMask RaytracingShaderStageToMask(RaytracingShaderStage stage)
+[[nodiscard]] constexpr RaytracingShaderStageMask RaytracingShaderStageToMask(RaytracingShaderStage stage)
 {
     switch(stage)
     {
@@ -163,13 +163,13 @@ enum class RaytracingPipelineStage
     None,
 };
 
-constexpr std::string_view ToStringView(RaytracingPipelineStage stage)
+[[nodiscard]] constexpr std::string_view ToStringView(RaytracingPipelineStage stage)
 {
     switch(stage)
     {
-    case scrap::RaytracingPipelineStage::RayGen: return "RayGen";
-    case scrap::RaytracingPipelineStage::HitGroup: return "HitGroup";
-    case scrap::RaytracingPipelineStage::Miss: return "Miss";
+    case RaytracingPipelineStage::RayGen: return "RayGen";
+    case RaytracingPipelineStage::HitGroup: return "HitGroup";
+    case RaytracingPipelineStage::Miss: return "Miss";
     default: return "Unknown RaytracingPipelineStage";
     }
 }
@@ -269,7 +269,7 @@ enum class ShaderVertexSemantic
 };
 
 template<>
-constexpr std::string_view ToStringView(ShaderVertexSemantic semantic)
+[[nodiscard]] constexpr std::string_view ToStringView(ShaderVertexSemantic semantic)
 {
     switch(semantic)
     {
@@ -355,7 +355,7 @@ enum class IndexBufferFormat
     Int32,
 };
 
-constexpr size_t IndexBufferFormatByteSize(IndexBufferFormat format)
+[[nodiscard]] constexpr size_t IndexBufferFormatByteSize(IndexBufferFormat format)
 {
     switch(format)
     {
@@ -367,7 +367,7 @@ constexpr size_t IndexBufferFormatByteSize(IndexBufferFormat format)
     }
 }
 
-constexpr gpufmt::Format TranslateIndexBufferFormat(IndexBufferFormat format)
+[[nodiscard]] constexpr gpufmt::Format TranslateIndexBufferFormat(IndexBufferFormat format)
 {
     switch(format)
     {

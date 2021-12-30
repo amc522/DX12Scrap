@@ -20,7 +20,7 @@ void ShaderTable::init(const ShaderTableParams& params)
         fmt::format("{} (Miss Table)", params.name),
     };
 
-    Buffer::SimpleParams bufferParams;
+    BufferSimpleParams bufferParams;
     bufferParams.accessFlags = ResourceAccessFlags::CpuWrite;
     bufferParams.flags = BufferFlags::None;
     bufferParams.initialResourceState = D3D12_RESOURCE_STATE_COMMON;

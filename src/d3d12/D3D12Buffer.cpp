@@ -13,17 +13,17 @@ using namespace Microsoft::WRL;
 
 namespace scrap::d3d12
 {
-std::optional<Buffer::Error> Buffer::init(const SimpleParams& params, std::span<const std::byte> buffer)
+std::optional<BufferError> Buffer::init(const BufferSimpleParams& params, std::span<const std::byte> buffer)
 {
     return initInternal(params, buffer);
 }
 
-std::optional<Buffer::Error> Buffer::init(const FormattedParams& params, std::span<const std::byte> buffer)
+std::optional<BufferError> Buffer::init(const BufferFormattedParams& params, std::span<const std::byte> buffer)
 {
     return initInternal(params, buffer);
 }
 
-std::optional<Buffer::Error> Buffer::init(const StructuredParams& params, std::span<const std::byte> buffer)
+std::optional<BufferError> Buffer::init(const BufferStructuredParams& params, std::span<const std::byte> buffer)
 {
     return initInternal(params, buffer);
 }
@@ -112,7 +112,7 @@ void Buffer::transition(ID3D12GraphicsCommandList* commandList,
     commandList->ResourceBarrier(1, &barrier);
 }
 
-std::optional<Buffer::Error> Buffer::initInternal(Params params, std::span<const std::byte> buffer)
+std::optional<BufferError> Buffer::initInternal(Params params, std::span<const std::byte> buffer)
 {
     assert(!mInitialized);
 
@@ -127,7 +127,7 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, std::span<const
     if(params.type == Type::Formatted)
     {
         const auto formatTranslation = gpufmt::dxgi::translateFormat(params.format);
-        if(!formatTranslation || !formatTranslation.exact) { return Error::InvalidFormat; }
+        if(!formatTranslation || !formatTranslation.exact) { return BufferError::InvalidFormat; }
         params.dxgiFormat = formatTranslation.exact.value();
 
         const auto& formatInfo = gpufmt::formatInfo(params.format);
@@ -230,7 +230,7 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, std::span<const
         hr = deviceContext.getDevice()->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc,
                                                                 initialResourceState, nullptr, IID_PPV_ARGS(&resource));
 
-        if(FAILED(hr)) { return Error::FailedToCreateGpuResource; }
+        if(FAILED(hr)) { return BufferError::FailedToCreateGpuResource; }
 
         mResource = TrackedShaderResource(std::move(resource));
     }
@@ -276,7 +276,7 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, std::span<const
         if(FAILED(hr))
         {
             spdlog::critical("Failed to create texture upload resource.");
-            return Error::FailedToCreateUploadResource;
+            return BufferError::FailedToCreateUploadResource;
         }
 
         mUploadResource = TrackedGpuObject(std::move(uploadResource));
@@ -336,7 +336,7 @@ std::optional<Buffer::Error> Buffer::initInternal(Params params, std::span<const
     if(needsCbv) { ++descriptorCount; }
 
     auto descriptorHeapReservation = deviceContext.getCbvSrvUavHeap().reserve(descriptorCount);
-    if(!descriptorHeapReservation) { return Error::InsufficientDescriptorHeapSpace; }
+    if(!descriptorHeapReservation) { return BufferError::InsufficientDescriptorHeapSpace; }
 
     mResource.setCbvSrvUavDescriptorHeapReservation(std::move(descriptorHeapReservation.value()));
 

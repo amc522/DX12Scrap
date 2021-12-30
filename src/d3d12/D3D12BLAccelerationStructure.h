@@ -17,24 +17,24 @@ namespace scrap::d3d12
 struct BLAccelerationStructureParams : public AccelerationStructureParams
 {};
 
+struct BLAccelerationStructureGeometryParams
+{
+    std::shared_ptr<Buffer> indexBuffer;
+    std::shared_ptr<Buffer> vertexBuffer;
+    RaytracingGeometryFlags flags = RaytracingGeometryFlags::None;
+};
+
 class BLAccelerationStructure
 {
 public:
-    struct GeometryParams
-    {
-        std::shared_ptr<Buffer> indexBuffer;
-        std::shared_ptr<Buffer> vertexBuffer;
-        RaytracingGeometryFlags flags = RaytracingGeometryFlags::None;
-    };
-
     BLAccelerationStructure(const BLAccelerationStructureParams& params);
 
     const Buffer& getBuffer() const { return mAccelerationStructure; }
 
     void reserve(size_t count);
 
-    void addMesh(const GeometryParams& geometryParams);
-    void addMesh(std::span<const GeometryParams> geometries);
+    void addMesh(const BLAccelerationStructureGeometryParams& geometryParams);
+    void addMesh(std::span<const BLAccelerationStructureGeometryParams> geometries);
 
     bool build(const GraphicsCommandList& commandList);
 

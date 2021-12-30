@@ -264,6 +264,9 @@
     <ClInclude Include="src\d3d12\D3D12RaytracingDispatchPipelineState.h">
       <Filter>Source Files\d3d12</Filter>
     </ClInclude>
+    <ClInclude Include="src\d3d12\D3D12Fwd.h">
+      <Filter>Source Files\d3d12</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

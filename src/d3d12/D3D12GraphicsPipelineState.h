@@ -1,6 +1,7 @@
 #pragma once
 
 #include "d3d12/D3D12FrameCodes.h"
+#include "d3d12/D3D12Fwd.h"
 #include "d3d12/D3D12TrackedGpuObject.h"
 
 #include <memory>
@@ -13,8 +14,6 @@
 
 namespace scrap::d3d12
 {
-class GraphicsShader;
-
 struct GraphicsPipelineStateParams
 {
     Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RenderDefs.h"
+#include "d3d12/D3D12Fwd.h"
 
 #include <optional>
 #include <span>
@@ -10,14 +11,7 @@
 
 namespace scrap::d3d12
 {
-class Buffer;
 class GpuMesh;
-class GraphicsCommandList;
-class GraphicsPipelineState;
-class RaytracingDispatchPipelineState;
-class ShaderTable;
-class Texture;
-class TLAccelerationStructure;
 
 struct VertexBuffer;
 

@@ -2,6 +2,7 @@
 
 #include "FreeBlockTracker.h"
 #include "RenderDefs.h"
+#include "d3d12/D3D12Fwd.h"
 
 #include <memory>
 #include <mutex>
@@ -11,17 +12,8 @@
 
 #include <EASTL/vector_set.h>
 
-struct D3D12_GPU_VIRTUAL_ADDRESS_RANGE;
-struct D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE;
-struct ID3D12CommandList;
-struct ID3D12CommandQueue;
-struct ID3D12GraphicsCommandList;
-
 namespace scrap::d3d12
 {
-class Buffer;
-class RaytracingPipelineState;
-
 struct ShaderTableStageParams
 {
     size_t entryByteStride = 0;

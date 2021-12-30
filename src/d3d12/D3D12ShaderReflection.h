@@ -1,23 +1,12 @@
 #pragma once
 
 #include "RenderDefs.h"
+#include "d3d12/D3D12Fwd.h"
 
 #include <optional>
 
 #include <d3dcommon.h>
 #include <tl/expected.hpp>
-
-struct ID3D12ShaderReflection;
-struct ID3D12ShaderReflectionConstantBuffer;
-
-struct _D3D12_SHADER_BUFFER_DESC;
-using D3D12_SHADER_BUFFER_DESC = _D3D12_SHADER_BUFFER_DESC;
-
-struct _D3D12_SHADER_INPUT_BIND_DESC;
-using D3D12_SHADER_INPUT_BIND_DESC = _D3D12_SHADER_INPUT_BIND_DESC;
-
-enum _D3D_SHADER_INPUT_TYPE;
-using D3D_SHADER_INPUT_TYPE = _D3D_SHADER_INPUT_TYPE;
 
 namespace scrap::d3d12
 {
