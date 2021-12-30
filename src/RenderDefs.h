@@ -174,6 +174,77 @@ constexpr std::string_view ToStringView(RaytracingPipelineStage stage)
     }
 }
 
+[[nodiscard]] constexpr RaytracingPipelineStage RaytracingShaderStageToPipelineStage(RaytracingShaderStage stage)
+{
+    switch(stage)
+    {
+    case RaytracingShaderStage::RayGen: return RaytracingPipelineStage::RayGen;
+    case RaytracingShaderStage::Intersection: return RaytracingPipelineStage::HitGroup;
+    case RaytracingShaderStage::AnyHit: return RaytracingPipelineStage::HitGroup;
+    case RaytracingShaderStage::ClosestHit: return RaytracingPipelineStage::HitGroup;
+    case RaytracingShaderStage::Miss: return RaytracingPipelineStage::Miss;
+    default: return RaytracingPipelineStage::None;
+    }
+}
+
+enum class RaytracingPipelineStageMask
+{
+    None = 0,
+    RayGen = 1 << ToUnderlying(RaytracingPipelineStage::RayGen),
+    HitGroup = 1 << ToUnderlying(RaytracingPipelineStage::HitGroup),
+    Miss = 1 << ToUnderlying(RaytracingPipelineStage::Miss)
+};
+DEFINE_ENUM_BITWISE_OPERATORS(RaytracingPipelineStageMask)
+
+[[nodiscard]] constexpr RaytracingPipelineStageMask RaytracingPipelineStageToMask(RaytracingPipelineStage stage)
+{
+    switch(stage)
+    {
+    case RaytracingPipelineStage::RayGen: return RaytracingPipelineStageMask::RayGen;
+    case RaytracingPipelineStage::HitGroup: return RaytracingPipelineStageMask::HitGroup;
+    case RaytracingPipelineStage::Miss: return RaytracingPipelineStageMask::Miss;
+    default: return RaytracingPipelineStageMask::None;
+    }
+}
+
+[[nodiscard]] constexpr RaytracingPipelineStageMask
+RaytracingShaderStageMaskToPipelineMask(RaytracingShaderStageMask shaderMask)
+{
+    RaytracingPipelineStageMask pipelineMask = RaytracingPipelineStageMask::None;
+    if((shaderMask & RaytracingShaderStageMask::RayGen) != RaytracingShaderStageMask::None)
+    {
+        pipelineMask |= RaytracingPipelineStageMask::RayGen;
+    }
+    if((shaderMask & RaytracingShaderStageMask::AnyHit) != RaytracingShaderStageMask::None)
+    {
+        pipelineMask |= RaytracingPipelineStageMask::HitGroup;
+    }
+    if((shaderMask & RaytracingShaderStageMask::ClosestHit) != RaytracingShaderStageMask::None)
+    {
+        pipelineMask |= RaytracingPipelineStageMask::HitGroup;
+    }
+    if((shaderMask & RaytracingShaderStageMask::Intersection) != RaytracingShaderStageMask::None)
+    {
+        pipelineMask |= RaytracingPipelineStageMask::HitGroup;
+    }
+    if((shaderMask & RaytracingShaderStageMask::Miss) != RaytracingShaderStageMask::None)
+    {
+        pipelineMask |= RaytracingPipelineStageMask::Miss;
+    }
+
+    return pipelineMask;
+}
+
+[[nodiscard]] constexpr bool TestRaytracingShaderStageInMask(RaytracingShaderStageMask mask, RaytracingShaderStage stage)
+{
+    return (mask & RaytracingShaderStageToMask(stage)) != RaytracingShaderStageMask::None;
+}
+
+[[nodiscard]] constexpr bool TestRaytracingPipelineStageInMask(RaytracingPipelineStageMask mask, RaytracingPipelineStage stage)
+{
+    return (mask & RaytracingPipelineStageToMask(stage)) != RaytracingPipelineStageMask::None;
+}
+
 enum class ResourceAccessFlags
 {
     None = 0,
