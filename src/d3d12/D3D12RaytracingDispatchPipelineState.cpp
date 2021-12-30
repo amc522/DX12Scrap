@@ -99,9 +99,11 @@ void RaytracingDispatchPipelineState::addPipelineState(std::shared_ptr<Raytracin
         if(FAILED(mStateObject->QueryInterface(IID_PPV_ARGS(&stateObjectProperties)))) { return; }
 
         auto makeShaderIdentifier = [&](std::wstring_view entryPointName) {
-            return RaytracingShaderIdentifier(
-                reinterpret_cast<std::byte*>(stateObjectProperties->GetShaderIdentifier(entryPointName.data())),
-                detail::kShaderIdentifierSize);
+            const std::byte* bytes =
+                reinterpret_cast<std::byte*>(stateObjectProperties->GetShaderIdentifier(entryPointName.data()));
+
+            return RaytracingShaderIdentifier(std::span<const std::byte, RaytracingShaderIdentifier::kByteSize>(
+                bytes, RaytracingShaderIdentifier::kByteSize));
         };
 
         const RaytracingPipelineStageMask pipelineStateStages = pipelineState->getPipelineStages();

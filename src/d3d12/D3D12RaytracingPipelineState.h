@@ -58,19 +58,40 @@ struct RaytracingPipelineStateParams
     uint32_t maxRecursionDepth = 1;
 };
 
-namespace detail
+class RaytracingShaderIdentifier
 {
-static constexpr uint32_t kShaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+public:
+    static constexpr uint32_t kByteSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
 
-} // namespace detail
+    RaytracingShaderIdentifier() = default;
+    RaytracingShaderIdentifier(const RaytracingShaderIdentifier&) = default;
+    RaytracingShaderIdentifier(RaytracingShaderIdentifier&&) = default;
+    RaytracingShaderIdentifier(std::span<const std::byte, kByteSize> bytes)
+    {
+        std::copy(bytes.begin(), bytes.end(), mBytes.begin());
+    }
 
-using RaytracingShaderIdentifier = std::span<const std::byte, detail::kShaderIdentifierSize>;
+    RaytracingShaderIdentifier& operator=(const RaytracingShaderIdentifier&) = default;
+    RaytracingShaderIdentifier& operator=(RaytracingShaderIdentifier&&) = default;
 
-namespace detail
-{
-static constexpr std::array<std::byte, kShaderIdentifierSize> kEmptyShaderIdentifierArray = {};
-static constexpr RaytracingShaderIdentifier kEmptyShaderIdentifier(kEmptyShaderIdentifierArray);
-} // namespace detail
+    [[nodiscard]] constexpr bool operator==(const RaytracingShaderIdentifier& right) const
+    {
+        return std::ranges::equal(mBytes, right.mBytes);
+    }
+
+    [[nodiscard]] std::array<std::byte, kByteSize>::const_iterator begin() const { return mBytes.cbegin(); }
+    [[nodiscard]] std::array<std::byte, kByteSize>::const_iterator end() const { return mBytes.cend(); }
+
+    [[nodiscard]] std::span<const std::byte> getBytes() const { return mBytes; }
+
+    [[nodiscard]] constexpr bool isInvalid() const
+    {
+        return !std::all_of(mBytes.begin(), mBytes.end(), [](std::byte val) { return val == std::byte(0); });
+    }
+
+private:
+    std::array<std::byte, kByteSize> mBytes{};
+};
 
 class RaytracingPipelineState
 {
@@ -113,7 +134,7 @@ private:
             : RaytracingPipelineStateShaderParams(other)
         {}
 
-        RaytracingShaderIdentifier shaderIdentifier = detail::kEmptyShaderIdentifier;
+        RaytracingShaderIdentifier shaderIdentifier;
     };
 
     std::wstring_view getFixedStageShaderEntryPointName(const RaytracingShaderStage stage) const;
@@ -131,8 +152,7 @@ private:
 
     eastl::fixed_vector<TrackedGpuObject<ID3D12RootSignature>, 1> mLocalRootSignatures;
 
-    std::array<RaytracingShaderIdentifier, (size_t)RaytracingPipelineStage::Count> mFixedStageShaderIdentifiers = {
-        detail::kEmptyShaderIdentifier, detail::kEmptyShaderIdentifier, detail::kEmptyShaderIdentifier};
+    std::array<RaytracingShaderIdentifier, (size_t)RaytracingPipelineStage::Count> mFixedStageShaderIdentifiers{};
 
     MonotonicBuffer mMonotonicBuffer;
     std::span<D3D12_STATE_SUBOBJECT> mSubObjects;

@@ -28,7 +28,7 @@ void ShaderTable::init(const ShaderTableParams& params)
     for(RaytracingPipelineStage stage : Enumerator<RaytracingPipelineStage>())
     {
         ShaderTableStageParams& params = mParams[(size_t)stage];
-        params.entryByteStride = AlignInteger(detail::kShaderIdentifierSize + params.entryByteStride,
+        params.entryByteStride = AlignInteger(RaytracingShaderIdentifier::kByteSize + params.entryByteStride,
                                               size_t(D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT));
 
         bufferParams.byteSize = params.entryByteStride * params.capacity;
@@ -54,9 +54,9 @@ tl::expected<ShaderTableAllocation, ShaderTable::Error> ShaderTable::addPipeline
     for(auto stage : Enumerator<RaytracingPipelineStage>())
     {
         const auto& stageArguments = localRootArguments[(size_t)stage];
-        const auto stageIdentifier = pipelineState->getShaderIdentifier(stage);
+        const auto& stageIdentifier = pipelineState->getShaderIdentifier(stage);
 
-        if(std::ranges::equal(stageIdentifier, detail::kEmptyShaderIdentifier)) { continue; }
+        if(!stageIdentifier.isInvalid()) { continue; }
 
         StageShaderTable& stageShaderTable = mShaderTables[(size_t)stage];
         auto result = stageShaderTable.freeBlocks.reserve();
@@ -66,7 +66,7 @@ tl::expected<ShaderTableAllocation, ShaderTable::Error> ShaderTable::addPipeline
         GpuBufferWriteGuard<Buffer> stageTableWriteGuard{*stageShaderTable.shaderTableBuffer, commandList};
         auto writeBuffer = stageTableWriteGuard.getWriteBuffer();
         writeBuffer = writeBuffer.subspan(result->getRange().start * mParams[(size_t)stage].entryByteStride,
-                                          detail::kShaderIdentifierSize + stageArguments.size_bytes());
+                                          RaytracingShaderIdentifier::kByteSize + stageArguments.size_bytes());
 
         auto writeItr = writeBuffer.begin();
         writeItr = std::copy(stageIdentifier.begin(), stageIdentifier.end(), writeItr);
@@ -118,9 +118,9 @@ void ShaderTable::updateLocalRootArguments(RaytracingPipelineStage stage,
     GpuBufferWriteGuard<d3d12::Buffer> writeGuard(*buffer, commandList);
 
     const size_t entryByteSize = mParams[(size_t)stage].entryByteStride;
-    const size_t offset = index * entryByteSize + detail::kShaderIdentifierSize;
+    const size_t offset = index * entryByteSize + RaytracingShaderIdentifier::kByteSize;
     auto rootArgumentsBuffer =
-        writeGuard.getWriteBuffer().subspan(offset, entryByteSize - detail::kShaderIdentifierSize);
+        writeGuard.getWriteBuffer().subspan(offset, entryByteSize - RaytracingShaderIdentifier::kByteSize);
     std::copy(localRootArguments.begin(), localRootArguments.end(), rootArgumentsBuffer.begin());
 }
 
