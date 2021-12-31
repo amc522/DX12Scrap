@@ -972,17 +972,16 @@ bool RaytracingScene::createPipelineState()
 #endif
         mShader = std::make_shared<d3d12::RaytracingShader>(std::move(shaderParams));
 
-        std::array localRootSignatures = {mClosestHitLocalRootSignature};
         d3d12::RaytracingPipelineStateParams pipelineStateParams;
-        pipelineStateParams.shaders = std::span(&mShader, 1);
+        pipelineStateParams.shader = mShader;
 
-        pipelineStateParams.fixedStages.raygen.shaderIndex = 0;
-        pipelineStateParams.fixedStages.raygen.shaderEntryPointIndex =
-            mShader->getFixedStageIndex(RaytracingShaderStage::RayGen, raygenEntryPointName);
+        pipelineStateParams.fixedStages[(size_t)RaytracingShaderStage::RayGen] =
+            d3d12::RaytracingPipelineStateShaderParams{.shaderEntryPointIndex = mShader->getFixedStageIndex(
+                                                           RaytracingShaderStage::RayGen, raygenEntryPointName)};
 
-        pipelineStateParams.fixedStages.miss.shaderIndex = 0;
-        pipelineStateParams.fixedStages.miss.shaderEntryPointIndex =
-            mShader->getFixedStageIndex(RaytracingShaderStage::Miss, missEntryPointName);
+        pipelineStateParams.fixedStages[(size_t)RaytracingShaderStage::Miss] =
+            d3d12::RaytracingPipelineStateShaderParams{
+                .shaderEntryPointIndex = mShader->getFixedStageIndex(RaytracingShaderStage::Miss, missEntryPointName)};
 
         // pipelineStateParams.hitGroupName = hitGroupName;
         pipelineStateParams.primitiveType = d3d12::RaytracingPipelineStatePrimitiveType::Triangles;
@@ -1012,13 +1011,14 @@ bool RaytracingScene::createPipelineState()
 
         std::array localRootSignatures = {mClosestHitLocalRootSignature};
         d3d12::RaytracingPipelineStateParams pipelineStateParams;
-        pipelineStateParams.localRootSignatures = localRootSignatures;
-        pipelineStateParams.shaders = std::span(&mShader, 1);
+        pipelineStateParams.shader = mShader;
 
-        pipelineStateParams.fixedStages.closestHit.shaderIndex = 0;
-        pipelineStateParams.fixedStages.closestHit.shaderEntryPointIndex =
-            mShader->getFixedStageIndex(RaytracingShaderStage::ClosestHit, closestHitEntryPointName);
-        pipelineStateParams.fixedStages.closestHit.localRootSignatureIndex = 0;
+        pipelineStateParams.fixedStages[(size_t)RaytracingShaderStage::ClosestHit] =
+            d3d12::RaytracingPipelineStateShaderParams{
+                .localRootSignature = mClosestHitLocalRootSignature,
+                .shaderEntryPointIndex =
+                    mShader->getFixedStageIndex(RaytracingShaderStage::ClosestHit, closestHitEntryPointName),
+            };
 
         pipelineStateParams.hitGroupName = hitGroupName;
         pipelineStateParams.primitiveType = d3d12::RaytracingPipelineStatePrimitiveType::Triangles;
