@@ -94,7 +94,7 @@ void RaytracingPipelineState::create()
         D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION exportsAssociation;
     };
 
-    const bool hasHitGroup = TestRaytracingPipelineStageInMask(mPipelineStages, RaytracingPipelineStage::HitGroup);
+    const bool hasHitGroup = testEnumInMask(mPipelineStages, RaytracingPipelineStage::HitGroup);
     const size_t dxilLibraryDescCount = 1;
     const size_t hitGroupCount = (hasHitGroup) ? 1 : 0;
     const size_t exportDescsCount = mValidFixedStageExportCount + mCallableShaderParams.size();
@@ -131,10 +131,8 @@ void RaytracingPipelineState::create()
         std::span fixedStageShaders = mShader->getFixedStageShaders();
         std::span callableShaders = mShader->getCallableShaders();
 
-        for(auto stage : Enumerator<RaytracingShaderStage>())
+        for(auto stage : RaytracingShaderStageEnumerator(mShaderStages))
         {
-            if(!TestRaytracingShaderStageInMask(mShaderStages, stage)) { continue; }
-
             const auto& shaderParams = mFixedStageShaderParams[(size_t)stage];
 
             D3D12_EXPORT_DESC& desc = exportDescs.emplace_back();
@@ -165,7 +163,7 @@ void RaytracingPipelineState::create()
         if(hasHitGroup)
         {
             auto GetFixedStageEntryPointName = [&](RaytracingShaderStage stage) -> LPCWSTR {
-                if(!TestRaytracingShaderStageInMask(mShaderStages, stage)) { return nullptr; }
+                if(!testEnumInMask(mShaderStages, stage)) { return nullptr; }
 
                 const auto& shaderParams = mFixedStageShaderParams[(size_t)stage];
                 std::span fixedStageShaders = mShader->getFixedStageShaders();
@@ -218,10 +216,8 @@ void RaytracingPipelineState::create()
                 return shaderParams.localRootSignatureIndex == localRootSignatureIndex;
             };
 
-            for(auto stage : Enumerator<RaytracingShaderStage>())
+            for(auto stage : RaytracingShaderStageEnumerator(mShaderStages))
             {
-                if(!TestRaytracingShaderStageInMask(mShaderStages, stage)) { continue; }
-
                 const auto& shaderParams = mFixedStageShaderParams[(size_t)stage];
                 if(shaderParams.localRootSignatureIndex == localRootSignatureIndex)
                 {

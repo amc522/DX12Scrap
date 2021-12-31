@@ -1,5 +1,6 @@
 #pragma once
 
+#include "EnumIterator.h"
 #include "StringUtils.h"
 #include "Utility.h"
 
@@ -126,9 +127,7 @@ enum class RaytracingShaderStageMask
     Intersection = 1 << (uint32_t)RaytracingShaderStage::Intersection,
     AnyHit = 1 << (uint32_t)RaytracingShaderStage::AnyHit,
     ClosestHit = 1 << (uint32_t)RaytracingShaderStage::ClosestHit,
-    Miss = 1 << (uint32_t)RaytracingShaderStage::Miss,
-    RgChMs = RayGen | ClosestHit | Miss,
-    RgIsAhChMs = RayGen | Intersection | AnyHit | ClosestHit | Miss,
+    Miss = 1 << (uint32_t)RaytracingShaderStage::Miss
 };
 DEFINE_ENUM_BITWISE_OPERATORS(RaytracingShaderStageMask);
 
@@ -144,6 +143,8 @@ DEFINE_ENUM_BITWISE_OPERATORS(RaytracingShaderStageMask);
     default: return RaytracingShaderStageMask::None;
     }
 }
+
+using RaytracingShaderStageEnumerator = MaskPairEnumerator<RaytracingShaderStageMask, RaytracingShaderStage>;
 
 enum class RaytracingShaderType
 {
@@ -235,15 +236,7 @@ RaytracingShaderStageMaskToPipelineMask(RaytracingShaderStageMask shaderMask)
     return pipelineMask;
 }
 
-[[nodiscard]] constexpr bool TestRaytracingShaderStageInMask(RaytracingShaderStageMask mask, RaytracingShaderStage stage)
-{
-    return (mask & RaytracingShaderStageToMask(stage)) != RaytracingShaderStageMask::None;
-}
-
-[[nodiscard]] constexpr bool TestRaytracingPipelineStageInMask(RaytracingPipelineStageMask mask, RaytracingPipelineStage stage)
-{
-    return (mask & RaytracingPipelineStageToMask(stage)) != RaytracingPipelineStageMask::None;
-}
+using RaytracingPipelineStageEnumerator = MaskPairEnumerator<RaytracingPipelineStageMask, RaytracingPipelineStage>;
 
 enum class ResourceAccessFlags
 {

@@ -106,14 +106,10 @@ void RaytracingDispatchPipelineState::addPipelineState(std::shared_ptr<Raytracin
                 bytes, RaytracingShaderIdentifier::kByteSize));
         };
 
-        const RaytracingPipelineStageMask pipelineStages = pipelineState->getPipelineStages();
-        for(auto stage : Enumerator<RaytracingPipelineStage>())
+        for(auto stage : RaytracingPipelineStageEnumerator(pipelineState->getPipelineStages()))
         {
-            if(TestRaytracingPipelineStageInMask(pipelineStages, stage))
-            {
-                const std::wstring_view entryPointName = pipelineState->getShaderEntryPointName(stage);
-                pipelineState->setShaderIdentifier(stage, makeShaderIdentifier(entryPointName));
-            }
+            const std::wstring_view entryPointName = pipelineState->getShaderEntryPointName(stage);
+            pipelineState->setShaderIdentifier(stage, makeShaderIdentifier(entryPointName));
         }
 
         for(size_t callableIndex = 0; callableIndex < pipelineState->getCallableShaderCount(); ++callableIndex)

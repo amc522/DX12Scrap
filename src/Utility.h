@@ -45,16 +45,25 @@
 
 namespace scrap
 {
-template<class EnumT> requires std::is_enum_v<EnumT>
+template<class EnumT>
+requires std::is_enum_v<EnumT>
 constexpr std::enable_if_t<std::is_enum_v<EnumT>, std::underlying_type_t<EnumT>> ToUnderlying(EnumT e)
 {
     return static_cast<std::underlying_type_t<EnumT>>(e);
 }
 
-template<class EnumT> requires std::is_enum_v<EnumT>
-constexpr std::enable_if_t<std::is_enum_v<EnumT>, EnumT> IncrementEnum(EnumT e)
+template<class EnumT>
+requires std::is_enum_v<EnumT>
+constexpr EnumT IncrementEnum(EnumT e, std::underlying_type_t<EnumT> offset = 1)
 {
-    return static_cast<EnumT>(ToUnderlying(e) + std::underlying_type_t<EnumT>(1));
+    return static_cast<EnumT>(ToUnderlying(e) + offset);
+}
+
+template<class EnumT>
+requires std::is_enum_v<EnumT>
+constexpr EnumT DecrementEnum(EnumT e, std::underlying_type_t<EnumT> offset = 1)
+{
+    return static_cast<EnumT>(ToUnderlying(e) - offset);
 }
 
 template<class... Ts>
