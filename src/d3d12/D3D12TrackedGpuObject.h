@@ -25,16 +25,21 @@ public:
     TrackedDeviceChild& operator=(const TrackedDeviceChild&) = delete;
     TrackedDeviceChild& operator=(TrackedDeviceChild&&) = default;
 
-    bool operator==(std::nullptr_t) const { return mDeviceChild == nullptr; }
-    bool operator!=(std::nullptr_t) const { return mDeviceChild != nullptr; }
+    [[nodiscard]] bool operator==(const TrackedDeviceChild& right) const { return mDeviceChild == right.mDeviceChild; }
+    [[nodiscard]] bool operator==(const Microsoft::WRL::ComPtr<ID3D12DeviceChild>& right) const
+    {
+        return mDeviceChild == right;
+    }
+    [[nodiscard]] bool operator==(std::nullptr_t) const { return mDeviceChild == nullptr; }
+    [[nodiscard]] bool operator!=(std::nullptr_t) const { return mDeviceChild != nullptr; }
 
     ID3D12DeviceChild* operator->() const { return mDeviceChild.Get(); }
 
     explicit operator ID3D12DeviceChild*() const { return mDeviceChild.Get(); }
-    ID3D12DeviceChild* getDeviceChild() const { return mDeviceChild.Get(); }
+    [[nodiscard]] ID3D12DeviceChild* getDeviceChild() const { return mDeviceChild.Get(); }
 
     template<class T>
-    T* getAs() const
+    [[nodiscard]] T* getAs() const
     {
         return static_cast<T*>(mDeviceChild.Get());
     }
@@ -42,8 +47,8 @@ public:
     void markAsUsed(ID3D12CommandQueue* commandQueue);
     void markAsUsed(ID3D12CommandList* commandList);
 
-    bool isInUse(ID3D12CommandQueue* commandQueue) const;
-    bool isInUse(ID3D12CommandList* commandList) const;
+    [[nodiscard]] bool isInUse(ID3D12CommandQueue* commandQueue) const;
+    [[nodiscard]] bool isInUse(ID3D12CommandList* commandList) const;
 
     void reset()
     {
@@ -75,25 +80,30 @@ public:
     TrackedShaderResource& operator=(const TrackedShaderResource&) = delete;
     TrackedShaderResource& operator=(TrackedShaderResource&&) = default;
 
-    bool operator==(std::nullptr_t) const { return mResource == nullptr; }
-    bool operator!=(std::nullptr_t) const { return mResource != nullptr; }
+    [[nodiscard]] bool operator==(const TrackedShaderResource& right) const { return mResource == right.mResource; }
+    [[nodiscard]] bool operator==(const Microsoft::WRL::ComPtr<ID3D12Resource>& right) const
+    {
+        return mResource == right;
+    }
+    [[nodiscard]] bool operator==(std::nullptr_t) const { return mResource == nullptr; }
+    [[nodiscard]] bool operator!=(std::nullptr_t) const { return mResource != nullptr; }
 
     explicit operator ID3D12Resource*() const { return mResource.Get(); }
-    ID3D12Resource* getResource() const { return mResource.Get(); }
+    [[nodiscard]] ID3D12Resource* getResource() const { return mResource.Get(); }
 
-    const FixedDescriptorHeapReservation& getCbvSrvUavDescriptorHeapReservation() const
+    [[nodiscard]] const FixedDescriptorHeapReservation& getCbvSrvUavDescriptorHeapReservation() const
     {
         return mCbvSrvUavDescriptorHeapReservation;
     }
     void setCbvSrvUavDescriptorHeapReservation(FixedDescriptorHeapReservation&& descriptorHeapReservation);
 
-    const FixedDescriptorHeapReservation& getRtvDescriptorHeapReservation() const
+    [[nodiscard]] const FixedDescriptorHeapReservation& getRtvDescriptorHeapReservation() const
     {
         return mRtvDescriptorHeapReservation;
     }
     void setRtvDescriptorHeapReservation(FixedDescriptorHeapReservation&& descriptorHeapReservation);
 
-    const FixedDescriptorHeapReservation& getDsvDescriptorHeapReservation() const
+    [[nodiscard]] const FixedDescriptorHeapReservation& getDsvDescriptorHeapReservation() const
     {
         return mDsvDescriptorHeapReservation;
     }
@@ -102,8 +112,8 @@ public:
     void markAsUsed(ID3D12CommandQueue* commandQueue);
     void markAsUsed(ID3D12CommandList* commandList);
 
-    bool isInUse(ID3D12CommandQueue* commandQueue) const;
-    bool isInUse(ID3D12CommandList* commandList) const;
+    [[nodiscard]] bool isInUse(ID3D12CommandQueue* commandQueue) const;
+    [[nodiscard]] bool isInUse(ID3D12CommandList* commandList) const;
 
     void reset()
     {
@@ -137,17 +147,19 @@ public:
     TrackedGpuObject& operator=(const TrackedGpuObject&) = delete;
     TrackedGpuObject& operator=(TrackedGpuObject&&) = default;
 
-    bool operator==(std::nullptr_t) const { return mDeviceChild == nullptr; }
-    bool operator!=(std::nullptr_t) const { return mDeviceChild != nullptr; }
+    [[nodiscard]] bool operator==(const TrackedGpuObject<T>& right) const { return mDeviceChild == right.mDeviceChild; }
+    [[nodiscard]] bool operator==(const Microsoft::WRL::ComPtr<T>& right) const { return mDeviceChild == right; }
+    [[nodiscard]] bool operator==(std::nullptr_t) const { return mDeviceChild == nullptr; }
+    [[nodiscard]] bool operator!=(std::nullptr_t) const { return mDeviceChild != nullptr; }
 
     T* operator->() const { return get(); }
-    T* get() const { return mDeviceChild.getAs<T>(); }
+    [[nodiscard]] T* get() const { return mDeviceChild.getAs<T>(); }
 
     void markAsUsed(ID3D12CommandQueue* commandQueue) { mDeviceChild.markAsUsed(commandQueue); }
     void markAsUsed(ID3D12CommandList* commandList) { mDeviceChild.markAsUsed(commandList); }
 
-    bool isInUse(ID3D12CommandQueue* commandQueue) const { return mDeviceChild.isInUse(commandQueue); }
-    bool isInUse(ID3D12CommandList* commandList) const { return mDeviceChild.isInUse(commandList); }
+    [[nodiscard]] bool isInUse(ID3D12CommandQueue* commandQueue) const { return mDeviceChild.isInUse(commandQueue); }
+    [[nodiscard]] bool isInUse(ID3D12CommandList* commandList) const { return mDeviceChild.isInUse(commandList); }
 
     void reset() { mDeviceChild.reset(); }
 
