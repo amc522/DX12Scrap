@@ -51,5 +51,6 @@ public:
     std::shared_ptr<GpuMesh> mGpuMesh;
     Material mMaterial;
     d3d12::TlasInstanceAllocation mInstanceAllocation;
+    SharedString name;
 };
 } // namespace scrap

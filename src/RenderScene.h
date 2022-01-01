@@ -68,7 +68,9 @@ public:
 
     bool isInitialized() { return mInitialized; }
 
-    std::shared_ptr<d3d12::GraphicsPipelineState> createPipelineState(d3d12::GraphicsShaderParams&& shaderParams, d3d12::GraphicsPipelineStateParams&& pipelineStateParams);
+    std::shared_ptr<d3d12::GraphicsPipelineState>
+    createPipelineState(d3d12::GraphicsShaderParams&& shaderParams,
+                        d3d12::GraphicsPipelineStateParams&& pipelineStateParams);
 
 private:
     struct TextureBindingDesc
@@ -135,6 +137,8 @@ private:
     std::shared_ptr<d3d12::Buffer> mFrameConstantBuffer;
 
     bool mInitialized = false;
+
+    std::string mStringBuffer;
 };
 
 class RenderScene

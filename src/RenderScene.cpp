@@ -78,7 +78,7 @@ RasterRenderer::RasterRenderer(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "
     createRenderTargets();
     createRootSignature();
     createFrameConstantBuffer();
-    
+
     d3d12::DeviceContext& deviceContext = d3d12::DeviceContext::instance();
     deviceContext.getCopyContext().execute();
 
@@ -288,13 +288,13 @@ void RasterRenderer::render(const FrameInfo& frameInfo, const RenderParams& rend
         for(RenderObject& renderObject : renderParams.renderObjects)
         {
             bindTextures(renderObject.mMaterial);
-            d3d12::drawIndexed(mCommandList,
-                               d3d12::DrawIndexedParams{.indexBuffer = renderObject.mGpuMesh->getIndexBuffer().get(),
-                                                        .pipelineState = renderObject.mMaterial.mRasterPipelineState.get(),
-                                                        .vertexBuffers = renderObject.mGpuMesh->getVertexElements(),
-                                                        .primitiveTopology = renderObject.mGpuMesh->getPrimitiveTopology(),
-                                                        .indexCount = renderObject.mGpuMesh->getIndexCount(),
-                                                        .instanceCount = 1});
+            d3d12::drawIndexed(mCommandList, d3d12::DrawIndexedParams{
+                                                 .indexBuffer = renderObject.mGpuMesh->getIndexBuffer().get(),
+                                                 .pipelineState = renderObject.mMaterial.mRasterPipelineState.get(),
+                                                 .vertexBuffers = renderObject.mGpuMesh->getVertexElements(),
+                                                 .primitiveTopology = renderObject.mGpuMesh->getPrimitiveTopology(),
+                                                 .indexCount = renderObject.mGpuMesh->getIndexCount(),
+                                                 .instanceCount = 1});
         }
 
         // Indicate that the back buffer will now be used to present.
@@ -312,11 +312,13 @@ void RasterRenderer::endFrame()
     mCommandList.endFrame();
 }
 
-std::shared_ptr<d3d12::GraphicsPipelineState> RasterRenderer::createPipelineState(d3d12::GraphicsShaderParams && shaderParams, d3d12::GraphicsPipelineStateParams && pipelineStateParams)
+std::shared_ptr<d3d12::GraphicsPipelineState>
+RasterRenderer::createPipelineState(d3d12::GraphicsShaderParams&& shaderParams,
+                                    d3d12::GraphicsPipelineStateParams&& pipelineStateParams)
 {
     pipelineStateParams.rootSignature = mRootSignature;
     pipelineStateParams.shader = std::make_shared<d3d12::GraphicsShader>(std::move(shaderParams));
-    pipelineStateParams.renderTargetFormats = { DXGI_FORMAT_R8G8B8A8_UNORM };
+    pipelineStateParams.renderTargetFormats = {DXGI_FORMAT_R8G8B8A8_UNORM};
     pipelineStateParams.depthStencilFormat = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
 
     return d3d12::DeviceContext::instance().createGraphicsPipelineState(std::move(pipelineStateParams));
@@ -325,7 +327,8 @@ std::shared_ptr<d3d12::GraphicsPipelineState> RasterRenderer::createPipelineStat
 //=====================================
 // RayTraceScene
 //=====================================
-RaytracingRenderer::RaytracingRenderer(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "RaytracingRenderer Command List")
+RaytracingRenderer::RaytracingRenderer()
+    : mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "RaytracingRenderer Command List")
 {
     mCommandList.beginRecording();
 
@@ -376,12 +379,16 @@ void RaytracingRenderer::preRender(const FrameInfo& frameInfo, const RenderParam
     mCommandList.beginRecording();
 
     {
+        d3d12::ScopedGpuEvent gpuEvent(mCommandList.get(), "Update Constant Buffers");
+
         d3d12::GpuBufferWriteGuard<d3d12::Buffer> writeGuard(*mFrameConstantBuffer, mCommandList.get());
         auto frameCbSpan = writeGuard.getWriteBufferAs<FrameConstantBuffer>();
         frameCbSpan.front() = renderParams.frameConstants;
     }
 
     if(!mShaderTable->isReady()) { return; }
+
+    d3d12::ScopedGpuEvent updateMaterialsEvent(mCommandList.get(), "Update Materials");
     struct BindlessIndices
     {
         std::array<uint32_t, d3d12::kMaxBindlessResources> resourceIndices = {};
@@ -392,6 +399,10 @@ void RaytracingRenderer::preRender(const FrameInfo& frameInfo, const RenderParam
 
     for(RenderObject& renderObject : renderParams.renderObjects)
     {
+        mStringBuffer.clear();
+        fmt::format_to(std::back_inserter(mStringBuffer), "{} {}", renderObject.name, renderObject.mId.value());
+        d3d12::ScopedGpuEvent renderObjectEvent(mCommandList.get(), mStringBuffer);
+
         std::shared_ptr<d3d12::BLAccelerationStructure>& blas = renderObject.mGpuMesh->accessBlas();
         if(blas->getBuildState() == d3d12::AccelerationStructureState::Invalid) { blas->build(mCommandList); }
 
@@ -479,14 +490,16 @@ void RaytracingRenderer::render(const FrameInfo& frameInfo, const RenderParams& 
 {
     d3d12::DeviceContext& d3d12Context = d3d12::DeviceContext::instance();
 
-    mTlas->build(mCommandList);
-
-    auto DispatchRays = [&](ID3D12GraphicsCommandList4* commandList, ID3D12StateObject* stateObject,
-                            D3D12_DISPATCH_RAYS_DESC* dispatchDesc) { mShaderTable->markAsUsed(commandList); };
+    {
+        d3d12::ScopedGpuEvent buildTlasEvent(mCommandList.get(), "Build TLAS");
+        mTlas->build(mCommandList);
+    }
 
     mCommandList.get()->SetComputeRootSignature(mGlobalRootSignature.Get());
 
     {
+        d3d12::ScopedGpuEvent mainPassEvent(mCommandList.get(), "Main Pass");
+
         std::array<d3d12::TLAccelerationStructure*, 1> accelerationStructures{mTlas.get()};
         std::array<d3d12::Texture*, 1> rwTextures{mRenderTarget.get()};
 
@@ -503,22 +516,26 @@ void RaytracingRenderer::render(const FrameInfo& frameInfo, const RenderParams& 
                                                                     .dimensions = {windowSize.x, windowSize.y, 1}});
     }
 
-    D3D12_RESOURCE_BARRIER preCopyBarriers[2];
-    preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(
-        d3d12Context.getBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST);
-    preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(
-        mRenderTarget->getResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    mCommandList.get()->ResourceBarrier(ARRAYSIZE(preCopyBarriers), preCopyBarriers);
+    {
+        d3d12::ScopedGpuEvent presentEvent(mCommandList.get(), "Copy To Backbuffer");
 
-    mCommandList.get()->CopyResource(d3d12Context.getBackBuffer(), mRenderTarget->getResource());
+        D3D12_RESOURCE_BARRIER preCopyBarriers[2];
+        preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(
+            d3d12Context.getBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST);
+        preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(
+            mRenderTarget->getResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        mCommandList.get()->ResourceBarrier(ARRAYSIZE(preCopyBarriers), preCopyBarriers);
 
-    D3D12_RESOURCE_BARRIER postCopyBarriers[2];
-    postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(
-        d3d12Context.getBackBuffer(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
-    postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(
-        mRenderTarget->getResource(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        mCommandList.get()->CopyResource(d3d12Context.getBackBuffer(), mRenderTarget->getResource());
 
-    mCommandList.get()->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
+        D3D12_RESOURCE_BARRIER postCopyBarriers[2];
+        postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(
+            d3d12Context.getBackBuffer(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+        postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(
+            mRenderTarget->getResource(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+        mCommandList.get()->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
+    }
 
     mCommandList.execute(d3d12::DeviceContext::instance().getGraphicsContext().getCommandQueue());
 }
@@ -998,6 +1015,7 @@ bool RenderScene::createRenderObject()
     mTexture = createTexture();
 
     RenderObject renderObject{RenderObjectId(mNextRenderObjectId++)};
+    renderObject.name = SharedString("Cube");
     renderObject.mGpuMesh = std::make_shared<GpuMesh>(createCube());
     renderObject.mTransform = glm::identity<glm::mat4x3>();
 
@@ -1022,8 +1040,9 @@ bool RenderScene::createRenderObject()
         pipelineStateParams.depthStencilState.StencilEnable = FALSE;
         pipelineStateParams.primitiveTopologyType =
             d3d12::TranslatePrimitiveTopologyType(renderObject.mGpuMesh->getPrimitiveTopology());
-        
-        renderObject.mMaterial.mRasterPipelineState = mRasterScene->createPipelineState(std::move(shaderParams), std::move(pipelineStateParams));
+
+        renderObject.mMaterial.mRasterPipelineState =
+            mRasterScene->createPipelineState(std::move(shaderParams), std::move(pipelineStateParams));
     }
 
     if(mRaytraceScene)
