@@ -99,6 +99,7 @@
     <ClInclude Include="src\Mouse.h" />
     <ClInclude Include="src\PrimitiveMesh.h" />
     <ClInclude Include="src\RenderDefs.h" />
+    <ClInclude Include="src\RenderObject.h" />
     <ClInclude Include="src\RenderScene.h" />
     <ClInclude Include="src\SharedString.h" />
     <ClInclude Include="src\SpanUtility.h" />

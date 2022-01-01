@@ -59,6 +59,8 @@ void BLAccelerationStructure::addMesh(std::span<const BLAccelerationStructureGeo
 
 bool BLAccelerationStructure::build(const GraphicsCommandList& commandList)
 {
+    mState = AccelerationStructureState::Building;
+
     ID3D12Device5* device = DeviceContext::instance().getDevice5();
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
@@ -104,6 +106,8 @@ bool BLAccelerationStructure::build(const GraphicsCommandList& commandList)
     commandList.get4()->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
 
     mScratchBuffer.markAsUsed(commandList.get());
+
+    mState = AccelerationStructureState::Built;
 
     return true;
 }

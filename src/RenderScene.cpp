@@ -69,35 +69,29 @@ SerializeAndCreateRootSignature(const D3D12_VERSIONED_ROOT_SIGNATURE_DESC& desc)
 }
 
 //=====================================
-// RasterScene
+// RasterRenderer
 //=====================================
-RasterScene::RasterScene(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "RasterScene Command List")
+RasterRenderer::RasterRenderer(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "RasterRenderer Command List")
 {
     mCommandList.beginRecording();
 
     createRenderTargets();
     createRootSignature();
     createFrameConstantBuffer();
-    createTriangle();
-    createCube();
-    createTexture();
-
+    
     d3d12::DeviceContext& deviceContext = d3d12::DeviceContext::instance();
     deviceContext.getCopyContext().execute();
 
     mCommandList.execute(deviceContext.getGraphicsContext().getCommandQueue());
 
-    if(!loadShaders()) { return; }
-
-    mCamera.setPosition(glm::vec3(0.0f, 0.0f, -5.0f));
     mInitialized = true;
 }
 
-RasterScene::RasterScene(RasterScene&&) = default;
+RasterRenderer::RasterRenderer(RasterRenderer&&) = default;
 
-RasterScene::~RasterScene() = default;
+RasterRenderer::~RasterRenderer() = default;
 
-bool RasterScene::createRootSignature()
+bool RasterRenderer::createRootSignature()
 {
     d3d12::DeviceContext& deviceContext = d3d12::DeviceContext::instance();
 
@@ -171,73 +165,7 @@ bool RasterScene::createRootSignature()
     return true;
 }
 
-bool RasterScene::loadShaders()
-{
-    { // hello triangle
-        d3d12::GraphicsShaderParams shaderParams;
-        shaderParams.filepaths[(size_t)GraphicsShaderStage::Vertex] = L"assets\\hello_triangle.hlsl";
-        shaderParams.filepaths[(size_t)GraphicsShaderStage::Pixel] = L"assets\\hello_triangle.hlsl";
-        shaderParams.entryPoints[(size_t)GraphicsShaderStage::Vertex] = "VSMain";
-        shaderParams.entryPoints[(size_t)GraphicsShaderStage::Pixel] = "PSMain";
-        shaderParams.stages = GraphicsShaderStageMask::VsPs;
-#ifdef _DEBUG
-        shaderParams.debug = true;
-#endif
-
-        // Describe and create the graphics pipeline state object (PSO).
-        {
-            d3d12::GraphicsPipelineStateParams psoParams = {};
-            psoParams.rootSignature = mRootSignature.Get();
-            psoParams.shader = std::make_shared<d3d12::GraphicsShader>(std::move(shaderParams));
-            psoParams.rasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-            psoParams.rasterizerState.FrontCounterClockwise = true;
-            psoParams.blendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-            psoParams.depthStencilState.DepthEnable = FALSE;
-            psoParams.depthStencilState.StencilEnable = FALSE;
-            psoParams.primitiveTopologyType =
-                d3d12::TranslatePrimitiveTopologyType(mTriangleMesh.getPrimitiveTopology());
-            psoParams.renderTargetFormats = {DXGI_FORMAT_R8G8B8A8_UNORM};
-
-            mHelloTrianglePso = d3d12::DeviceContext::instance().createGraphicsPipelineState(std::move(psoParams));
-        }
-    }
-
-    { // hello cube
-        d3d12::GraphicsShaderParams shaderParams;
-        shaderParams.filepaths[(size_t)GraphicsShaderStage::Vertex] = L"assets\\hello_cube.hlsl";
-        shaderParams.filepaths[(size_t)GraphicsShaderStage::Pixel] = L"assets\\hello_cube.hlsl";
-        shaderParams.entryPoints[(size_t)GraphicsShaderStage::Vertex] = "VSMain";
-        shaderParams.entryPoints[(size_t)GraphicsShaderStage::Pixel] = "PSMain";
-        shaderParams.stages = GraphicsShaderStageMask::VsPs;
-#ifdef _DEBUG
-        shaderParams.debug = true;
-#endif
-
-        // Describe and create the graphics pipeline state object (PSO).
-        {
-            d3d12::GraphicsPipelineStateParams psoParams = {};
-            psoParams.rootSignature = mRootSignature;
-            psoParams.shader = std::make_shared<d3d12::GraphicsShader>(std::move(shaderParams));
-            psoParams.rasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-            psoParams.rasterizerState.FrontCounterClockwise = true;
-            psoParams.blendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-            psoParams.depthStencilState.DepthEnable = TRUE;
-            psoParams.depthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-            psoParams.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-            psoParams.depthStencilState.StencilEnable = FALSE;
-            psoParams.primitiveTopologyType =
-                d3d12::TranslatePrimitiveTopologyType(mTriangleMesh.getPrimitiveTopology());
-            psoParams.renderTargetFormats = {DXGI_FORMAT_R8G8B8A8_UNORM};
-            psoParams.depthStencilFormat = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
-
-            mHelloCubePso = d3d12::DeviceContext::instance().createGraphicsPipelineState(std::move(psoParams));
-        }
-    }
-
-    return true;
-}
-
-void RasterScene::createRenderTargets()
+void RasterRenderer::createRenderTargets()
 {
     // Currently using the swap chain as our render targets. Just need the depth/stencil buffer
     d3d12::TextureParams params = {};
@@ -264,7 +192,7 @@ void RasterScene::createRenderTargets()
     mDepthStencilTexture = std::move(depthStencilTexture);
 }
 
-void RasterScene::createFrameConstantBuffer()
+void RasterRenderer::createFrameConstantBuffer()
 {
     d3d12::BufferSimpleParams params;
     params.accessFlags = ResourceAccessFlags::CpuWrite | ResourceAccessFlags::GpuRead;
@@ -278,190 +206,39 @@ void RasterScene::createFrameConstantBuffer()
     mFrameConstantBuffer = std::move(constantBuffer);
 }
 
-void RasterScene::createTriangle()
-{
-    { // Positions
-        d3d12::BufferFormattedParams params;
-        params.format = gpufmt::Format::R32G32_SFLOAT;
-        params.numElements = 3;
-        params.accessFlags = ResourceAccessFlags::GpuRead;
-        params.name = "Triangle Positions Buffer";
+RasterRenderer& RasterRenderer::operator=(RasterRenderer&&) = default;
 
-        std::array<glm::vec2, 3> vertices{{{-0.5f, -0.5f}, {0.5f, -0.5f}, {0.0f, 0.5f}}};
-        mTriangleMesh.createVertexElement(ShaderVertexSemantic::Position, 0, params,
-                                          std::as_bytes(std::span(vertices)));
-    }
-
-    { // UVs
-        d3d12::BufferFormattedParams params;
-        params.format = gpufmt::Format::R32G32_SFLOAT;
-        params.numElements = 3;
-        params.accessFlags = ResourceAccessFlags::GpuRead;
-        params.name = "Triangle TexCoords Buffer";
-
-        std::array<glm::vec2, 3> vertices{{{0.0f, 1.0f}, {1.0f, 1.0f}, {0.5f, 0.0f}}};
-        mTriangleMesh.createVertexElement(ShaderVertexSemantic::TexCoord, 0, params,
-                                          std::as_bytes(std::span(vertices)));
-    }
-
-    { // Colors
-        d3d12::BufferFormattedParams params;
-        params.format = gpufmt::Format::R32G32B32A32_SFLOAT;
-        params.numElements = 3;
-        params.accessFlags = ResourceAccessFlags::GpuRead;
-        params.name = "Triangle TexCoords Buffer";
-
-        std::array<glm::vec4, 3> vertices{{{1.0f, 0.0, 0.0, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}};
-        mTriangleMesh.createVertexElement(ShaderVertexSemantic::Color, 0, params, std::as_bytes(std::span(vertices)));
-    }
-
-    { // Indices
-        GpuMesh::IndexBufferParams params;
-        params.format = IndexBufferFormat::UInt16;
-        params.numIndices = 3;
-        params.accessFlags = ResourceAccessFlags::GpuRead;
-        params.initialResourceState = D3D12_RESOURCE_STATE_COMMON;
-        params.name = "Triangle Index Buffer";
-
-        std::array<uint16_t, 3> indices{0, 1, 2};
-        mTriangleMesh.initIndices(params, std::as_bytes(std::span(indices)));
-    }
-}
-
-void RasterScene::createTexture()
-{
-    cputex::TextureParams textureParams;
-    textureParams.dimension = cputex::TextureDimension::Texture2D;
-    textureParams.extent = {1024, 1024, 1};
-    textureParams.faces = 1;
-    textureParams.mips = cputex::maxMips(textureParams.extent);
-    textureParams.arraySize = 1;
-    textureParams.format = gpufmt::Format::R8G8B8A8_UNORM;
-    cputex::UniqueTexture cpuTexture{textureParams};
-
-    //-------------------------------------
-    // Generate a checkboard texture
-    //-------------------------------------
-    for(uint32_t mip = 0; mip < textureParams.mips; ++mip)
-    {
-        cputex::SurfaceSpan surface = cpuTexture.accessMipSurface(0, 0, mip);
-        const UINT bytesPerPixel = gpufmt::formatInfo(textureParams.format).blockByteSize;
-        const UINT rowPitch = surface.extent().x * bytesPerPixel;
-        const UINT cellPitch = std::max(rowPitch >> 3, 1u); // The width of a cell in the checkboard texture.
-        const UINT cellHeight =
-            std::max(surface.extent().x >> 3,
-                     std::max(cellPitch / bytesPerPixel, 1u)); // The height of a cell in the checkerboard texture.
-        const UINT textureSize = static_cast<UINT>(surface.sizeInBytes());
-
-        UINT8* pData = surface.accessDataAs<UINT8>().data();
-
-        for(UINT n = 0; n < textureSize; n += bytesPerPixel)
-        {
-            UINT x = n % rowPitch;
-            UINT y = n / rowPitch;
-            UINT i = x / cellPitch;
-            UINT j = y / cellHeight;
-
-            if(i % 2 == j % 2)
-            {
-                pData[n] = 0x00;     // R
-                pData[n + 1] = 0x00; // G
-                pData[n + 2] = 0x00; // B
-                pData[n + 3] = 0xff; // A
-            }
-            else
-            {
-                pData[n] = 0xff;     // R
-                pData[n + 1] = 0xff; // G
-                pData[n + 2] = 0xff; // B
-                pData[n + 3] = 0xff; // A
-            }
-        }
-    }
-
-    auto texture = std::make_unique<d3d12::Texture>();
-    texture->initFromMemory(cpuTexture, ResourceAccessFlags::GpuRead, "Firsrt Texture");
-    mTexture = std::move(texture);
-}
-
-void RasterScene::createCube()
-{
-    constexpr uint32_t subdivisions = 1;
-    MeshSizes meshSizes = CalculateCubeMeshSizes(CubeMeshTopologyType::Triangle, subdivisions);
-
-    CpuMesh cubeMesh(GetCubeMeshPrimitiveTopology(CubeMeshTopologyType::Triangle));
-    cubeMesh.initIndices(IndexBufferFormat::UInt16, meshSizes.indexCount);
-    cubeMesh.createVertexElement(ShaderVertexSemantic::Position, 0, gpufmt::Format::R32G32B32_SFLOAT,
-                                 meshSizes.vertexCount);
-    cubeMesh.createVertexElement(ShaderVertexSemantic::Normal, 0, gpufmt::Format::R32G32B32_SFLOAT,
-                                 meshSizes.vertexCount);
-    cubeMesh.createVertexElement(ShaderVertexSemantic::Tangent, 0, gpufmt::Format::R32G32B32_SFLOAT,
-                                 meshSizes.vertexCount);
-    cubeMesh.createVertexElement(ShaderVertexSemantic::Binormal, 0, gpufmt::Format::R32G32B32_SFLOAT,
-                                 meshSizes.vertexCount);
-    cubeMesh.createVertexElement(ShaderVertexSemantic::TexCoord, 0, gpufmt::Format::R32G32_SFLOAT,
-                                 meshSizes.vertexCount);
-
-    PrimitiveMesh3dParams primitiveParams(cubeMesh);
-    GenerateCubeMeshTris(primitiveParams, subdivisions);
-
-    mCubeMesh = GpuMesh(cubeMesh, ResourceAccessFlags::GpuRead, "Cube");
-}
-
-RasterScene& RasterScene::operator=(RasterScene&&) = default;
-
-void RasterScene::preRender(const FrameInfo& frameInfo)
-{
-    mCamera.update(frameInfo);
-
-    const glm::ivec2 windowSize = frameInfo.mainWindow->getDrawableSize();
-
-    const glm::mat4x4 worldToViewMat = mCamera.worldToViewMatrix();
-    const glm::mat4x4 viewToClipMat =
-        glm::perspectiveFovLH_ZO(1.04719f, (float)windowSize.x, (float)windowSize.y, 0.1f, 100.0f);
-    const glm::mat4x4 worldToClipMat = viewToClipMat * worldToViewMat;
-
-    // This function is called before the copy context command list is executed for the frame.
-
-    // Update relevant constant buffers on the copy context command list so they are ready before the frame is rendered.
-    {
-        d3d12::GpuBufferWriteGuard writeGuard(*mFrameConstantBuffer.get(),
-                                              d3d12::DeviceContext::instance().getCopyContext().getCommandList());
-
-        std::span<FrameConstantBuffer> buffer = writeGuard.getWriteBufferAs<FrameConstantBuffer>();
-        buffer.front().time = std::chrono::duration_cast<std::chrono::duration<float>>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
-                                  .count();
-        buffer.front().frameTimeDelta = frameInfo.frameDeltaSec.count();
-        buffer.front().worldToView = glm::transpose(worldToViewMat);
-        buffer.front().worldToClip = glm::transpose(worldToClipMat);
-        buffer.front().viewToClip = glm::transpose(viewToClipMat);
-    }
-}
-
-void RasterScene::bindTextures(d3d12::GraphicsPipelineState& pso, std::span<TextureBindingDesc> textures)
-{
-    const d3d12::GraphicsShader& shader = *pso.getShader();
-
-    { // bind resources
-        for(const TextureBindingDesc& textureBindingDesc : textures)
-        {
-            const uint32_t textureIndex =
-                shader
-                    .getResourceIndex(textureBindingDesc.nameHash, ShaderResourceType::Texture,
-                                      textureBindingDesc.texture->getShaderResourceDimension())
-                    .value_or(d3d12::kMaxBindlessResources);
-            mCommandList.setBindlessResource(textureIndex, mTexture->getSrvDescriptorHeapIndex());
-        }
-    }
-}
-
-void RasterScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context)
+void RasterRenderer::preRender(const FrameInfo& frameInfo, const RenderParams& renderParams)
 {
     mCommandList.beginRecording();
 
     {
-        d3d12::ScopedGpuEvent gpuEvent(mCommandList.get(), "RasterScene");
+        d3d12::GpuBufferWriteGuard<d3d12::Buffer> writeGuard(*mFrameConstantBuffer, mCommandList.get());
+        auto frameCbSpan = writeGuard.getWriteBufferAs<FrameConstantBuffer>();
+        frameCbSpan.front() = renderParams.frameConstants;
+    }
+}
+
+void RasterRenderer::bindTextures(Material& material)
+{
+    const d3d12::GraphicsShader& shader = *material.mRasterPipelineState->getShader();
+
+    // bind resources
+    for(const auto& [key, texture] : material.textures)
+    {
+        const uint32_t textureIndex =
+            shader.getResourceIndex(key, ShaderResourceType::Texture, texture->getShaderResourceDimension())
+                .value_or(d3d12::kMaxBindlessResources);
+        mCommandList.setBindlessResource(textureIndex, texture->getSrvDescriptorHeapIndex());
+    }
+}
+
+void RasterRenderer::render(const FrameInfo& frameInfo, const RenderParams& renderParams)
+{
+    d3d12::DeviceContext& d3d12Context = d3d12::DeviceContext::instance();
+
+    {
+        d3d12::ScopedGpuEvent gpuEvent(mCommandList.get(), "RasterRenderer");
 
         D3D12_VIEWPORT viewport{};
         viewport.TopLeftX = 0.0f;
@@ -508,15 +285,17 @@ void RasterScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12
         mCommandList.get()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
         mCommandList.get()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-        std::array<TextureBindingDesc, 1> textureBindings = {
-            TextureBindingDesc{std::hash<std::string_view>()("Texture"), mTexture.get()}};
-        bindTextures(*mHelloCubePso, textureBindings);
-        d3d12::drawIndexed(mCommandList, d3d12::DrawIndexedParams{.indexBuffer = mCubeMesh.getIndexBuffer().get(),
-                                                                  .pipelineState = mHelloCubePso.get(),
-                                                                  .vertexBuffers = mCubeMesh.getVertexElements(),
-                                                                  .primitiveTopology = mCubeMesh.getPrimitiveTopology(),
-                                                                  .indexCount = mCubeMesh.getIndexCount(),
-                                                                  .instanceCount = 1});
+        for(RenderObject& renderObject : renderParams.renderObjects)
+        {
+            bindTextures(renderObject.mMaterial);
+            d3d12::drawIndexed(mCommandList,
+                               d3d12::DrawIndexedParams{.indexBuffer = renderObject.mGpuMesh->getIndexBuffer().get(),
+                                                        .pipelineState = renderObject.mMaterial.mRasterPipelineState.get(),
+                                                        .vertexBuffers = renderObject.mGpuMesh->getVertexElements(),
+                                                        .primitiveTopology = renderObject.mGpuMesh->getPrimitiveTopology(),
+                                                        .indexCount = renderObject.mGpuMesh->getIndexCount(),
+                                                        .instanceCount = 1});
+        }
 
         // Indicate that the back buffer will now be used to present.
         renderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
@@ -528,19 +307,27 @@ void RasterScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12
     mCommandList.execute(d3d12Context.getGraphicsContext().getCommandQueue());
 }
 
-void RasterScene::endFrame()
+void RasterRenderer::endFrame()
 {
     mCommandList.endFrame();
+}
+
+std::shared_ptr<d3d12::GraphicsPipelineState> RasterRenderer::createPipelineState(d3d12::GraphicsShaderParams && shaderParams, d3d12::GraphicsPipelineStateParams && pipelineStateParams)
+{
+    pipelineStateParams.rootSignature = mRootSignature;
+    pipelineStateParams.shader = std::make_shared<d3d12::GraphicsShader>(std::move(shaderParams));
+    pipelineStateParams.renderTargetFormats = { DXGI_FORMAT_R8G8B8A8_UNORM };
+    pipelineStateParams.depthStencilFormat = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+
+    return d3d12::DeviceContext::instance().createGraphicsPipelineState(std::move(pipelineStateParams));
 }
 
 //=====================================
 // RayTraceScene
 //=====================================
-RaytracingScene::RaytracingScene(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "RaytracingScene Command List")
+RaytracingRenderer::RaytracingRenderer(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, "RaytracingRenderer Command List")
 {
     mCommandList.beginRecording();
-
-    createTexture();
 
     if(!createRenderTargets())
     {
@@ -554,15 +341,9 @@ RaytracingScene::RaytracingScene(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT,
         return;
     }
 
-    if(!createPipelineState())
+    if(!createInternalPipelineStates())
     {
         spdlog::critical("Failed to create raytracing pipeline state.");
-        return;
-    }
-
-    if(!buildGeometry())
-    {
-        spdlog::critical("Failed to create raytracing geometry.");
         return;
     }
 
@@ -583,101 +364,120 @@ RaytracingScene::RaytracingScene(): mCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT,
 
     mCommandList.execute(d3d12::DeviceContext::instance().getGraphicsContext().getCommandQueue());
 
-    mCamera.setPosition(glm::vec3(0.0f, 0.0f, -5.0f));
-
     mInitialized = true;
 }
 
-RaytracingScene::RaytracingScene(RaytracingScene&&) = default;
-RaytracingScene::~RaytracingScene() = default;
-RaytracingScene& RaytracingScene::operator=(RaytracingScene&&) = default;
+RaytracingRenderer::RaytracingRenderer(RaytracingRenderer&&) = default;
+RaytracingRenderer::~RaytracingRenderer() = default;
+RaytracingRenderer& RaytracingRenderer::operator=(RaytracingRenderer&&) = default;
 
-void RaytracingScene::preRender(const FrameInfo& frameInfo)
+void RaytracingRenderer::preRender(const FrameInfo& frameInfo, const RenderParams& renderParams)
 {
-    mCamera.update(frameInfo);
-    const auto windowSize = frameInfo.mainWindow->getSize();
+    mCommandList.beginRecording();
 
     {
-        const glm::mat4x4 worldToViewMat = mCamera.worldToViewMatrix();
-        const glm::mat4x4 viewToWorldMat = glm::inverse(worldToViewMat);
-        const glm::mat4x4 viewToClipMat =
-            glm::perspectiveFovLH_ZO(1.04719f, (float)windowSize.x, (float)windowSize.y, 0.1f, 100.0f);
-        const glm::mat4x4 clipToViewMat = glm::inverse(viewToClipMat);
-        const glm::mat4x4 worldToClipMat = viewToClipMat * worldToViewMat;
-        const glm::mat4x4 clipToWorldMat = glm::inverse(worldToClipMat);
-
-        d3d12::GpuBufferWriteGuard<d3d12::Buffer> writeGuard(
-            *mFrameConstantBuffer, d3d12::DeviceContext::instance().getCopyContext().getCommandList());
+        d3d12::GpuBufferWriteGuard<d3d12::Buffer> writeGuard(*mFrameConstantBuffer, mCommandList.get());
         auto frameCbSpan = writeGuard.getWriteBufferAs<FrameConstantBuffer>();
-
-        FrameConstantBuffer& frameCb = frameCbSpan[0];
-        frameCb.worldToView = glm::transpose(worldToViewMat);
-        frameCb.viewToWorld = glm::transpose(viewToWorldMat);
-        frameCb.viewToClip = glm::transpose(viewToClipMat);
-        frameCb.clipToView = glm::transpose(clipToViewMat);
-        frameCb.worldToClip = glm::transpose(worldToClipMat);
-        frameCb.clipToWorld = glm::transpose(clipToWorldMat);
-        frameCb.cameraWorldPos = mCamera.getPosition();
-        frameCb.time = std::chrono::duration_cast<std::chrono::duration<float>>(
-                           std::chrono::steady_clock::now().time_since_epoch())
-                           .count();
-        frameCb.frameTimeDelta = frameInfo.frameDeltaSec.count();
+        frameCbSpan.front() = renderParams.frameConstants;
     }
 
+    if(!mShaderTable->isReady()) { return; }
+    struct BindlessIndices
     {
-        struct BindlessIndices
+        std::array<uint32_t, d3d12::kMaxBindlessResources> resourceIndices = {};
+        std::array<uint32_t, d3d12::kMaxBindlessVertexBuffers> vertexBufferIndices = {};
+    } bindlessIndices;
+
+    mShaderTable->beginUpdate(mCommandList);
+
+    for(RenderObject& renderObject : renderParams.renderObjects)
+    {
+        std::shared_ptr<d3d12::BLAccelerationStructure>& blas = renderObject.mGpuMesh->accessBlas();
+        if(blas->getBuildState() == d3d12::AccelerationStructureState::Invalid) { blas->build(mCommandList); }
+
+        if(!renderObject.mInstanceAllocation.isValid())
         {
-            std::array<uint32_t, d3d12::kMaxBindlessResources> resourceIndices = {};
-            std::array<uint32_t, d3d12::kMaxBindlessVertexBuffers> vertexBufferIndices = {};
-        } bindlessIndices;
+            auto addResult = mTlas->addInstance(
+                d3d12::TLAccelerationStructureInstanceParams{.accelerationStructure = renderObject.mGpuMesh->getBlas(),
+                                                             .transform = glm::identity<glm::mat4x3>(),
+                                                             .flags = d3d12::TlasInstanceFlags::TriangleFrontCcw,
+                                                             .instanceId = renderObject.mId.value()});
+
+            if(!addResult) { continue; }
+
+            renderObject.mInstanceAllocation = std::move(addResult.value());
+        }
+
+        renderObject.mInstanceAllocation.updateTransform(renderObject.mTransform);
+
+        if(!renderObject.mMaterial.mShaderTableAllocation.isValid())
+        {
+            mDispatchPipelineState->addPipelineState(renderObject.mMaterial.mRaytracingPipelineState);
+
+            auto addResult =
+                mShaderTable->addPipelineState(renderObject.mMaterial.mRaytracingPipelineState, {}, mCommandList.get());
+
+            if(!addResult) { continue; }
+
+            renderObject.mMaterial.mShaderTableAllocation = std::move(addResult.value());
+        }
+
+        std::shared_ptr<d3d12::RaytracingShader> shader = renderObject.mMaterial.mRaytracingPipelineState->getShader();
 
         { // bind vertex buffers
             // creating an array with one more than necessary to give a slot to assign buffers not used by the
             // shader.
-            for(const d3d12::VertexBuffer& vertexElement : mCubeMesh.getVertexElements())
+            for(const d3d12::VertexBuffer& vertexElement : renderObject.mGpuMesh->getVertexElements())
             {
-                const std::optional<uint32_t> constantBufferIndex = mShader->getVertexElementIndex(
+                const std::optional<uint32_t> constantBufferIndex = shader->getVertexElementIndex(
                     RaytracingShaderStage::ClosestHit, vertexElement.semantic, vertexElement.semanticIndex);
 
                 if(!constantBufferIndex) { continue; }
                 bindlessIndices.vertexBufferIndices[constantBufferIndex.value()] =
                     vertexElement.buffer->getSrvDescriptorHeapIndex();
+
+                vertexElement.buffer->markAsUsed(mCommandList.get());
             }
         }
 
-        { // bind resources
-            const std::optional<uint32_t> textureIndex =
-                mShader->getResourceIndex(RaytracingShaderStage::ClosestHit, std::hash<std::string_view>()("Textue"),
-                                          ShaderResourceType::Texture, mTexture->getShaderResourceDimension());
-
-            if(textureIndex)
-            {
-                bindlessIndices.resourceIndices[textureIndex.value()] = mTexture->getSrvDescriptorHeapIndex();
-            }
-
-            const std::optional<uint32_t> indexBufferIndex = mShader->getResourceIndex(
-                RaytracingShaderStage::ClosestHit, std::hash<std::string_view>()("IndexBuffer"),
-                ShaderResourceType::Buffer, ShaderResourceDimension::Buffer);
+        { // bind index buffer
+            const std::optional<uint32_t> indexBufferIndex =
+                shader->getResourceIndex(RaytracingShaderStage::ClosestHit, SharedString("IndexBuffer"),
+                                         ShaderResourceType::Buffer, ShaderResourceDimension::Buffer);
 
             if(indexBufferIndex)
             {
                 bindlessIndices.resourceIndices[indexBufferIndex.value()] =
-                    mCubeMesh.getIndexBuffer()->getSrvDescriptorHeapIndex();
+                    renderObject.mGpuMesh->getIndexBuffer()->getSrvDescriptorHeapIndex();
+
+                renderObject.mGpuMesh->getIndexBuffer()->markAsUsed(mCommandList.get());
             }
         }
 
-        mHitGroupShaderTableAllocation.updateLocalRootArguments(
-            RaytracingPipelineStage::HitGroup, ToByteSpan(bindlessIndices),
-            d3d12::DeviceContext::instance().getCopyContext().getCommandList());
+        // bind resources
+        for(const auto& [key, texture] : renderObject.mMaterial.textures)
+        {
+            const std::optional<uint32_t> textureIndex =
+                shader->getResourceIndex(RaytracingShaderStage::ClosestHit, key, ShaderResourceType::Texture,
+                                         texture->getShaderResourceDimension());
+
+            if(textureIndex)
+            {
+                bindlessIndices.resourceIndices[textureIndex.value()] = texture->getSrvDescriptorHeapIndex();
+                texture->markAsUsed(mCommandList.get());
+            }
+        }
+
+        renderObject.mMaterial.mShaderTableAllocation.updateLocalRootArguments(
+            RaytracingPipelineStage::HitGroup, ToByteSpan(bindlessIndices), mCommandList.get());
     }
 
-    mCubeMeshTransform = glm::rotate(mCubeMeshTransform, 0.01f, glm::vec3(0.0f, 1.0f, 0.0f));
-    mTlasInstance.updateTransform(static_cast<glm::mat4x3>(mCubeMeshTransform));
+    mShaderTable->endUpdate(mCommandList);
 }
 
-void RaytracingScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context)
+void RaytracingRenderer::render(const FrameInfo& frameInfo, const RenderParams& renderParams)
 {
-    mCommandList.beginRecording();
+    d3d12::DeviceContext& d3d12Context = d3d12::DeviceContext::instance();
 
     mTlas->build(mCommandList);
 
@@ -723,68 +523,12 @@ void RaytracingScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d
     mCommandList.execute(d3d12::DeviceContext::instance().getGraphicsContext().getCommandQueue());
 }
 
-void RaytracingScene::endFrame()
+void RaytracingRenderer::endFrame()
 {
     mCommandList.endFrame();
 }
 
-void RaytracingScene::createTexture()
-{
-    cputex::TextureParams textureParams;
-    textureParams.dimension = cputex::TextureDimension::Texture2D;
-    textureParams.extent = {1024, 1024, 1};
-    textureParams.faces = 1;
-    textureParams.mips = cputex::maxMips(textureParams.extent);
-    textureParams.arraySize = 1;
-    textureParams.format = gpufmt::Format::R8G8B8A8_UNORM;
-    cputex::UniqueTexture cpuTexture{textureParams};
-
-    //-------------------------------------
-    // Generate a checkboard texture
-    //-------------------------------------
-    for(uint32_t mip = 0; mip < textureParams.mips; ++mip)
-    {
-        cputex::SurfaceSpan surface = cpuTexture.accessMipSurface(0, 0, mip);
-        const UINT bytesPerPixel = gpufmt::formatInfo(textureParams.format).blockByteSize;
-        const UINT rowPitch = surface.extent().x * bytesPerPixel;
-        const UINT cellPitch = std::max(rowPitch >> 3, 1u); // The width of a cell in the checkboard texture.
-        const UINT cellHeight =
-            std::max(surface.extent().x >> 3,
-                     std::max(cellPitch / bytesPerPixel, 1u)); // The height of a cell in the checkerboard texture.
-        const UINT textureSize = static_cast<UINT>(surface.sizeInBytes());
-
-        UINT8* pData = surface.accessDataAs<UINT8>().data();
-
-        for(UINT n = 0; n < textureSize; n += bytesPerPixel)
-        {
-            UINT x = n % rowPitch;
-            UINT y = n / rowPitch;
-            UINT i = x / cellPitch;
-            UINT j = y / cellHeight;
-
-            if(i % 2 == j % 2)
-            {
-                pData[n] = 0x00;     // R
-                pData[n + 1] = 0x00; // G
-                pData[n + 2] = 0x00; // B
-                pData[n + 3] = 0xff; // A
-            }
-            else
-            {
-                pData[n] = 0xff;     // R
-                pData[n + 1] = 0xff; // G
-                pData[n + 2] = 0xff; // B
-                pData[n + 3] = 0xff; // A
-            }
-        }
-    }
-
-    auto texture = std::make_unique<d3d12::Texture>();
-    texture->initFromMemory(cpuTexture, ResourceAccessFlags::GpuRead, "Firsrt Texture");
-    mTexture = std::move(texture);
-}
-
-bool RaytracingScene::createRenderTargets()
+bool RaytracingRenderer::createRenderTargets()
 {
     d3d12::DeviceContext& deviceContext = d3d12::DeviceContext::instance();
 
@@ -814,7 +558,7 @@ bool RaytracingScene::createRenderTargets()
     return true;
 }
 
-bool RaytracingScene::createRootSignatures()
+bool RaytracingRenderer::createRootSignatures()
 {
     d3d12::DeviceContext& deviceContext = d3d12::DeviceContext::instance();
 
@@ -927,7 +671,7 @@ bool RaytracingScene::createRootSignatures()
         }
 
         rootSigResult.value()->SetName(L"Closest Hit Local Root Signature");
-        mClosestHitLocalRootSignature = std::move(rootSigResult.value());
+        mLocalRootSignatures[(size_t)RaytracingShaderStage::ClosestHit] = std::move(rootSigResult.value());
         spdlog::info("Created raytracing local root signature.");
     }
 
@@ -944,7 +688,7 @@ bool RaytracingScene::createRootSignatures()
     return true;
 }
 
-bool RaytracingScene::createPipelineState()
+bool RaytracingRenderer::createInternalPipelineStates()
 {
     { // Dispatch pipeline state
         mDispatchPipelineState = std::make_unique<d3d12::RaytracingDispatchPipelineState>();
@@ -970,18 +714,18 @@ bool RaytracingScene::createPipelineState()
 #ifdef _DEBUG
         shaderParams.debug = true;
 #endif
-        mShader = std::make_shared<d3d12::RaytracingShader>(std::move(shaderParams));
+        auto shader = std::make_shared<d3d12::RaytracingShader>(std::move(shaderParams));
 
         d3d12::RaytracingPipelineStateParams pipelineStateParams;
-        pipelineStateParams.shader = mShader;
+        pipelineStateParams.shader = shader;
 
         pipelineStateParams.fixedStages[(size_t)RaytracingShaderStage::RayGen] =
-            d3d12::RaytracingPipelineStateShaderParams{.shaderEntryPointIndex = mShader->getFixedStageIndex(
+            d3d12::RaytracingPipelineStateShaderParams{.shaderEntryPointIndex = shader->getFixedStageIndex(
                                                            RaytracingShaderStage::RayGen, raygenEntryPointName)};
 
         pipelineStateParams.fixedStages[(size_t)RaytracingShaderStage::Miss] =
             d3d12::RaytracingPipelineStateShaderParams{
-                .shaderEntryPointIndex = mShader->getFixedStageIndex(RaytracingShaderStage::Miss, missEntryPointName)};
+                .shaderEntryPointIndex = shader->getFixedStageIndex(RaytracingShaderStage::Miss, missEntryPointName)};
 
         // pipelineStateParams.hitGroupName = hitGroupName;
         pipelineStateParams.primitiveType = d3d12::RaytracingPipelineStatePrimitiveType::Triangles;
@@ -993,116 +737,59 @@ bool RaytracingScene::createPipelineState()
         mDispatchPipelineState->addPipelineState(mMainPassPipelineState);
     }
 
-    { // Hit group pipeline state
-        SharedString closestHitEntryPointName("MyClosestHitShader");
-        SharedString hitGroupName("MyHitGroup");
-
-        std::array<d3d12::RaytracingFixedStageShaderEntryPoint, 1> fixedStageShaderEntryPoints = {
-            d3d12::RaytracingFixedStageShaderEntryPoint{RaytracingShaderStage::ClosestHit, closestHitEntryPointName}};
-
-        d3d12::RaytracingShaderParams shaderParams;
-        shaderParams.filepath = "assets/raytracing_basic3d.hlsl";
-        shaderParams.fixedStageEntryPoints = fixedStageShaderEntryPoints;
-
-#ifdef _DEBUG
-        shaderParams.debug = true;
-#endif
-        mShader = std::make_shared<d3d12::RaytracingShader>(std::move(shaderParams));
-
-        std::array localRootSignatures = {mClosestHitLocalRootSignature};
-        d3d12::RaytracingPipelineStateParams pipelineStateParams;
-        pipelineStateParams.shader = mShader;
-
-        pipelineStateParams.fixedStages[(size_t)RaytracingShaderStage::ClosestHit] =
-            d3d12::RaytracingPipelineStateShaderParams{
-                .localRootSignature = mClosestHitLocalRootSignature,
-                .shaderEntryPointIndex =
-                    mShader->getFixedStageIndex(RaytracingShaderStage::ClosestHit, closestHitEntryPointName),
-            };
-
-        pipelineStateParams.hitGroupName = hitGroupName;
-        pipelineStateParams.primitiveType = d3d12::RaytracingPipelineStatePrimitiveType::Triangles;
-        pipelineStateParams.maxRecursionDepth = 1;
-
-        mHitGroupPipelineState = std::make_shared<d3d12::RaytracingPipelineState>(std::move(pipelineStateParams));
-        mHitGroupPipelineState->create();
-
-        mDispatchPipelineState->addPipelineState(mHitGroupPipelineState);
-    }
-
     return true;
 }
 
-bool RaytracingScene::buildGeometry()
+std::shared_ptr<d3d12::RaytracingPipelineState>
+RaytracingRenderer::createPipelineState(d3d12::RaytracingShaderParams&& shaderParams)
 {
-    constexpr uint32_t subdivisions = 1;
-    MeshSizes meshSizes = CalculateCubeMeshSizes(CubeMeshTopologyType::Triangle, subdivisions);
+    auto shader = std::make_shared<d3d12::RaytracingShader>(std::move(shaderParams));
 
-    CpuMesh cubeMesh(GetCubeMeshPrimitiveTopology(CubeMeshTopologyType::Triangle));
-    cubeMesh.initIndices(IndexBufferFormat::UInt16, meshSizes.indexCount);
-    cubeMesh.createVertexElement(ShaderVertexSemantic::Position, 0, gpufmt::Format::R32G32B32_SFLOAT,
-                                 meshSizes.vertexCount);
-    cubeMesh.createVertexElement(ShaderVertexSemantic::Normal, 0, gpufmt::Format::R32G32B32_SFLOAT,
-                                 meshSizes.vertexCount);
-    cubeMesh.createVertexElement(ShaderVertexSemantic::Tangent, 0, gpufmt::Format::R32G32B32_SFLOAT,
-                                 meshSizes.vertexCount);
-    cubeMesh.createVertexElement(ShaderVertexSemantic::Binormal, 0, gpufmt::Format::R32G32B32_SFLOAT,
-                                 meshSizes.vertexCount);
-    cubeMesh.createVertexElement(ShaderVertexSemantic::TexCoord, 0, gpufmt::Format::R32G32_SFLOAT,
-                                 meshSizes.vertexCount);
+    d3d12::RaytracingPipelineStateParams pipelineStateParams{};
+    pipelineStateParams.shader = shader;
 
-    PrimitiveMesh3dParams primitiveParams(cubeMesh);
-    GenerateCubeMeshTris(primitiveParams, subdivisions);
+    // for now just pulling out the first shader in each stage
+    for(auto stage : Enumerator<RaytracingShaderStage>())
+    {
+        const auto* stageShaderInfo = shader->getFixedStageShader(stage, 0);
 
-    mCubeMesh = GpuMesh(cubeMesh, ResourceAccessFlags::GpuRead, "Cube");
+        if(stageShaderInfo == nullptr) { continue; }
 
-    return true;
+        pipelineStateParams.fixedStages[(size_t)stage] =
+            d3d12::RaytracingPipelineStateShaderParams{.localRootSignature = mLocalRootSignatures[(size_t)stage],
+                                                       .shaderEntryPointIndex = stageShaderInfo->index};
+    }
+
+    std::span callableShaders = shader->getCallableShaders();
+    std::vector<d3d12::RaytracingPipelineStateShaderParams> callableParams;
+    callableParams.reserve(callableShaders.size());
+
+    for(size_t i = 0; i < callableShaders.size(); ++i)
+    {
+        callableParams.emplace_back(d3d12::RaytracingPipelineStateShaderParams{.shaderEntryPointIndex = i});
+    }
+
+    std::string hitGroupName = fmt::format("{} hit group", shaderParams.filepath.generic_string());
+    pipelineStateParams.hitGroupName = hitGroupName;
+
+    auto pipelineState = std::make_shared<d3d12::RaytracingPipelineState>(std::move(pipelineStateParams));
+
+    pipelineState->create();
+
+    return pipelineState;
 }
 
-bool RaytracingScene::buildAccelerationStructures()
+bool RaytracingRenderer::buildAccelerationStructures()
 {
-    {
-        d3d12::BLAccelerationStructureParams blasParams;
-        blasParams.initialReservedObjects = 1;
-        blasParams.buildOption = d3d12::AccelerationStructureBuildOption::FastTrace;
-        blasParams.flags = d3d12::AccelerationStructureFlags::None;
-        blasParams.name = "BLAS";
+    d3d12::TLAccelerationStructureParams tlasParams;
+    tlasParams.initialReservedObjects = 1;
+    tlasParams.buildOption = d3d12::AccelerationStructureBuildOption::FastTrace;
+    tlasParams.flags = d3d12::AccelerationStructureFlags::AllowUpdates;
+    tlasParams.instanceDescs.accessFlags = ResourceAccessFlags::None;
+    tlasParams.instanceDescs.bufferFlags = d3d12::BufferFlags::None;
+    tlasParams.name = "TLAS";
 
-        mBlas = std::make_shared<d3d12::BLAccelerationStructure>(blasParams);
-
-        d3d12::BLAccelerationStructureGeometryParams geomParams;
-        geomParams.flags = d3d12::RaytracingGeometryFlags::None;
-        geomParams.indexBuffer = mCubeMesh.getIndexBuffer();
-        geomParams.vertexBuffer = mCubeMesh.getVertexBuffer(ShaderVertexSemantic::Position, 0);
-
-        mBlas->addMesh(geomParams);
-        mBlas->build(mCommandList);
-    }
-
-    {
-        d3d12::TLAccelerationStructureParams tlasParams;
-        tlasParams.initialReservedObjects = 1;
-        tlasParams.buildOption = d3d12::AccelerationStructureBuildOption::FastTrace;
-        tlasParams.flags = d3d12::AccelerationStructureFlags::AllowUpdates;
-        tlasParams.instanceDescs.accessFlags = ResourceAccessFlags::None;
-        tlasParams.instanceDescs.bufferFlags = d3d12::BufferFlags::None;
-        tlasParams.name = "TLAS";
-
-        mTlas = std::make_unique<d3d12::TLAccelerationStructure>(tlasParams);
-
-        d3d12::TLAccelerationStructureInstanceParams instanceParams;
-        instanceParams.accelerationStructure = mBlas;
-        instanceParams.flags = d3d12::TlasInstanceFlags::TriangleFrontCcw;
-        instanceParams.instanceContributionToHitGroupIndex = 0;
-        instanceParams.instanceId = 0;
-        instanceParams.instanceMask = 1;
-        instanceParams.transform = glm::identity<glm::mat4x3>();
-
-        auto instanceAddResult = mTlas->addInstance(instanceParams);
-        if(!instanceAddResult) { return false; }
-
-        mTlasInstance = std::move(instanceAddResult.value());
-    }
+    mTlas = std::make_unique<d3d12::TLAccelerationStructure>(tlasParams);
 
     return true;
 }
@@ -1113,7 +800,7 @@ constexpr std::span<const std::byte> AsBytes(const T& value)
     return std::span<const std::byte>(reinterpret_cast<const std::byte*>(&value), sizeof(T));
 }
 
-bool RaytracingScene::buildShaderTables()
+bool RaytracingRenderer::buildShaderTables()
 {
     struct RootArguments
     {
@@ -1141,13 +828,6 @@ bool RaytracingScene::buildShaderTables()
         mMainPassShaderTableAllocation = std::move(shaderTableResult.value());
     }
 
-    {
-        auto shaderTableResult =
-            mShaderTable->addPipelineState(mHitGroupPipelineState, localRootArguments, mCommandList.get());
-        if(!shaderTableResult) { return false; }
-        mHitGroupShaderTableAllocation = std::move(shaderTableResult.value());
-    }
-
     return true;
 }
 
@@ -1159,26 +839,67 @@ RenderScene::RenderScene()
 {
     d3d12::DeviceContext& deviceContext = d3d12::DeviceContext::instance();
 
-    mRasterScene = std::make_unique<RasterScene>();
+    mRasterScene = std::make_unique<RasterRenderer>();
 
-    if(deviceContext.isRaytracingSupported()) { mRaytraceScene = std::make_unique<RaytracingScene>(); }
+    if(deviceContext.isRaytracingSupported()) { mRaytraceScene = std::make_unique<RaytracingRenderer>(); }
+
+    mCamera.setPosition(glm::vec3(0.0f, 0.0f, -5.0f));
+
+    createRenderObject();
 }
 
 void RenderScene::preRender(const FrameInfo& frameInfo)
 {
-    if(mActiveScene == Scene::Raster) { mRasterScene->preRender(frameInfo); }
+    if(frameInfo.keyboard->getKeyState(SDLK_SPACE).pressedCount > 0)
+    {
+        mActiveScene = (mActiveScene == Scene::Raster) ? Scene::Raytracing : Scene::Raster;
+    }
+
+    mCamera.update(frameInfo);
+
+    mRenderObjects.front().mTransform =
+        glm::rotate(static_cast<glm::mat4x4>(mRenderObjects.front().mTransform), 0.01f, glm::vec3(0.0f, 1.0f, 0.0f));
+
+    const auto windowSize = frameInfo.mainWindow->getSize();
+
+    {
+        const glm::mat4x4 worldToViewMat = mCamera.worldToViewMatrix();
+        const glm::mat4x4 viewToWorldMat = glm::inverse(worldToViewMat);
+        const glm::mat4x4 viewToClipMat =
+            glm::perspectiveFovLH_ZO(1.04719f, (float)windowSize.x, (float)windowSize.y, 0.1f, 100.0f);
+        const glm::mat4x4 clipToViewMat = glm::inverse(viewToClipMat);
+        const glm::mat4x4 worldToClipMat = viewToClipMat * worldToViewMat;
+        const glm::mat4x4 clipToWorldMat = glm::inverse(worldToClipMat);
+
+        FrameConstantBuffer& frameCb = mRenderParams.frameConstants;
+        frameCb.worldToView = glm::transpose(worldToViewMat);
+        frameCb.viewToWorld = glm::transpose(viewToWorldMat);
+        frameCb.viewToClip = glm::transpose(viewToClipMat);
+        frameCb.clipToView = glm::transpose(clipToViewMat);
+        frameCb.worldToClip = glm::transpose(worldToClipMat);
+        frameCb.clipToWorld = glm::transpose(clipToWorldMat);
+        frameCb.cameraWorldPos = mCamera.getPosition();
+        frameCb.time = std::chrono::duration_cast<std::chrono::duration<float>>(
+                           std::chrono::steady_clock::now().time_since_epoch())
+                           .count();
+        frameCb.frameTimeDelta = frameInfo.frameDeltaSec.count();
+    }
+
+    mRenderParams.renderObjects = mRenderObjects;
+
+    if(mActiveScene == Scene::Raster) { mRasterScene->preRender(frameInfo, mRenderParams); }
     else if(mRaytraceScene != nullptr && mActiveScene == Scene::Raytracing)
     {
-        mRaytraceScene->preRender(frameInfo);
+        mRaytraceScene->preRender(frameInfo, mRenderParams);
     }
 }
 
 void RenderScene::render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context)
 {
-    if(mActiveScene == Scene::Raster) { mRasterScene->render(frameInfo, d3d12Context); }
+    if(mActiveScene == Scene::Raster) { mRasterScene->render(frameInfo, mRenderParams); }
     else if(mRaytraceScene != nullptr && mActiveScene == Scene::Raytracing)
     {
-        mRaytraceScene->render(frameInfo, d3d12Context);
+        mRaytraceScene->render(frameInfo, mRenderParams);
     }
 }
 
@@ -1190,4 +911,141 @@ void RenderScene::endFrame()
         mRaytraceScene->endFrame();
     }
 }
+
+GpuMesh RenderScene::createCube()
+{
+    constexpr uint32_t subdivisions = 1;
+    MeshSizes meshSizes = CalculateCubeMeshSizes(CubeMeshTopologyType::Triangle, subdivisions);
+
+    CpuMesh cubeMesh(GetCubeMeshPrimitiveTopology(CubeMeshTopologyType::Triangle));
+    cubeMesh.initIndices(IndexBufferFormat::UInt16, meshSizes.indexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::Position, 0, gpufmt::Format::R32G32B32_SFLOAT,
+                                 meshSizes.vertexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::Normal, 0, gpufmt::Format::R32G32B32_SFLOAT,
+                                 meshSizes.vertexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::Tangent, 0, gpufmt::Format::R32G32B32_SFLOAT,
+                                 meshSizes.vertexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::Binormal, 0, gpufmt::Format::R32G32B32_SFLOAT,
+                                 meshSizes.vertexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::TexCoord, 0, gpufmt::Format::R32G32_SFLOAT,
+                                 meshSizes.vertexCount);
+
+    PrimitiveMesh3dParams primitiveParams(cubeMesh);
+    GenerateCubeMeshTris(primitiveParams, subdivisions);
+
+    return GpuMesh(cubeMesh, ResourceAccessFlags::GpuRead, "Cube");
+}
+
+std::shared_ptr<d3d12::Texture> RenderScene::createTexture()
+{
+    cputex::TextureParams textureParams;
+    textureParams.dimension = cputex::TextureDimension::Texture2D;
+    textureParams.extent = {1024, 1024, 1};
+    textureParams.faces = 1;
+    textureParams.mips = cputex::maxMips(textureParams.extent);
+    textureParams.arraySize = 1;
+    textureParams.format = gpufmt::Format::R8G8B8A8_UNORM;
+    cputex::UniqueTexture cpuTexture{textureParams};
+
+    //-------------------------------------
+    // Generate a checkboard texture
+    //-------------------------------------
+    for(uint32_t mip = 0; mip < textureParams.mips; ++mip)
+    {
+        cputex::SurfaceSpan surface = cpuTexture.accessMipSurface(0, 0, mip);
+        const UINT bytesPerPixel = gpufmt::formatInfo(textureParams.format).blockByteSize;
+        const UINT rowPitch = surface.extent().x * bytesPerPixel;
+        const UINT cellPitch = std::max(rowPitch >> 3, 1u); // The width of a cell in the checkboard texture.
+        const UINT cellHeight =
+            std::max(surface.extent().x >> 3,
+                     std::max(cellPitch / bytesPerPixel, 1u)); // The height of a cell in the checkerboard texture.
+        const UINT textureSize = static_cast<UINT>(surface.sizeInBytes());
+
+        UINT8* pData = surface.accessDataAs<UINT8>().data();
+
+        for(UINT n = 0; n < textureSize; n += bytesPerPixel)
+        {
+            UINT x = n % rowPitch;
+            UINT y = n / rowPitch;
+            UINT i = x / cellPitch;
+            UINT j = y / cellHeight;
+
+            if(i % 2 == j % 2)
+            {
+                pData[n] = 0x00;     // R
+                pData[n + 1] = 0x00; // G
+                pData[n + 2] = 0x00; // B
+                pData[n + 3] = 0xff; // A
+            }
+            else
+            {
+                pData[n] = 0xff;     // R
+                pData[n + 1] = 0xff; // G
+                pData[n + 2] = 0xff; // B
+                pData[n + 3] = 0xff; // A
+            }
+        }
+    }
+
+    auto texture = std::make_unique<d3d12::Texture>();
+    texture->initFromMemory(cpuTexture, ResourceAccessFlags::GpuRead, "Firsrt Texture");
+
+    return texture;
+}
+
+bool RenderScene::createRenderObject()
+{
+    mTexture = createTexture();
+
+    RenderObject renderObject{RenderObjectId(mNextRenderObjectId++)};
+    renderObject.mGpuMesh = std::make_shared<GpuMesh>(createCube());
+    renderObject.mTransform = glm::identity<glm::mat4x3>();
+
+    {
+        d3d12::GraphicsShaderParams shaderParams;
+        shaderParams.filepaths[(size_t)GraphicsShaderStage::Vertex] = L"assets\\hello_cube.hlsl";
+        shaderParams.filepaths[(size_t)GraphicsShaderStage::Pixel] = L"assets\\hello_cube.hlsl";
+        shaderParams.entryPoints[(size_t)GraphicsShaderStage::Vertex] = "VSMain";
+        shaderParams.entryPoints[(size_t)GraphicsShaderStage::Pixel] = "PSMain";
+        shaderParams.stages = GraphicsShaderStageMask::VsPs;
+#ifdef _DEBUG
+        shaderParams.debug = true;
+#endif
+
+        d3d12::GraphicsPipelineStateParams pipelineStateParams = {};
+        pipelineStateParams.rasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+        pipelineStateParams.rasterizerState.FrontCounterClockwise = true;
+        pipelineStateParams.blendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+        pipelineStateParams.depthStencilState.DepthEnable = TRUE;
+        pipelineStateParams.depthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+        pipelineStateParams.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+        pipelineStateParams.depthStencilState.StencilEnable = FALSE;
+        pipelineStateParams.primitiveTopologyType =
+            d3d12::TranslatePrimitiveTopologyType(renderObject.mGpuMesh->getPrimitiveTopology());
+        
+        renderObject.mMaterial.mRasterPipelineState = mRasterScene->createPipelineState(std::move(shaderParams), std::move(pipelineStateParams));
+    }
+
+    if(mRaytraceScene)
+    {
+        d3d12::RaytracingShaderParams shaderParams;
+        shaderParams.filepath = "assets/raytracing_basic3d.hlsl";
+
+        std::array fixedStageEntryPoints{
+            d3d12::RaytracingFixedStageShaderEntryPoint{.stage = RaytracingShaderStage::ClosestHit,
+                                                        .entryPoint = SharedString("MyClosestHitShader")}};
+        shaderParams.fixedStageEntryPoints = fixedStageEntryPoints;
+
+#ifdef _DEBUG
+        shaderParams.debug = true;
+#endif
+        renderObject.mMaterial.mRaytracingPipelineState = mRaytraceScene->createPipelineState(std::move(shaderParams));
+    }
+
+    renderObject.mMaterial.textures.insert(eastl::make_pair(SharedString("Texture"), mTexture));
+    mRenderObjects.emplace_back(std::move(renderObject));
+
+    return true;
+}
+
 } // namespace scrap

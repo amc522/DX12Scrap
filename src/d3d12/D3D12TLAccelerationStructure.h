@@ -59,6 +59,8 @@ public:
 
     void updateTransform(const glm::mat4x3& transform);
 
+    bool isValid() const { return mAccelerationStructure != nullptr; }
+
 private:
     TLAccelerationStructure* mAccelerationStructure = nullptr;
     size_t mId = std::numeric_limits<size_t>::max();
@@ -73,11 +75,11 @@ struct TLAccelerationStructureInstanceParams
 {
     std::shared_ptr<BLAccelerationStructure> accelerationStructure;
     glm::mat4x3 transform = glm::identity<glm::mat4x3>();
-    TlasInstanceFlags flags;
-    uint32_t instanceId : 24;
-    uint32_t instanceMask : 8;
-    uint32_t instanceContributionToHitGroupIndex : 24;
-    uint32_t padding : 8;
+    TlasInstanceFlags flags = TlasInstanceFlags::None;
+    uint32_t instanceId : 24 = 0xffffff;
+    uint32_t instanceMask : 8 = 0xff;
+    uint32_t instanceContributionToHitGroupIndex : 24 = 0;
+    uint32_t padding : 8 = 0xff;
 };
 
 class TLAccelerationStructure

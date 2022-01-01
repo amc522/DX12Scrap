@@ -39,6 +39,11 @@ RaytracingShader::RaytracingShader(RaytracingShaderParams&& params)
                          return left.stage < right.stage;
                      });
 
+    for(size_t i = 0; i < mFixedStageShaders.size(); ++i)
+    {
+        mFixedStageShaders[i].index = i;
+    }
+
     mCallableShaders.reserve(params.callableEntryPoints.size());
 
     for(const RaytracingCallableShaderEntryPoint& entryPoint : params.callableEntryPoints)
@@ -449,7 +454,7 @@ std::optional<uint32_t> RaytracingShader::getVertexElementIndex(RaytracingShader
 }
 
 std::optional<uint32_t> RaytracingShader::getResourceIndex(RaytracingShaderStage stage,
-                                                           uint64_t nameHash,
+                                                           SharedString name,
                                                            ShaderResourceType resourceType,
                                                            ShaderResourceDimension resourceDimension) const
 {
@@ -459,8 +464,7 @@ std::optional<uint32_t> RaytracingShader::getResourceIndex(RaytracingShaderStage
 
     for(const ShaderResource& resource : shaderInfo->inputs.resources)
     {
-        if(resource.nameHash == resource.nameHash && resource.type == resourceType &&
-           resource.dimension == resourceDimension)
+        if(resource.name == name && resource.type == resourceType && resource.dimension == resourceDimension)
         {
             return resource.index;
         }

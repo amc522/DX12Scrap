@@ -6,8 +6,11 @@
 
 #include <memory>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
+
+#include <d3d12.h>
 
 namespace scrap
 {
@@ -35,7 +38,7 @@ public:
     void initIndices(const IndexBufferParams& params);
     void initIndices(const IndexBufferParams& params, std::span<const std::byte> data);
 
-    [[nodiscard]] const std::shared_ptr<d3d12::Buffer> getIndexBuffer() const { return mIndexBuffer; }
+    [[nodiscard]] const std::shared_ptr<d3d12::Buffer>& getIndexBuffer() const { return mIndexBuffer; }
 
     [[nodiscard]] uint32_t getIndexCount() const { return mIndexCount; }
     void createVertexElement(ShaderVertexSemantic semantic,
@@ -51,13 +54,20 @@ public:
 
     [[nodiscard]] std::span<const d3d12::VertexBuffer> getVertexElements() const { return mVertexElements; }
 
+    [[nodiscard]] std::shared_ptr<d3d12::BLAccelerationStructure>& accessBlas() { return mBlas; }
+    [[nodiscard]] const std::shared_ptr<d3d12::BLAccelerationStructure>& getBlas() const { return mBlas; }
+
     [[nodiscard]] bool isReady() const;
     void markAsUsed(ID3D12CommandList* commandList);
 
 private:
+    void createBlas();
+
     PrimitiveTopology mPrimitiveTopology = PrimitiveTopology::Undefined;
     std::shared_ptr<d3d12::Buffer> mIndexBuffer;
     std::vector<d3d12::VertexBuffer> mVertexElements;
+    std::shared_ptr<d3d12::BLAccelerationStructure> mBlas;
+    std::string mName;
     uint32_t mIndexCount = 0;
 };
 } // namespace scrap

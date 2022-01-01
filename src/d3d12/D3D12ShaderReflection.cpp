@@ -320,8 +320,7 @@ EnumerateBindlessConstantBufferVariables(ID3D12ShaderReflectionConstantBuffer* s
     }
 
     name = name.substr(nextSeparatorPos + 1);
-    resource.name = name;
-    resource.nameHash = std::hash<std::string_view>()(resource.name);
+    resource.name = SharedString(name);
 
     return resource;
 }

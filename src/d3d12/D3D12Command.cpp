@@ -83,6 +83,8 @@ std::optional<CommandError> dispatchRays(d3d12::GraphicsCommandList& commandList
         if(!tlas->isReady()) { return CommandError::ResourcesNotReady; }
     }
 
+    if(!params.shaderTable->isReady()) { return CommandError::ResourcesNotReady; }
+
     for(d3d12::Texture* rwTexture : params.rwTextures)
     {
         if(!rwTexture->isReady()) { return CommandError::ResourcesNotReady; }

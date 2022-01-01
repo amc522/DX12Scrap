@@ -323,8 +323,7 @@ enum class ShaderResourceReturnType
 
 struct ShaderResource
 {
-    std::string name;
-    uint64_t nameHash = 0;
+    SharedString name;
     uint32_t index = 0;
     ShaderResourceType type = ShaderResourceType::Unknown;
     ShaderResourceDimension dimension = ShaderResourceDimension::Unknown;

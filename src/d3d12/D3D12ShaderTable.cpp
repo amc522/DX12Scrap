@@ -1,10 +1,12 @@
 #include "d3d12/D3D12ShaderTable.h"
-
+#include "d3d12/D3D12Context.h"
 #include "EnumIterator.h"
 #include "d3d12/D3D12Buffer.h"
 #include "d3d12/D3D12RaytracingPipelineState.h"
+#include "d3d12/D3D12CommandList.h"
 
 #include <d3d12.h>
+#include <d3dx12.h>
 
 namespace scrap::d3d12
 {
@@ -22,8 +24,8 @@ void ShaderTable::init(const ShaderTableParams& params)
 
     BufferSimpleParams bufferParams;
     bufferParams.accessFlags = ResourceAccessFlags::CpuWrite;
-    bufferParams.flags = BufferFlags::None;
-    bufferParams.initialResourceState = D3D12_RESOURCE_STATE_COMMON;
+    bufferParams.flags = BufferFlags::NonPixelShaderResource;
+    bufferParams.initialResourceState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
     for(RaytracingPipelineStage stage : Enumerator<RaytracingPipelineStage>())
     {
@@ -108,6 +110,36 @@ void ShaderTable::deallocate(const std::shared_ptr<RaytracingPipelineState>& pip
     }
 }
 
+void ShaderTable::beginUpdate(GraphicsCommandList& commandList)
+{
+    std::array<D3D12_RESOURCE_BARRIER, (size_t)RaytracingPipelineStage::Count> barriers;
+
+    for(auto stage : Enumerator<RaytracingPipelineStage>())
+    {
+        const auto& stageTable = mShaderTables[(size_t)stage];
+        barriers[(size_t)stage] = CD3DX12_RESOURCE_BARRIER::Transition(
+            stageTable.shaderTableBuffer->getResource(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+            D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+    }
+
+    commandList.get()->ResourceBarrier((uint32_t)barriers.size(), barriers.data());
+}
+
+void ShaderTable::endUpdate(GraphicsCommandList & commandList)
+{
+    std::array<D3D12_RESOURCE_BARRIER, (size_t)RaytracingPipelineStage::Count> barriers;
+
+    for(auto stage : Enumerator<RaytracingPipelineStage>())
+    {
+        const auto& stageTable = mShaderTables[(size_t)stage];
+        barriers[(size_t)stage] = CD3DX12_RESOURCE_BARRIER::Transition(
+            stageTable.shaderTableBuffer->getResource(),
+            D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+    }
+
+    commandList.get()->ResourceBarrier((uint32_t)barriers.size(), barriers.data());
+}
+
 void ShaderTable::updateLocalRootArguments(RaytracingPipelineStage stage,
                                            size_t index,
                                            std::span<const std::byte> localRootArguments,
@@ -190,6 +222,16 @@ void ShaderTable::markAsUsed(ID3D12CommandQueue* commandQueue)
     {
         pipelineState.pipelineState->markAsUsed(commandQueue);
     }
+}
+
+bool ShaderTable::isReady() const
+{
+    for(const StageShaderTable& stageShaderTable : mShaderTables)
+    {
+        if(!stageShaderTable.shaderTableBuffer->isReady()) { return false; }
+    }
+
+    return true;
 }
 
 ShaderTableAllocation& ShaderTableAllocation::operator=(ShaderTableAllocation&& other)

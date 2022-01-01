@@ -650,6 +650,12 @@ public:
         return !operator==(left, right);
     }
 
+    friend bool operator<(const BasicSharedString<CharT, TraitsT>& left,
+                          const BasicSharedString<CharT, TraitsT>& right)
+    {
+        return left.hash() < right.hash();
+    }
+
     const CharT at(size_t index) const
     {
         if(index >= this->mLength)

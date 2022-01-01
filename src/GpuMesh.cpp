@@ -1,6 +1,9 @@
 #include "GpuMesh.h"
 
 #include "CpuMesh.h"
+#include "d3d12/D3D12BLAccelerationStructure.h"
+#include "d3d12/D3D12Buffer.h"
+#include "d3d12/D3D12VertexBuffer.h"
 
 #include <fmt/format.h>
 #include <gpufmt/traits.h>
@@ -42,6 +45,8 @@ GpuMesh::GpuMesh(const CpuMesh& cpuMesh, ResourceAccessFlags accessFlags, std::s
         params.name = bufferName;
         createVertexElement(element.semantic, element.semanticIndex, params, element.data);
     }
+
+    createBlas();
 }
 
 void GpuMesh::initIndices(const IndexBufferParams& params)
@@ -164,5 +169,18 @@ void GpuMesh::markAsUsed(ID3D12CommandList* commandList)
     {
         element.buffer->markAsUsed(commandList);
     }
+}
+void GpuMesh::createBlas()
+{
+    mBlas = std::make_shared<d3d12::BLAccelerationStructure>(
+        d3d12::BLAccelerationStructureParams{{.flags = d3d12::AccelerationStructureFlags::None,
+                                              .buildOption = d3d12::AccelerationStructureBuildOption::FastTrace,
+                                              .initialReservedObjects = 1,
+                                              .name = fmt::format("{} blas", mName)}});
+
+    mBlas->addMesh(
+        d3d12::BLAccelerationStructureGeometryParams{.indexBuffer = mIndexBuffer,
+                                                     .vertexBuffer = getVertexBuffer(ShaderVertexSemantic::Position, 0),
+                                                     .flags = d3d12::RaytracingGeometryFlags::None});
 }
 } // namespace scrap

@@ -48,6 +48,8 @@ public:
     ShaderTableAllocation& operator=(const ShaderTableAllocation&) = delete;
     ShaderTableAllocation& operator=(ShaderTableAllocation&& other);
 
+    [[nodiscard]] bool isValid() const { return mShaderTable != nullptr; }
+
     void updateLocalRootArguments(RaytracingPipelineStage stage,
                                   std::span<const std::byte> localRootArguments,
                                   ID3D12GraphicsCommandList* commandList);
@@ -81,6 +83,9 @@ public:
 
     void deallocate(const std::shared_ptr<RaytracingPipelineState>& pipelineState);
 
+    void beginUpdate(GraphicsCommandList& commandList);
+    void endUpdate(GraphicsCommandList& commandList);
+
     void updateLocalRootArguments(RaytracingPipelineStage stage,
                                   size_t index,
                                   std::span<const std::byte> localRootArguments,
@@ -95,6 +100,9 @@ public:
     void markAsUsed(ID3D12CommandList* commandList);
     void markAsUsed(ID3D12CommandQueue* commandQueue);
 
+    bool isReady() const;
+
+    
 private:
     struct StageShaderTable
     {

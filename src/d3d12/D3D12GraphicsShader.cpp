@@ -317,13 +317,13 @@ std::optional<uint32_t> GraphicsShader::getVertexElementIndex(ShaderVertexSemant
     return std::nullopt;
 }
 
-std::optional<uint32_t> GraphicsShader::getResourceIndex(uint64_t nameHash,
+std::optional<uint32_t> GraphicsShader::getResourceIndex(SharedString name,
                                                          ShaderResourceType resourceType,
                                                          ShaderResourceDimension resourceDimension) const
 {
     for(const ShaderResource& resource : mShaderInputs.resources)
     {
-        if(resource.nameHash == resource.nameHash && resource.type == resourceType &&
+        if(resource.name == name && resource.type == resourceType &&
            resource.dimension == resourceDimension)
         {
             return resource.index;

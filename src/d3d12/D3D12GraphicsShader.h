@@ -60,7 +60,7 @@ public:
     const ShaderInputs& getShaderInputs() const { return mShaderInputs; }
 
     std::optional<uint32_t> getVertexElementIndex(ShaderVertexSemantic semantic, uint32_t semanticIndex) const;
-    std::optional<uint32_t> getResourceIndex(uint64_t nameHash,
+    std::optional<uint32_t> getResourceIndex(SharedString name,
                                              ShaderResourceType resourceType,
                                              ShaderResourceDimension resourceDimension) const;
 

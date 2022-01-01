@@ -91,6 +91,8 @@ public:
     void markAsUsed(ID3D12CommandQueue* commandQueue);
     void markAsUsed(ID3D12CommandList* commandList);
 
+    const std::shared_ptr<RaytracingShader>& getShader() const { return mShader; }
+
     [[nodiscard]] RaytracingShaderStageMask getShaderStages() const { return mShaderStages; }
     [[nodiscard]] RaytracingPipelineStageMask getPipelineStages() const { return mPipelineStages; }
 

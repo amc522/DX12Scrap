@@ -40,6 +40,9 @@ public:
 
     void markAsUsed(const GraphicsCommandList& commandList);
 
+    bool isReady() { return mState == AccelerationStructureState::Built; }
+    AccelerationStructureState getBuildState() const { return mState; }
+
 private:
     BLAccelerationStructureParams mParams;
     std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> mGeometryDescs;

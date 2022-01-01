@@ -7,6 +7,7 @@
 
 #include "Camera.h"
 #include "GpuMesh.h"
+#include "RenderObject.h"
 #include "d3d12/D3D12CommandList.h"
 #include "d3d12/D3D12Config.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
@@ -38,120 +39,99 @@ struct FrameConstantBuffer
     glm::vec3 padding;
 };
 
+struct RenderParams
+{
+    FrameConstantBuffer frameConstants;
+    std::span<RenderObject> renderObjects;
+};
+
 enum class Scene
 {
     Raster,
     Raytracing
 };
 
-class RasterScene
+class RasterRenderer
 {
 public:
-    RasterScene();
-    RasterScene(const RasterScene&) = delete;
-    RasterScene(RasterScene&&);
-    ~RasterScene();
+    RasterRenderer();
+    RasterRenderer(const RasterRenderer&) = delete;
+    RasterRenderer(RasterRenderer&&);
+    ~RasterRenderer();
 
-    RasterScene& operator=(const RasterScene&) = delete;
-    RasterScene& operator=(RasterScene&&);
+    RasterRenderer& operator=(const RasterRenderer&) = delete;
+    RasterRenderer& operator=(RasterRenderer&&);
 
-    void preRender(const FrameInfo& frameInfo);
-    void render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context);
+    void preRender(const FrameInfo& frameInfo, const RenderParams& renderParams);
+    void render(const FrameInfo& frameInfo, const RenderParams& renderParams);
     void endFrame();
 
     bool isInitialized() { return mInitialized; }
 
+    std::shared_ptr<d3d12::GraphicsPipelineState> createPipelineState(d3d12::GraphicsShaderParams&& shaderParams, d3d12::GraphicsPipelineStateParams&& pipelineStateParams);
+
 private:
     struct TextureBindingDesc
     {
-        size_t nameHash;
+        SharedString name;
         d3d12::Texture* texture;
     };
 
     bool createRootSignature();
-    bool loadShaders();
     void createRenderTargets();
     void createFrameConstantBuffer();
-    void createTriangle();
-    void createCube();
-    void createTexture();
 
-    void bindTextures(d3d12::GraphicsPipelineState& pso, std::span<TextureBindingDesc> textures);
-
-    Camera mCamera;
+    void bindTextures(Material& material);
 
     Microsoft::WRL::ComPtr<ID3D12RootSignature> mRootSignature;
-    std::shared_ptr<d3d12::GraphicsPipelineState> mHelloTrianglePso;
-    std::shared_ptr<d3d12::GraphicsPipelineState> mHelloCubePso;
 
     d3d12::GraphicsCommandList mCommandList;
 
     std::shared_ptr<d3d12::Buffer> mFrameConstantBuffer;
 
-    GpuMesh mTriangleMesh{PrimitiveTopology::TriangleList};
-    GpuMesh mCubeMesh;
-
     std::unique_ptr<d3d12::Texture> mDepthStencilTexture;
-    std::unique_ptr<d3d12::Texture> mTexture;
     bool mInitialized = false;
 };
 
-class RaytracingScene
+class RaytracingRenderer
 {
 public:
-    RaytracingScene();
-    RaytracingScene(const RaytracingScene&) = delete;
-    RaytracingScene(RaytracingScene&&);
-    ~RaytracingScene();
+    RaytracingRenderer();
+    RaytracingRenderer(const RaytracingRenderer&) = delete;
+    RaytracingRenderer(RaytracingRenderer&&);
+    ~RaytracingRenderer();
 
-    RaytracingScene& operator=(const RaytracingScene&) = delete;
-    RaytracingScene& operator=(RaytracingScene&&);
+    RaytracingRenderer& operator=(const RaytracingRenderer&) = delete;
+    RaytracingRenderer& operator=(RaytracingRenderer&&);
 
-    void preRender(const FrameInfo& frameInfo);
-    void render(const FrameInfo& frameInfo, d3d12::DeviceContext& d3d12Context);
+    void preRender(const FrameInfo& frameInfo, const RenderParams& renderParams);
+    void render(const FrameInfo& frameInfo, const RenderParams& renderParams);
     void endFrame();
 
     bool isInitialized() { return mInitialized; }
 
+    std::shared_ptr<d3d12::RaytracingPipelineState> createPipelineState(d3d12::RaytracingShaderParams&& shaderParams);
+
 private:
-    void createTexture();
     bool createRenderTargets();
     bool createRootSignatures();
-    bool createPipelineState();
-    bool buildGeometry();
+    bool createInternalPipelineStates();
     bool buildAccelerationStructures();
     bool buildShaderTables();
 
-    static constexpr std::wstring_view kRaygenShaderName = L"MyRaygenShader";
-    static constexpr std::wstring_view kClosestHitShaderName = L"MyClosestHitShader";
-    static constexpr std::wstring_view kMissShaderName = L"MyMissShader";
-    static constexpr std::wstring_view kHitGroupName = L"MyHitGroup";
-
-    Camera mCamera;
-
     Microsoft::WRL::ComPtr<ID3D12RootSignature> mGlobalRootSignature;
-    Microsoft::WRL::ComPtr<ID3D12RootSignature> mClosestHitLocalRootSignature;
+    std::array<Microsoft::WRL::ComPtr<ID3D12RootSignature>, (size_t)RaytracingShaderStage::Count> mLocalRootSignatures;
     d3d12::GraphicsCommandList mCommandList;
 
     std::unique_ptr<d3d12::Texture> mRenderTarget;
-    GpuMesh mCubeMesh;
-    glm::mat4x4 mCubeMeshTransform = glm::identity<glm::mat4x4>();
-
-    std::unique_ptr<d3d12::Texture> mTexture;
 
     std::unique_ptr<d3d12::TLAccelerationStructure> mTlas;
-    std::shared_ptr<d3d12::BLAccelerationStructure> mBlas;
-    d3d12::TlasInstanceAllocation mTlasInstance;
 
-    std::shared_ptr<d3d12::RaytracingShader> mShader;
     std::shared_ptr<d3d12::RaytracingDispatchPipelineState> mDispatchPipelineState;
-    std::shared_ptr<d3d12::RaytracingPipelineState> mHitGroupPipelineState;
     std::shared_ptr<d3d12::RaytracingPipelineState> mMainPassPipelineState;
     std::shared_ptr<d3d12::ShaderTable> mShaderTable;
     d3d12::ShaderTableAllocation mMainPassShaderTableAllocation;
-    d3d12::ShaderTableAllocation mHitGroupShaderTableAllocation;
 
-    FrameConstantBuffer mFrameCpuConstantBuffer;
     std::shared_ptr<d3d12::Buffer> mFrameConstantBuffer;
 
     bool mInitialized = false;
@@ -172,8 +152,20 @@ public:
     void endFrame();
 
 private:
-    std::unique_ptr<RasterScene> mRasterScene;
-    std::unique_ptr<RaytracingScene> mRaytraceScene;
+    GpuMesh createCube();
+    std::shared_ptr<d3d12::Texture> createTexture();
+
+    bool createRenderObject();
+
+    Camera mCamera;
+    std::unique_ptr<RasterRenderer> mRasterScene;
+    std::unique_ptr<RaytracingRenderer> mRaytraceScene;
     Scene mActiveScene = Scene::Raytracing;
+
+    std::vector<RenderObject> mRenderObjects;
+    uint32_t mNextRenderObjectId = 0;
+
+    std::shared_ptr<d3d12::Texture> mTexture;
+    RenderParams mRenderParams{};
 };
 } // namespace scrap

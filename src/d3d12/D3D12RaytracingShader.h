@@ -29,6 +29,7 @@ namespace detail
 {
 struct RaytracingShaderInfo
 {
+    size_t index = 0;
     SharedString entryPoint;
     WSharedString wideEntryPoint;
     ShaderInputs inputs;
@@ -46,8 +47,8 @@ struct RaytracingFixedStageShaderInfo : public detail::RaytracingShaderInfo
 struct RaytracingShaderParams
 {
     std::filesystem::path filepath;
-    std::span<const RaytracingFixedStageShaderEntryPoint> fixedStageEntryPoints;
-    std::span<const RaytracingCallableShaderEntryPoint> callableEntryPoints;
+    std::span<RaytracingFixedStageShaderEntryPoint> fixedStageEntryPoints;
+    std::span<RaytracingCallableShaderEntryPoint> callableEntryPoints;
     bool debug = false;
 };
 
@@ -102,7 +103,7 @@ public:
     std::optional<uint32_t>
     getVertexElementIndex(RaytracingShaderStage stage, ShaderVertexSemantic semantic, uint32_t semanticIndex) const;
     std::optional<uint32_t> getResourceIndex(RaytracingShaderStage stage,
-                                             uint64_t nameHash,
+                                             SharedString name,
                                              ShaderResourceType resourceType,
                                              ShaderResourceDimension resourceDimension) const;
 
