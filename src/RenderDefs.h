@@ -309,8 +309,13 @@ enum class ShaderResourceReturnType
 {
     Unorm,
     Snorm,
+    Int16,
+    UInt16,
     Int,
     UInt,
+    Int64,
+    UInt64,
+    Half,
     Float,
     Double,
     None

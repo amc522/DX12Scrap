@@ -120,7 +120,7 @@ EnumerateBindlessConstantBufferVariables(ID3D12ShaderReflectionConstantBuffer* s
     name.remove_suffix(suffix.size());
 
     // get the resource type
-    size_t nextSeparatorPos = name.find("_");
+    size_t nextSeparatorPos = name.find("$");
     if(nextSeparatorPos == std::string_view::npos) { return {}; }
 
     const std::string_view typeName = name.substr(0, nextSeparatorPos);
@@ -240,19 +240,39 @@ EnumerateBindlessConstantBufferVariables(ID3D12ShaderReflectionConstantBuffer* s
     }
 
     // get the resource type
-    nextSeparatorPos = name.find("_");
+    nextSeparatorPos = name.find("$");
     if(nextSeparatorPos == std::string_view::npos) { return {}; }
 
-    std::string_view returnTypeStr = name.substr(0, nextSeparatorPos);
+    std::string_view fullReturnTypeStr = name.substr(0, nextSeparatorPos);
 
-    const size_t componentCountPos = name.find_first_of("1234");
+    // check for _t types
+    auto underscoreTPos = fullReturnTypeStr.find("_t");
 
+    std::string_view returnTypeStr;
     std::string_view componentCountStr;
-    if(componentCountPos != std::string_view::npos)
-    {
-        componentCountStr = returnTypeStr.substr(componentCountPos);
-        returnTypeStr = returnTypeStr.substr(0, componentCountPos);
 
+    if(underscoreTPos != std::string_view::npos)
+    {
+        returnTypeStr = fullReturnTypeStr.substr(0, underscoreTPos + 2);
+        componentCountStr = fullReturnTypeStr.substr(underscoreTPos + 2);
+    }
+    else
+    {
+        const size_t componentCountPos = name.find_first_of("1234");
+
+        if(componentCountPos != std::string_view::npos)
+        {
+            returnTypeStr = fullReturnTypeStr.substr(0, componentCountPos);
+            componentCountStr = fullReturnTypeStr.substr(componentCountPos);
+        }
+        else
+        {
+            returnTypeStr = fullReturnTypeStr;
+        }
+    }
+
+    if(!componentCountStr.empty())
+    {
         std::from_chars(componentCountStr.data(), componentCountStr.data() + componentCountStr.size(),
                         resource.returnTypeComponentCount);
     }
@@ -262,6 +282,14 @@ EnumerateBindlessConstantBufferVariables(ID3D12ShaderReflectionConstantBuffer* s
     {
         resource.returnType = ShaderResourceReturnType::Snorm;
     }
+    else if(returnTypeStr == "int16_t")
+    {
+        resource.returnType = ShaderResourceReturnType::Int16;
+    }
+    else if(returnTypeStr == "uint16_t")
+    {
+        resource.returnType = ShaderResourceReturnType::UInt16;
+    }
     else if(returnTypeStr == "int")
     {
         resource.returnType = ShaderResourceReturnType::Int;
@@ -269,6 +297,18 @@ EnumerateBindlessConstantBufferVariables(ID3D12ShaderReflectionConstantBuffer* s
     else if(returnTypeStr == "uint")
     {
         resource.returnType = ShaderResourceReturnType::UInt;
+    }
+    else if(returnTypeStr == "int64_t")
+    {
+        resource.returnType = ShaderResourceReturnType::Int64;
+    }
+    else if(returnTypeStr == "uint64_t")
+    {
+        resource.returnType = ShaderResourceReturnType::UInt64;
+    }
+    else if(returnTypeStr == "half" || returnTypeStr == "float16_t")
+    {
+        resource.returnType = ShaderResourceReturnType::Half;
     }
     else if(returnTypeStr == "float")
     {
