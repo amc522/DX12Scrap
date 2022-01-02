@@ -45,6 +45,21 @@
 
 namespace scrap
 {
+template<class T>
+concept RangeEnum = std::is_enum_v<T> && requires
+{
+    T::First;
+    T::Last;
+    T::Count;
+    requires(ToUnderlying(T::Last) - ToUnderlying(T::First) + 1) == ToUnderlying(T::Count);
+};
+
+template<class T>
+concept MaskEnum = std::is_enum_v<T> && requires
+{
+    T::None;
+};
+
 template<class EnumT>
 requires std::is_enum_v<EnumT>
 constexpr std::enable_if_t<std::is_enum_v<EnumT>, std::underlying_type_t<EnumT>> ToUnderlying(EnumT e)

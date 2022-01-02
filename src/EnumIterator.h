@@ -6,21 +6,6 @@
 
 namespace scrap
 {
-template<class T>
-concept RangeEnum = std::is_enum_v<T> && requires
-{
-    T::First;
-    T::Last;
-    T::Count;
-    requires(ToUnderlying(T::Last) - ToUnderlying(T::First) + 1) == ToUnderlying(T::Count);
-};
-
-template<class T>
-concept MaskEnum = std::is_enum_v<T> && requires
-{
-    T::None;
-};
-
 template<class EnumT>
 requires std::is_enum_v<EnumT>
 class EnumIterator
@@ -102,7 +87,7 @@ public:
     [[nodiscard]] constexpr bool operator>=(const EnumIterator& rhs) const noexcept { return !(*this < rhs); }
 
 private:
-    EnumT mValue = 0;
+    EnumT mValue = EnumT::First;
 };
 
 template<RangeEnum EnumT, EnumT First = EnumT::First, EnumT Last = EnumT::Last>

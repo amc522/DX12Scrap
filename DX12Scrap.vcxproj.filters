@@ -270,6 +270,9 @@
     <ClInclude Include="src\RenderObject.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\EnumArray.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
