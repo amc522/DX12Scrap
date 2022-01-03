@@ -12,8 +12,8 @@ struct ResourceIndices
     DECLARE_RESOURCE(Buffer, uint16_t, IndexBuffer)
 };
 
-ConstantBuffer<VertexIndices> gVertexBuffers : register(VERTEX_INDICES_CBUFFER_REGISTER);
-ConstantBuffer<ResourceIndices> gResources : register(RESOURCE_INDICES_CBUFFER_REGISTER);
+ConstantBuffer<VertexIndices> gVertexBuffers : register(VERTEX_CBUFFER_REGISTER);
+ConstantBuffer<ResourceIndices> gResources : register(RESOURCE_CBUFFER_REGISTER);
 
 SamplerState gSampler : register(s0);
 

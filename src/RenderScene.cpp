@@ -102,29 +102,29 @@ bool RasterRenderer::createRootSignature()
 
     D3D12_ROOT_PARAMETER1& frameConstantBuffer = rootParameters[d3d12::RasterRootParamSlot::FrameCB];
     frameConstantBuffer.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    frameConstantBuffer.Descriptor.ShaderRegister = d3d12::reservedShaderRegister::kFrameCB.shaderRegister;
-    frameConstantBuffer.Descriptor.RegisterSpace = d3d12::reservedShaderRegister::kFrameCB.registerSpace;
+    frameConstantBuffer.Descriptor.ShaderRegister = d3d12::shader::kFrameCBuffer.shaderRegister;
+    frameConstantBuffer.Descriptor.RegisterSpace = d3d12::shader::kFrameCBuffer.registerSpace;
     frameConstantBuffer.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
     frameConstantBuffer.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
     D3D12_ROOT_PARAMETER1& resourceRootConstants = rootParameters[d3d12::RasterRootParamSlot::ResourceIndices];
     resourceRootConstants.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
     resourceRootConstants.Constants.Num32BitValues = d3d12::kMaxBindlessResources;
-    resourceRootConstants.Constants.ShaderRegister = d3d12::reservedShaderRegister::kResourceCB.shaderRegister;
-    resourceRootConstants.Constants.RegisterSpace = d3d12::reservedShaderRegister::kResourceCB.registerSpace;
+    resourceRootConstants.Constants.ShaderRegister = d3d12::shader::kResourceCBuffer.shaderRegister;
+    resourceRootConstants.Constants.RegisterSpace = d3d12::shader::kResourceCBuffer.registerSpace;
     resourceRootConstants.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
     D3D12_ROOT_PARAMETER1& vertexRootConstants = rootParameters[d3d12::RasterRootParamSlot::VertexIndices];
     vertexRootConstants.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
     vertexRootConstants.Constants.Num32BitValues = d3d12::kMaxBindlessVertexBuffers;
-    vertexRootConstants.Constants.ShaderRegister = d3d12::reservedShaderRegister::kVertexCB.shaderRegister;
-    vertexRootConstants.Constants.RegisterSpace = d3d12::reservedShaderRegister::kVertexCB.registerSpace;
+    vertexRootConstants.Constants.ShaderRegister = d3d12::shader::kVertexCBuffer.shaderRegister;
+    vertexRootConstants.Constants.RegisterSpace = d3d12::shader::kVertexCBuffer.registerSpace;
     vertexRootConstants.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
     D3D12_ROOT_PARAMETER1& objectConstantBuffer = rootParameters[d3d12::RasterRootParamSlot::ObjectCB];
     objectConstantBuffer.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    objectConstantBuffer.Descriptor.ShaderRegister = d3d12::reservedShaderRegister::kObjectCB.shaderRegister;
-    objectConstantBuffer.Descriptor.RegisterSpace = d3d12::reservedShaderRegister::kObjectCB.registerSpace;
+    objectConstantBuffer.Descriptor.ShaderRegister = d3d12::shader::kObjectCBuffer.shaderRegister;
+    objectConstantBuffer.Descriptor.RegisterSpace = d3d12::shader::kObjectCBuffer.registerSpace;
     objectConstantBuffer.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_VOLATILE;
     objectConstantBuffer.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
@@ -637,8 +637,8 @@ bool RaytracingRenderer::createRootSignatures()
         descriptorRange.NumDescriptors = 1;
         descriptorRange.OffsetInDescriptorsFromTableStart = 0;
         descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-        descriptorRange.BaseShaderRegister = d3d12::reservedShaderRegister::kOutputBuffer.shaderRegister;
-        descriptorRange.RegisterSpace = d3d12::reservedShaderRegister::kOutputBuffer.registerSpace;
+        descriptorRange.BaseShaderRegister = d3d12::shader::kOutputBuffer.shaderRegister;
+        descriptorRange.RegisterSpace = d3d12::shader::kOutputBuffer.registerSpace;
         descriptorRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
 
         auto& uavRootParam = rootParams[d3d12::RaytracingGlobalRootParamSlot::OutputView];
@@ -651,16 +651,16 @@ bool RaytracingRenderer::createRootSignatures()
         auto& tlasRootParam = rootParams[d3d12::RaytracingGlobalRootParamSlot::AccelerationStructure];
         tlasRootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
         tlasRootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        tlasRootParam.Descriptor.ShaderRegister = d3d12::reservedShaderRegister::kAccelerationStructure.shaderRegister;
-        tlasRootParam.Descriptor.RegisterSpace = d3d12::reservedShaderRegister::kAccelerationStructure.registerSpace;
+        tlasRootParam.Descriptor.ShaderRegister = d3d12::shader::kAccelerationStructure.shaderRegister;
+        tlasRootParam.Descriptor.RegisterSpace = d3d12::shader::kAccelerationStructure.registerSpace;
         tlasRootParam.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
 
         // Frame constant buffer
         auto& frameCbRootParam = rootParams[d3d12::RaytracingGlobalRootParamSlot::FrameCB];
         frameCbRootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
         frameCbRootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        frameCbRootParam.Descriptor.ShaderRegister = d3d12::reservedShaderRegister::kFrameCB.shaderRegister;
-        frameCbRootParam.Descriptor.RegisterSpace = d3d12::reservedShaderRegister::kFrameCB.registerSpace;
+        frameCbRootParam.Descriptor.ShaderRegister = d3d12::shader::kFrameCBuffer.shaderRegister;
+        frameCbRootParam.Descriptor.RegisterSpace = d3d12::shader::kFrameCBuffer.registerSpace;
         frameCbRootParam.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
 
         // Static samplers
@@ -711,16 +711,16 @@ bool RaytracingRenderer::createRootSignatures()
         resourceIndicesParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         resourceIndicesParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         resourceIndicesParam.Constants.Num32BitValues = d3d12::kMaxBindlessResources;
-        resourceIndicesParam.Constants.ShaderRegister = d3d12::reservedShaderRegister::kResourceCB.shaderRegister;
-        resourceIndicesParam.Constants.RegisterSpace = d3d12::reservedShaderRegister::kResourceCB.registerSpace;
+        resourceIndicesParam.Constants.ShaderRegister = d3d12::shader::kResourceCBuffer.shaderRegister;
+        resourceIndicesParam.Constants.RegisterSpace = d3d12::shader::kResourceCBuffer.registerSpace;
 
         // Bindless vertex buffer indices
         auto& vertexIndicesParam = rootParams[d3d12::RaytracingClosestHitLocalRootParamSlot::VertexIndices];
         vertexIndicesParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         vertexIndicesParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         vertexIndicesParam.Constants.Num32BitValues = d3d12::kMaxBindlessVertexBuffers;
-        vertexIndicesParam.Constants.ShaderRegister = d3d12::reservedShaderRegister::kVertexCB.shaderRegister;
-        vertexIndicesParam.Constants.RegisterSpace = d3d12::reservedShaderRegister::kVertexCB.registerSpace;
+        vertexIndicesParam.Constants.ShaderRegister = d3d12::shader::kVertexCBuffer.shaderRegister;
+        vertexIndicesParam.Constants.RegisterSpace = d3d12::shader::kVertexCBuffer.registerSpace;
 
         D3D12_VERSIONED_ROOT_SIGNATURE_DESC desc = {};
         desc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;

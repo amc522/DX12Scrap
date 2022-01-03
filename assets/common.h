@@ -1,5 +1,7 @@
 #pragma pack_matrix(row_major)
 
+#include "shader_interop.h"
+
 // example bindless resource index variable name:
 //   gTexture2D$float4$MyTextureDescriptorIndex
 #define BINDLESS_RESOURCE_INDEX_VARIABLE_NAME(ResourceObjectType, ResourceValueType, Name) g##ResourceObjectType##$##ResourceValueType##$##Name##DescriptorIndex
@@ -11,10 +13,6 @@ ResourceObjectType<ResourceValueType> get##Name() { return ResourceDescriptorHea
 // example bindless vertex buffer index variable name
 //   gBuffer$float3$MyVertexBufferDescriptorIndex
 #define DECLARE_VERTEX_BUFFER(ValueType, Name) DECLARE_RESOURCE(Buffer, ValueType, Name)
-
-#define VERTEX_INDICES_CBUFFER_REGISTER b0, space1
-#define RESOURCE_INDICES_CBUFFER_REGISTER b2, space1
-
 
 struct Frame
 {
@@ -29,7 +27,7 @@ struct Frame
     float frameTimeDelta;
     float3 padding;
 };
-ConstantBuffer<Frame> gFrame : register(b1, space1);
+ConstantBuffer<Frame> gFrame : register(FRAME_CBUFFER_REGISTER);
 
 struct ObjectConstantBuffer
 {
@@ -40,4 +38,4 @@ struct ObjectConstantBuffer
     float4x4 objectToClip;
     float4x4 clipToObject;
 };
-ConstantBuffer<ObjectConstantBuffer> gObjectCb : register(b5, space1);
+ConstantBuffer<ObjectConstantBuffer> gObjectCb : register(OBJECT_CBUFFER_REGISTER);

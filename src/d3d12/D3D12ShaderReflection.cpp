@@ -381,14 +381,14 @@ EnumerateBindlessConstantBufferVariables(ID3D12ShaderReflectionConstantBuffer* s
 
 bool IsVertexIndicesRegister(const D3D12_SHADER_INPUT_BIND_DESC& desc)
 {
-    return desc.Type == D3D_SIT_CBUFFER && desc.BindPoint == reservedShaderRegister::kVertexCB.shaderRegister &&
-           desc.Space == reservedShaderRegister::kVertexCB.registerSpace;
+    return desc.Type == D3D_SIT_CBUFFER && desc.BindPoint == scrap::d3d12::shader::kVertexCBuffer.shaderRegister &&
+           desc.Space == scrap::d3d12::shader::kVertexCBuffer.registerSpace;
 }
 
 bool IsResourceIndicesRegister(const D3D12_SHADER_INPUT_BIND_DESC& desc)
 {
-    return desc.Type == D3D_SIT_CBUFFER && desc.BindPoint == reservedShaderRegister::kResourceCB.shaderRegister &&
-           desc.Space == reservedShaderRegister::kResourceCB.registerSpace;
+    return desc.Type == D3D_SIT_CBUFFER && desc.BindPoint == scrap::d3d12::shader::kResourceCBuffer.shaderRegister &&
+           desc.Space == scrap::d3d12::shader::kResourceCBuffer.registerSpace;
 }
 
 tl::expected<VertexInputsCbInfo, ShaderReflectionErrorInfo>

@@ -18,13 +18,13 @@ struct VertexIndices
     DECLARE_VERTEX_BUFFER(float3, Normals)
     DECLARE_VERTEX_BUFFER(float2, TexCoords)
 };
-ConstantBuffer<VertexIndices> gVertexBuffers : register(VERTEX_INDICES_CBUFFER_REGISTER);
+ConstantBuffer<VertexIndices> gVertexBuffers : register(VERTEX_CBUFFER_REGISTER);
 
 struct ResourceIndices
 {
     DECLARE_RESOURCE(Texture2D, float4, Texture);
 };
-ConstantBuffer<ResourceIndices> gResources : register(RESOURCE_INDICES_CBUFFER_REGISTER);
+ConstantBuffer<ResourceIndices> gResources : register(RESOURCE_CBUFFER_REGISTER);
 
 SamplerState gSampler : register(s0);
 
