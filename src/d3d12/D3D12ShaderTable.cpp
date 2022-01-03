@@ -7,16 +7,17 @@
 
 #include <d3d12.h>
 #include <d3dx12.h>
+#include "EnumArray.h"
 
 namespace scrap::d3d12
 {
 void ShaderTable::init(const ShaderTableParams& params)
 {
-    mParams[(size_t)RaytracingPipelineStage::RayGen] = params.raygen;
-    mParams[(size_t)RaytracingPipelineStage::HitGroup] = params.hitGroup;
-    mParams[(size_t)RaytracingPipelineStage::Miss] = params.miss;
+    mParams[RaytracingPipelineStage::RayGen] = params.raygen;
+    mParams[RaytracingPipelineStage::HitGroup] = params.hitGroup;
+    mParams[RaytracingPipelineStage::Miss] = params.miss;
 
-    std::array<std::string, (size_t)RaytracingPipelineStage::Count> tableNames{
+    EnumArray<std::string, RaytracingPipelineStage> tableNames{
         fmt::format("{} (Raygen Table)", params.name),
         fmt::format("{} (Hit Group Table)", params.name),
         fmt::format("{} (Miss Table)", params.name),
@@ -27,16 +28,16 @@ void ShaderTable::init(const ShaderTableParams& params)
     bufferParams.flags = BufferFlags::NonPixelShaderResource;
     bufferParams.initialResourceState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
-    for(RaytracingPipelineStage stage : Enumerator<RaytracingPipelineStage>())
+    for(RaytracingPipelineStage stage : enumerate<RaytracingPipelineStage>())
     {
-        ShaderTableStageParams& params = mParams[(size_t)stage];
+        ShaderTableStageParams& params = mParams[stage];
         params.entryByteStride = AlignInteger(RaytracingShaderIdentifier::kByteSize + params.entryByteStride,
                                               size_t(D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT));
 
         bufferParams.byteSize = params.entryByteStride * params.capacity;
-        bufferParams.name = tableNames[(size_t)stage];
+        bufferParams.name = tableNames[stage];
 
-        auto& stageShaderTable = mShaderTables[(size_t)stage];
+        auto& stageShaderTable = mShaderTables[stage];
         stageShaderTable.shaderTableBuffer = std::make_shared<Buffer>();
         stageShaderTable.shaderTableBuffer->init(bufferParams);
         stageShaderTable.freeBlocks = FreeBlockTracker(params.capacity);
@@ -45,7 +46,7 @@ void ShaderTable::init(const ShaderTableParams& params)
 
 tl::expected<ShaderTableAllocation, ShaderTable::Error> ShaderTable::addPipelineState(
     std::shared_ptr<RaytracingPipelineState> pipelineState,
-    std::array<std::span<const std::byte>, (size_t)RaytracingPipelineStage::Count> localRootArguments,
+    EnumArray<std::span<const std::byte>, RaytracingPipelineStage> localRootArguments,
     ID3D12GraphicsCommandList* commandList)
 {
     ShaderTableAllocation allocation;
@@ -53,28 +54,28 @@ tl::expected<ShaderTableAllocation, ShaderTable::Error> ShaderTable::addPipeline
 
     std::lock_guard lockGuard(mMutex);
 
-    for(auto stage : Enumerator<RaytracingPipelineStage>())
+    for(auto stage : enumerate<RaytracingPipelineStage>())
     {
-        const auto& stageArguments = localRootArguments[(size_t)stage];
+        const auto& stageArguments = localRootArguments[stage];
         const auto& stageIdentifier = pipelineState->getShaderIdentifier(stage);
 
         if(!stageIdentifier.isInvalid()) { continue; }
 
-        StageShaderTable& stageShaderTable = mShaderTables[(size_t)stage];
+        StageShaderTable& stageShaderTable = mShaderTables[stage];
         auto result = stageShaderTable.freeBlocks.reserve();
 
         if(!result) { return tl::make_unexpected(Error::InsufficientSpace); }
 
         GpuBufferWriteGuard<Buffer> stageTableWriteGuard{*stageShaderTable.shaderTableBuffer, commandList};
         auto writeBuffer = stageTableWriteGuard.getWriteBuffer();
-        writeBuffer = writeBuffer.subspan(result->getRange().start * mParams[(size_t)stage].entryByteStride,
+        writeBuffer = writeBuffer.subspan(result->getRange().start * mParams[stage].entryByteStride,
                                           RaytracingShaderIdentifier::kByteSize + stageArguments.size_bytes());
 
         auto writeItr = writeBuffer.begin();
         writeItr = std::copy(stageIdentifier.begin(), stageIdentifier.end(), writeItr);
         std::copy(stageArguments.begin(), stageArguments.end(), writeItr);
 
-        allocation.mTableReservations[(size_t)stage] = std::move(result.value());
+        allocation.mTableReservations[stage] = std::move(result.value());
     }
 
     auto result = mPipelineStates.emplace(pipelineState);
@@ -112,12 +113,11 @@ void ShaderTable::deallocate(const std::shared_ptr<RaytracingPipelineState>& pip
 
 void ShaderTable::beginUpdate(GraphicsCommandList& commandList)
 {
-    std::array<D3D12_RESOURCE_BARRIER, (size_t)RaytracingPipelineStage::Count> barriers;
+    EnumArray<D3D12_RESOURCE_BARRIER, RaytracingPipelineStage> barriers;
 
-    for(auto stage : Enumerator<RaytracingPipelineStage>())
+    for(auto[stage, stageTable] : enumerate(mShaderTables))
     {
-        const auto& stageTable = mShaderTables[(size_t)stage];
-        barriers[(size_t)stage] = CD3DX12_RESOURCE_BARRIER::Transition(
+        barriers[stage] = CD3DX12_RESOURCE_BARRIER::Transition(
             stageTable.shaderTableBuffer->getResource(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
             D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
     }
@@ -127,12 +127,12 @@ void ShaderTable::beginUpdate(GraphicsCommandList& commandList)
 
 void ShaderTable::endUpdate(GraphicsCommandList & commandList)
 {
-    std::array<D3D12_RESOURCE_BARRIER, (size_t)RaytracingPipelineStage::Count> barriers;
+    EnumArray<D3D12_RESOURCE_BARRIER, RaytracingPipelineStage> barriers;
 
-    for(auto stage : Enumerator<RaytracingPipelineStage>())
+    for(auto stage : enumerate<RaytracingPipelineStage>())
     {
-        const auto& stageTable = mShaderTables[(size_t)stage];
-        barriers[(size_t)stage] = CD3DX12_RESOURCE_BARRIER::Transition(
+        const auto& stageTable = mShaderTables[stage];
+        barriers[stage] = CD3DX12_RESOURCE_BARRIER::Transition(
             stageTable.shaderTableBuffer->getResource(),
             D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
     }
@@ -145,11 +145,11 @@ void ShaderTable::updateLocalRootArguments(RaytracingPipelineStage stage,
                                            std::span<const std::byte> localRootArguments,
                                            ID3D12GraphicsCommandList* commandList)
 {
-    std::shared_ptr<d3d12::Buffer>& buffer = mShaderTables[(size_t)stage].shaderTableBuffer;
+    std::shared_ptr<d3d12::Buffer>& buffer = mShaderTables[stage].shaderTableBuffer;
 
     GpuBufferWriteGuard<d3d12::Buffer> writeGuard(*buffer, commandList);
 
-    const size_t entryByteSize = mParams[(size_t)stage].entryByteStride;
+    const size_t entryByteSize = mParams[stage].entryByteStride;
     const size_t offset = index * entryByteSize + RaytracingShaderIdentifier::kByteSize;
     auto rootArgumentsBuffer =
         writeGuard.getWriteBuffer().subspan(offset, entryByteSize - RaytracingShaderIdentifier::kByteSize);
@@ -159,8 +159,8 @@ void ShaderTable::updateLocalRootArguments(RaytracingPipelineStage stage,
 D3D12_GPU_VIRTUAL_ADDRESS_RANGE ShaderTable::getRaygenRecordAddressAndStride(size_t index) const
 {
     D3D12_GPU_VIRTUAL_ADDRESS_RANGE ret;
-    ret.SizeInBytes = mParams[(size_t)RaytracingPipelineStage::RayGen].entryByteStride;
-    ret.StartAddress = mShaderTables[(size_t)RaytracingPipelineStage::RayGen]
+    ret.SizeInBytes = mParams[RaytracingPipelineStage::RayGen].entryByteStride;
+    ret.StartAddress = mShaderTables[RaytracingPipelineStage::RayGen]
                            .shaderTableBuffer->getResource()
                            ->GetGPUVirtualAddress() +
                        ret.SizeInBytes * index;
@@ -172,10 +172,10 @@ D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE ShaderTable::getHitGroupTableAddressR
                                                                                               size_t count) const
 {
     const std::shared_ptr<Buffer>& shaderTableBuffer =
-        mShaderTables[(size_t)RaytracingPipelineStage::HitGroup].shaderTableBuffer;
+        mShaderTables[RaytracingPipelineStage::HitGroup].shaderTableBuffer;
 
     D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE ret;
-    ret.StrideInBytes = mParams[(size_t)RaytracingPipelineStage::HitGroup].entryByteStride;
+    ret.StrideInBytes = mParams[RaytracingPipelineStage::HitGroup].entryByteStride;
     ret.StartAddress = shaderTableBuffer->getResource()->GetGPUVirtualAddress() + ret.StrideInBytes * indexOffset;
     ret.SizeInBytes =
         (count > 0) ? ret.StrideInBytes * count : shaderTableBuffer->getByteSize() - (ret.StrideInBytes * indexOffset);
@@ -187,10 +187,10 @@ D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE ShaderTable::getMissTableAddressRange
                                                                                           size_t count) const
 {
     const std::shared_ptr<Buffer>& shaderTableBuffer =
-        mShaderTables[(size_t)RaytracingPipelineStage::Miss].shaderTableBuffer;
+        mShaderTables[RaytracingPipelineStage::Miss].shaderTableBuffer;
 
     D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE ret;
-    ret.StrideInBytes = mParams[(size_t)RaytracingPipelineStage::Miss].entryByteStride;
+    ret.StrideInBytes = mParams[RaytracingPipelineStage::Miss].entryByteStride;
     ret.StartAddress = shaderTableBuffer->getResource()->GetGPUVirtualAddress() + ret.StrideInBytes * indexOffset;
     ret.SizeInBytes =
         (count > 0) ? ret.StrideInBytes * count : shaderTableBuffer->getByteSize() - (ret.StrideInBytes * indexOffset);
@@ -250,7 +250,7 @@ void ShaderTableAllocation::updateLocalRootArguments(RaytracingPipelineStage sta
                                                      std::span<const std::byte> localRootArguments,
                                                      ID3D12GraphicsCommandList* commandList)
 {
-    mShaderTable->updateLocalRootArguments(stage, mTableReservations[(size_t)stage].getRange().start,
+    mShaderTable->updateLocalRootArguments(stage, mTableReservations[stage].getRange().start,
                                            localRootArguments, commandList);
 }
 

@@ -144,7 +144,11 @@ DEFINE_ENUM_BITWISE_OPERATORS(RaytracingShaderStageMask);
     }
 }
 
-using RaytracingShaderStageEnumerator = MaskPairEnumerator<RaytracingShaderStageMask, RaytracingShaderStage>;
+[[nodiscard]] constexpr detail::MaskPairEnumerator<RaytracingShaderStageMask, RaytracingShaderStage>
+enumerate(RaytracingShaderStageMask mask) noexcept
+{
+    return detail::MaskPairEnumerator<RaytracingShaderStageMask, RaytracingShaderStage>(mask);
+}
 
 enum class RaytracingShaderType
 {
@@ -236,7 +240,11 @@ RaytracingShaderStageMaskToPipelineMask(RaytracingShaderStageMask shaderMask)
     return pipelineMask;
 }
 
-using RaytracingPipelineStageEnumerator = MaskPairEnumerator<RaytracingPipelineStageMask, RaytracingPipelineStage>;
+[[nodiscard]] constexpr detail::MaskPairEnumerator<RaytracingPipelineStageMask, RaytracingPipelineStage>
+enumerate(RaytracingPipelineStageMask mask) noexcept
+{
+    return detail::MaskPairEnumerator<RaytracingPipelineStageMask, RaytracingPipelineStage>(mask);
+}
 
 enum class ResourceAccessFlags
 {

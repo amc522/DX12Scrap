@@ -106,7 +106,7 @@ void RaytracingDispatchPipelineState::addPipelineState(std::shared_ptr<Raytracin
                 bytes, RaytracingShaderIdentifier::kByteSize));
         };
 
-        for(auto stage : RaytracingPipelineStageEnumerator(pipelineState->getPipelineStages()))
+        for(auto stage : enumerate(pipelineState->getPipelineStages()))
         {
             const std::wstring_view entryPointName = pipelineState->getShaderEntryPointName(stage);
             pipelineState->setShaderIdentifier(stage, makeShaderIdentifier(entryPointName));

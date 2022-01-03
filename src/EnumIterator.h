@@ -6,100 +6,133 @@
 
 namespace scrap
 {
+namespace detail
+{
 template<class EnumT>
 requires std::is_enum_v<EnumT>
-class EnumIterator
+class RangeEnumEnumeratorIterator
 {
 public:
     using iterator_category = std::random_access_iterator_tag;
     using value_type = EnumT;
     using difference_type = std::underlying_type_t<EnumT>;
 
-    constexpr EnumIterator() noexcept = default;
-    constexpr EnumIterator(EnumT value): mValue(value) {}
+    constexpr RangeEnumEnumeratorIterator() noexcept = default;
+    constexpr RangeEnumEnumeratorIterator(EnumT value): mValue(value) {}
 
-    constexpr EnumIterator& operator=(const EnumIterator&) noexcept = default;
+    constexpr RangeEnumEnumeratorIterator& operator=(const RangeEnumEnumeratorIterator&) noexcept = default;
     [[nodiscard]] constexpr EnumT operator*() const noexcept { return mValue; }
 
-    constexpr EnumIterator& operator++() noexcept
+    constexpr RangeEnumEnumeratorIterator& operator++() noexcept
     {
         mValue = IncrementEnum(mValue);
         return *this;
     }
 
-    constexpr EnumIterator operator++(int) noexcept
+    constexpr RangeEnumEnumeratorIterator operator++(int) noexcept
     {
-        EnumIterator ret = *this;
+        RangeEnumEnumeratorIterator ret = *this;
         ++(*this);
         return ret;
     }
 
-    constexpr EnumIterator& operator--() noexcept
+    constexpr RangeEnumEnumeratorIterator& operator--() noexcept
     {
         mValue = DecrementEnum(mValue);
         return *this;
     }
 
-    constexpr EnumIterator operator--(int) noexcept
+    constexpr RangeEnumEnumeratorIterator operator--(int) noexcept
     {
-        EnumIterator ret = *this;
+        RangeEnumEnumeratorIterator ret = *this;
         --(*this);
         return ret;
     }
 
-    constexpr EnumIterator& operator+=(const difference_type offset) noexcept
+    constexpr RangeEnumEnumeratorIterator& operator+=(const difference_type offset) noexcept
     {
         mValue = IncrementEnum(mValue, offset);
         return *this;
     }
 
-    [[nodiscard]] constexpr EnumIterator operator+(const difference_type offset) const noexcept
+    [[nodiscard]] constexpr RangeEnumEnumeratorIterator operator+(const difference_type offset) const noexcept
     {
-        EnumIterator ret = *this;
+        RangeEnumEnumeratorIterator ret = *this;
         ret += offset;
         return ret;
     }
 
-    constexpr EnumIterator& operator-=(const difference_type offset) noexcept { return *this += -offset; }
-
-    [[nodiscard]] constexpr EnumIterator operator-(const difference_type offset) const noexcept
+    constexpr RangeEnumEnumeratorIterator& operator-=(const difference_type offset) noexcept
     {
-        EnumIterator ret = *this;
+        return *this += -offset;
+    }
+
+    [[nodiscard]] constexpr RangeEnumEnumeratorIterator operator-(const difference_type offset) const noexcept
+    {
+        RangeEnumEnumeratorIterator ret = *this;
         ret -= offset;
         return ret;
     }
 
-    [[nodiscard]] constexpr difference_type operator-(const EnumIterator& rhs) const noexcept
+    [[nodiscard]] constexpr difference_type operator-(const RangeEnumEnumeratorIterator& rhs) const noexcept
     {
         return ToUnderlying(mValue) - ToUnderlying(rhs.mValue);
     }
 
-    [[nodiscard]] constexpr bool operator==(const EnumIterator& rhs) const noexcept { return mValue == rhs.mValue; }
+    [[nodiscard]] constexpr bool operator==(const RangeEnumEnumeratorIterator& rhs) const noexcept
+    {
+        return mValue == rhs.mValue;
+    }
 
-    [[nodiscard]] constexpr bool operator!=(const EnumIterator& rhs) const noexcept { return !(*this == rhs); }
+    [[nodiscard]] constexpr bool operator!=(const RangeEnumEnumeratorIterator& rhs) const noexcept
+    {
+        return !(*this == rhs);
+    }
 
-    [[nodiscard]] constexpr bool operator<(const EnumIterator& rhs) const noexcept { return mValue < rhs.mValue; }
+    [[nodiscard]] constexpr bool operator<(const RangeEnumEnumeratorIterator& rhs) const noexcept
+    {
+        return mValue < rhs.mValue;
+    }
 
-    [[nodiscard]] constexpr bool operator>(const EnumIterator& rhs) const noexcept { return rhs < *this; }
+    [[nodiscard]] constexpr bool operator>(const RangeEnumEnumeratorIterator& rhs) const noexcept
+    {
+        return rhs < *this;
+    }
 
-    [[nodiscard]] constexpr bool operator<=(const EnumIterator& rhs) const noexcept { return !(rhs < *this); }
+    [[nodiscard]] constexpr bool operator<=(const RangeEnumEnumeratorIterator& rhs) const noexcept
+    {
+        return !(rhs < *this);
+    }
 
-    [[nodiscard]] constexpr bool operator>=(const EnumIterator& rhs) const noexcept { return !(*this < rhs); }
+    [[nodiscard]] constexpr bool operator>=(const RangeEnumEnumeratorIterator& rhs) const noexcept
+    {
+        return !(*this < rhs);
+    }
 
 private:
     EnumT mValue = EnumT::First;
 };
 
 template<RangeEnum EnumT, EnumT First = EnumT::First, EnumT Last = EnumT::Last>
-class Enumerator
+class RangeEnumEnumerator
 {
 public:
-    [[nodiscard]] constexpr EnumIterator<EnumT> begin() const noexcept { return EnumIterator<EnumT>(First); }
-    [[nodiscard]] constexpr EnumIterator<EnumT> end() const noexcept
+    [[nodiscard]] constexpr RangeEnumEnumeratorIterator<EnumT> begin() const noexcept
     {
-        return EnumIterator<EnumT>(static_cast<EnumT>(ToUnderlying(Last) + 1));
+        return RangeEnumEnumeratorIterator<EnumT>(First);
+    }
+    [[nodiscard]] constexpr RangeEnumEnumeratorIterator<EnumT> end() const noexcept
+    {
+        return RangeEnumEnumeratorIterator<EnumT>(static_cast<EnumT>(ToUnderlying(Last) + 1));
     }
 };
+} // namespace detail
+
+template<RangeEnum EnumT>
+[[nodiscard]] constexpr detail::RangeEnumEnumerator<EnumT> enumerate() noexcept
+{
+    return detail::RangeEnumEnumerator<EnumT>();
+}
 
 template<MaskEnum EnumMaskT, class EnumT>
 requires std::is_enum_v<EnumT>
@@ -109,16 +142,18 @@ requires std::is_enum_v<EnumT>
     return (mask & maskValue) == maskValue;
 }
 
+namespace detail
+{
 template<MaskEnum EnumMaskT, RangeEnum EnumT>
-class EnumMaskIterator
+class MaskPairEnumeratorIterator
 {
 public:
     using iterator_category = std::random_access_iterator_tag;
     using value_type = EnumT;
     using difference_type = std::underlying_type_t<EnumT>;
 
-    constexpr EnumMaskIterator() noexcept = default;
-    constexpr EnumMaskIterator(EnumMaskT mask, EnumT value): mMask(mask), mValue(value)
+    constexpr MaskPairEnumeratorIterator() noexcept = default;
+    constexpr MaskPairEnumeratorIterator(EnumMaskT mask, EnumT value): mMask(mask), mValue(value)
     {
         while(!testEnumInMask(mMask, mValue) && mValue <= EnumT::Last)
         {
@@ -126,10 +161,10 @@ public:
         }
     }
 
-    constexpr EnumMaskIterator& operator=(const EnumMaskIterator&) noexcept = default;
+    constexpr MaskPairEnumeratorIterator& operator=(const MaskPairEnumeratorIterator&) noexcept = default;
     [[nodiscard]] constexpr EnumT operator*() const noexcept { return mValue; }
 
-    constexpr EnumMaskIterator& operator++() noexcept
+    constexpr MaskPairEnumeratorIterator& operator++() noexcept
     {
         do
         {
@@ -139,14 +174,14 @@ public:
         return *this;
     }
 
-    constexpr EnumMaskIterator operator++(int) noexcept
+    constexpr MaskPairEnumeratorIterator operator++(int) noexcept
     {
-        EnumIterator ret = *this;
+        RangeEnumEnumeratorIterator ret = *this;
         ++(*this);
         return ret;
     }
 
-    constexpr EnumMaskIterator& operator--() noexcept
+    constexpr MaskPairEnumeratorIterator& operator--() noexcept
     {
         do
         {
@@ -156,32 +191,44 @@ public:
         return *this;
     }
 
-    constexpr EnumMaskIterator operator--(int) noexcept
+    constexpr MaskPairEnumeratorIterator operator--(int) noexcept
     {
-        EnumIterator ret = *this;
+        RangeEnumEnumeratorIterator ret = *this;
         --(*this);
         return ret;
     }
 
-    [[nodiscard]] constexpr difference_type operator-(const EnumMaskIterator& rhs) const noexcept
+    [[nodiscard]] constexpr difference_type operator-(const MaskPairEnumeratorIterator& rhs) const noexcept
     {
         return mValue - rhs.mValue;
     }
 
-    [[nodiscard]] constexpr bool operator==(const EnumMaskIterator& rhs) const noexcept
+    [[nodiscard]] constexpr bool operator==(const MaskPairEnumeratorIterator& rhs) const noexcept
     {
         return mMask == rhs.mMask && mValue == rhs.mValue;
     }
 
-    [[nodiscard]] constexpr bool operator!=(const EnumMaskIterator& rhs) const noexcept { return !(*this == rhs); }
+    [[nodiscard]] constexpr bool operator!=(const MaskPairEnumeratorIterator& rhs) const noexcept
+    {
+        return !(*this == rhs);
+    }
 
-    [[nodiscard]] constexpr bool operator<(const EnumMaskIterator& rhs) const noexcept { return mValue < rhs.mValue; }
+    [[nodiscard]] constexpr bool operator<(const MaskPairEnumeratorIterator& rhs) const noexcept
+    {
+        return mValue < rhs.mValue;
+    }
 
-    [[nodiscard]] constexpr bool operator>(const EnumMaskIterator& rhs) const noexcept { return rhs < *this; }
+    [[nodiscard]] constexpr bool operator>(const MaskPairEnumeratorIterator& rhs) const noexcept { return rhs < *this; }
 
-    [[nodiscard]] constexpr bool operator<=(const EnumMaskIterator& rhs) const noexcept { return !(rhs < *this); }
+    [[nodiscard]] constexpr bool operator<=(const MaskPairEnumeratorIterator& rhs) const noexcept
+    {
+        return !(rhs < *this);
+    }
 
-    [[nodiscard]] constexpr bool operator>=(const EnumMaskIterator& rhs) const noexcept { return !(*this < rhs); }
+    [[nodiscard]] constexpr bool operator>=(const MaskPairEnumeratorIterator& rhs) const noexcept
+    {
+        return !(*this < rhs);
+    }
 
 private:
     EnumMaskT mMask = EnumMaskT::None;
@@ -192,19 +239,25 @@ template<MaskEnum EnumMaskT, RangeEnum EnumT>
 class MaskPairEnumerator
 {
 public:
-    explicit MaskPairEnumerator(EnumMaskT mask): mMask(mask) {}
+    constexpr explicit MaskPairEnumerator(EnumMaskT mask): mMask(mask) {}
 
-    [[nodiscard]] constexpr EnumMaskIterator<EnumMaskT, EnumT> begin() const noexcept
+    [[nodiscard]] constexpr MaskPairEnumeratorIterator<EnumMaskT, EnumT> begin() const noexcept
     {
-        return EnumMaskIterator<EnumMaskT, EnumT>(mMask, EnumT::First);
+        return MaskPairEnumeratorIterator<EnumMaskT, EnumT>(mMask, EnumT::First);
     }
-    [[nodiscard]] constexpr EnumMaskIterator<EnumMaskT, EnumT> end() const noexcept
+    [[nodiscard]] constexpr MaskPairEnumeratorIterator<EnumMaskT, EnumT> end() const noexcept
     {
-        return EnumMaskIterator<EnumMaskT, EnumT>(mMask, static_cast<EnumT>(ToUnderlying(EnumT::Last) + 1));
+        return MaskPairEnumeratorIterator<EnumMaskT, EnumT>(mMask, static_cast<EnumT>(ToUnderlying(EnumT::Last) + 1));
     }
 
 private:
     EnumMaskT mMask;
 };
+} // namespace detail
 
+template<MaskEnum EnumMaskT, RangeEnum EnumT>
+[[nodiscard]] constexpr detail::MaskPairEnumerator<EnumMaskT, EnumT> enumerate(EnumMaskT mask) noexcept
+{
+    return detail::MaskPairEnumerator<EnumMaskT, EnumT>(mask);
+}
 } // namespace scrap

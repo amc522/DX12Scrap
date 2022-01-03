@@ -766,7 +766,7 @@ RaytracingRenderer::createPipelineState(d3d12::RaytracingShaderParams&& shaderPa
     pipelineStateParams.shader = shader;
 
     // for now just pulling out the first shader in each stage
-    for(auto stage : Enumerator<RaytracingShaderStage>())
+    for(auto stage : enumerate<RaytracingShaderStage>())
     {
         const auto* stageShaderInfo = shader->getFixedStageShader(stage, 0);
 

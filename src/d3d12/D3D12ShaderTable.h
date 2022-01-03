@@ -1,5 +1,6 @@
 #pragma once
 
+#include "EnumArray.h"
 #include "FreeBlockTracker.h"
 #include "RenderDefs.h"
 #include "d3d12/D3D12Fwd.h"
@@ -60,7 +61,7 @@ private:
     void destroy();
 
     ShaderTable* mShaderTable = nullptr;
-    std::array<ScopedReservedBlocks, (size_t)RaytracingPipelineStage::Count> mTableReservations = {};
+    EnumArray<ScopedReservedBlocks, RaytracingPipelineStage> mTableReservations = {};
     std::shared_ptr<RaytracingPipelineState> mPipelineState;
 };
 
@@ -78,7 +79,7 @@ public:
 
     [[nodiscard]] tl::expected<ShaderTableAllocation, Error>
     addPipelineState(std::shared_ptr<RaytracingPipelineState> pipelineState,
-                     std::array<std::span<const std::byte>, (size_t)RaytracingPipelineStage::Count> localRootArguments,
+                     EnumArray<std::span<const std::byte>, RaytracingPipelineStage> localRootArguments,
                      ID3D12GraphicsCommandList* commandList);
 
     void deallocate(const std::shared_ptr<RaytracingPipelineState>& pipelineState);
@@ -102,7 +103,6 @@ public:
 
     bool isReady() const;
 
-    
 private:
     struct StageShaderTable
     {
@@ -130,8 +130,8 @@ private:
         }
     };
 
-    std::array<StageShaderTable, (size_t)RaytracingPipelineStage::Count> mShaderTables;
-    std::array<ShaderTableStageParams, (size_t)RaytracingPipelineStage::Count> mParams;
+    EnumArray<StageShaderTable, RaytracingPipelineStage> mShaderTables;
+    EnumArray<ShaderTableStageParams, RaytracingPipelineStage> mParams;
     eastl::vector_set<RefCountedPipelineState> mPipelineStates;
     std::mutex mMutex;
 };

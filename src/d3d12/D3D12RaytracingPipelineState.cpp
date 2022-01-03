@@ -14,7 +14,7 @@ RaytracingPipelineState::RaytracingPipelineState(RaytracingPipelineStateParams&&
     , mMaxRecursionDepth(params.maxRecursionDepth)
     , mShader(std::move(params.shader))
 {
-    for(auto stage : Enumerator<RaytracingShaderStage>())
+    for(auto stage : enumerate<RaytracingShaderStage>())
     {
         const auto& inputParams = params.fixedStages[(size_t)stage];
 
@@ -131,7 +131,7 @@ void RaytracingPipelineState::create()
         std::span fixedStageShaders = mShader->getFixedStageShaders();
         std::span callableShaders = mShader->getCallableShaders();
 
-        for(auto stage : RaytracingShaderStageEnumerator(mShaderStages))
+        for(auto stage : enumerate(mShaderStages))
         {
             const auto& shaderParams = mFixedStageShaderParams[(size_t)stage];
 
@@ -216,7 +216,7 @@ void RaytracingPipelineState::create()
                 return shaderParams.localRootSignatureIndex == localRootSignatureIndex;
             };
 
-            for(auto stage : RaytracingShaderStageEnumerator(mShaderStages))
+            for(auto stage : enumerate(mShaderStages))
             {
                 const auto& shaderParams = mFixedStageShaderParams[(size_t)stage];
                 if(shaderParams.localRootSignatureIndex == localRootSignatureIndex)

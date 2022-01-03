@@ -352,6 +352,233 @@ template<class T, RangeEnum EnumT>
     return std::lexicographical_compare_three_way(left.begin(), left.end(), right.begin(), right.end(),
                                                   detail::SynthThreeWay{});
 }
+
+namespace detail
+{
+template<class T, RangeEnum EnumT>
+class EnumArrayConstEnumeratorIterator
+{
+public:
+    using iterator_concept = std::random_access_iterator_tag;
+    using iterator_category = std::random_access_iterator_tag;
+    using value_type = std::pair<EnumT, const T&>;
+    using difference_type = ptrdiff_t;
+
+    constexpr EnumArrayConstEnumeratorIterator(const EnumArray<T, EnumT>& enumArray, EnumT index) noexcept
+        : mEnumArray(&enumArray)
+        , mIndex(index)
+    {}
+
+    [[nodiscard]] constexpr value_type operator*() const noexcept
+    {
+        return std::pair<EnumT, const T&>(mIndex, (*mEnumArray)[mIndex]);
+    }
+
+    constexpr EnumArrayConstEnumeratorIterator& operator++() noexcept
+    {
+        mIndex = IncrementEnum(mIndex);
+        return *this;
+    }
+
+    constexpr EnumArrayConstEnumeratorIterator operator++(int) noexcept
+    {
+        EnumArrayConstEnumeratorIterator temp = *this;
+        mIndex = IncrementEnum(mIndex);
+        return temp;
+    }
+
+    constexpr EnumArrayConstEnumeratorIterator& operator--() noexcept
+    {
+        mIndex = DecrementEnum(mIndex);
+        return *this;
+    }
+
+    constexpr EnumArrayConstEnumeratorIterator operator--(int) noexcept
+    {
+        EnumArrayConstEnumeratorIterator temp = *this;
+        mIndex = DecrementEnum(mIndex);
+        return temp;
+    }
+
+    constexpr EnumArrayConstEnumeratorIterator& operator+=(const ptrdiff_t offset) noexcept
+    {
+        mIndex = IncrementEnum(mIndex, offset);
+        return *this;
+    }
+
+    [[nodiscard]] constexpr EnumArrayConstEnumeratorIterator operator+(const ptrdiff_t offset) const noexcept
+    {
+        EnumArrayConstEnumeratorIterator temp = *this;
+        temp += offset;
+        return temp;
+    }
+
+    constexpr EnumArrayConstEnumeratorIterator& operator-=(const ptrdiff_t offset) noexcept
+    {
+        mIndex = DecrementEnum(mIndex, offset);
+        return *this;
+    }
+
+    [[nodiscard]] constexpr EnumArrayConstEnumeratorIterator operator-(const ptrdiff_t offset) const noexcept
+    {
+        EnumArrayConstEnumeratorIterator temp = *this;
+        temp -= offset;
+        return temp;
+    }
+
+    [[nodiscard]] constexpr ptrdiff_t operator-(const EnumArrayConstEnumeratorIterator& right) const noexcept
+    {
+        return ToUnderlying(mIndex) - ToUnderlying(right.mIndex);
+    }
+
+    [[nodiscard]] constexpr bool operator==(const EnumArrayConstEnumeratorIterator& right) const noexcept
+    {
+        return mEnumArray == right.mEnumArray && mIndex == right.mIndex;
+    }
+
+    [[nodiscard]] constexpr std::strong_ordering
+    operator<=>(const EnumArrayConstEnumeratorIterator& right) const noexcept
+    {
+        if(mEnumArray == right.mEnumArray) { return mIndex <=> right.mIndex; }
+
+        return mEnumArray <=> right.mEnumArray;
+    }
+
+private:
+    const EnumArray<T, EnumT>* mEnumArray;
+    EnumT mIndex = EnumT::First;
+};
+
+template<class T, RangeEnum EnumT>
+class EnumArrayEnumeratorIterator : public EnumArrayConstEnumeratorIterator<T, EnumT>
+{
+public:
+    using base = EnumArrayConstEnumeratorIterator<T, EnumT>;
+
+    using iterator_concept = std::random_access_iterator_tag;
+    using iterator_category = std::random_access_iterator_tag;
+    using value_type = std::pair<EnumT, T&>;
+    using difference_type = ptrdiff_t;
+
+    constexpr EnumArrayEnumeratorIterator() noexcept {}
+
+    constexpr explicit EnumArrayEnumeratorIterator(EnumArray<T, EnumT>& enumArray, EnumT index) noexcept
+        : base(enumArray, index)
+    {}
+
+    [[nodiscard]] constexpr value_type operator*() const noexcept
+    {
+        std::pair<EnumT, const T&> constPair = base::operator*();
+        return std::pair<EnumT, T&>(constPair.first, const_cast<T&>(constPair.second));
+    }
+
+    constexpr EnumArrayEnumeratorIterator& operator++() noexcept
+    {
+        base::operator++();
+        return *this;
+    }
+
+    constexpr EnumArrayEnumeratorIterator operator++(int) noexcept
+    {
+        EnumArrayEnumeratorIterator temp = *this;
+        base::operator++();
+        return temp;
+    }
+
+    constexpr EnumArrayEnumeratorIterator& operator--() noexcept
+    {
+        base::operator--();
+        return *this;
+    }
+
+    constexpr EnumArrayEnumeratorIterator operator--(int) noexcept
+    {
+        EnumArrayEnumeratorIterator temp = *this;
+        base::operator--();
+        return temp;
+    }
+
+    constexpr EnumArrayEnumeratorIterator& operator+=(const ptrdiff_t offset) noexcept
+    {
+        base::operator+=(offset);
+        return *this;
+    }
+
+    [[nodiscard]] constexpr EnumArrayEnumeratorIterator operator+(const ptrdiff_t offset) const noexcept
+    {
+        EnumArrayEnumeratorIterator temp = *this;
+        temp += offset;
+        return temp;
+    }
+
+    constexpr EnumArrayEnumeratorIterator& operator-=(const ptrdiff_t offset) noexcept
+    {
+        base::operator-=(offset);
+        return *this;
+    }
+
+    using base::operator-;
+
+    [[nodiscard]] constexpr EnumArrayEnumeratorIterator operator-(const ptrdiff_t offset) const noexcept
+    {
+        EnumArrayEnumeratorIterator temp = *this;
+        temp -= offset;
+        return temp;
+    }
+};
+
+template<class T, RangeEnum EnumT>
+class EnumArrayEnumerator
+{
+public:
+    explicit EnumArrayEnumerator(EnumArray<T, EnumT>& enumArray): mEnumArray(&enumArray) {}
+
+    [[nodiscard]] constexpr EnumArrayEnumeratorIterator<T, EnumT> begin() const noexcept
+    {
+        return EnumArrayEnumeratorIterator<T, EnumT>(*mEnumArray, EnumT::First);
+    }
+    [[nodiscard]] constexpr EnumArrayEnumeratorIterator<T, EnumT> end() const noexcept
+    {
+        return EnumArrayEnumeratorIterator<T, EnumT>(*mEnumArray, static_cast<EnumT>(ToUnderlying(EnumT::Last) + 1));
+    }
+
+private:
+    EnumArray<T, EnumT>* mEnumArray = nullptr;
+};
+
+template<class T, RangeEnum EnumT>
+class EnumArrayConstEnumerator
+{
+public:
+    explicit EnumArrayConstEnumerator(const EnumArray<T, EnumT>& enumArray): mEnumArray(&enumArray) {}
+
+    [[nodiscard]] constexpr EnumArrayEnumeratorIterator<T, EnumT> begin() const noexcept
+    {
+        return EnumArrayEnumeratorIterator<T, EnumT>(*mEnumArray, EnumT::First);
+    }
+    [[nodiscard]] constexpr EnumArrayEnumeratorIterator<T, EnumT> end() const noexcept
+    {
+        return EnumArrayEnumeratorIterator<T, EnumT>(*mEnumArray, static_cast<EnumT>(ToUnderlying(EnumT::Last) + 1));
+    }
+
+private:
+    const EnumArray<T, EnumT>* mEnumArray = nullptr;
+};
+} // namespace detail
+
+template<class T, RangeEnum EnumT>
+constexpr [[nodiscard]] detail::EnumArrayEnumerator<T, EnumT> enumerate(EnumArray<T, EnumT>& enumArray) noexcept
+{
+    return detail::EnumArrayEnumerator(enumArray);
+}
+
+template<class T, RangeEnum EnumT>
+constexpr [[nodiscard]] detail::EnumArrayConstEnumerator<T, EnumT>
+enumerate(const EnumArray<T, EnumT>& enumArray) noexcept
+{
+    return detail::EnumArrayConstEnumerator(enumArray);
+}
+
 } // namespace scrap
 
 namespace std
