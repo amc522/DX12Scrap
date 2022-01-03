@@ -93,6 +93,12 @@ DEFINE_ENUM_BITWISE_OPERATORS(GraphicsShaderStageMask);
     }
 }
 
+[[nodiscard]] constexpr detail::MaskPairEnumerator<GraphicsShaderStageMask, GraphicsShaderStage>
+enumerate(GraphicsShaderStageMask mask) noexcept
+{
+    return detail::MaskPairEnumerator<GraphicsShaderStageMask, GraphicsShaderStage>(mask);
+}
+
 enum class RaytracingShaderStage
 {
     RayGen,

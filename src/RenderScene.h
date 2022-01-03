@@ -6,6 +6,7 @@
 #pragma once
 
 #include "Camera.h"
+#include "EnumArray.h"
 #include "GpuMesh.h"
 #include "RenderObject.h"
 #include "d3d12/D3D12CommandList.h"
@@ -122,7 +123,7 @@ private:
     bool buildShaderTables();
 
     Microsoft::WRL::ComPtr<ID3D12RootSignature> mGlobalRootSignature;
-    std::array<Microsoft::WRL::ComPtr<ID3D12RootSignature>, (size_t)RaytracingShaderStage::Count> mLocalRootSignatures;
+    EnumArray<Microsoft::WRL::ComPtr<ID3D12RootSignature>, RaytracingShaderStage> mLocalRootSignatures;
     d3d12::GraphicsCommandList mCommandList;
 
     std::unique_ptr<d3d12::Texture> mRenderTarget;

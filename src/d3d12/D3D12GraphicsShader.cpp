@@ -49,10 +49,9 @@ void GraphicsShader::create()
 
     if(mParams.stages == GraphicsShaderStageMask::None)
     {
-        for(GraphicsShaderStage stage = GraphicsShaderStage::First; stage <= GraphicsShaderStage::Last;
-            stage = IncrementEnum(stage))
+        for(GraphicsShaderStage stage : enumerate<GraphicsShaderStage>())
         {
-            if(!mParams.filepaths[(size_t)stage].empty() && !mParams.entryPoints[(size_t)stage].empty())
+            if(!mParams.filepaths[stage].empty() && !mParams.entryPoints[stage].empty())
             {
                 mParams.stages |= GraphicsShaderStageToMask(stage);
             }
@@ -81,33 +80,30 @@ void GraphicsShader::create()
     UINT compileFlags = 0;
 
     bool compiled = true;
-    for(GraphicsShaderStage stage = GraphicsShaderStage::First; stage <= GraphicsShaderStage::Last;
-        stage = IncrementEnum(stage))
+    for(GraphicsShaderStage stage : enumerate(mParams.stages))
     {
-        if(!hasShaderStage(stage)) { continue; }
+        ShaderInfo& shaderInfo = mShaders[stage];
 
-        ShaderInfo& shaderInfo = mShaders[(size_t)stage];
+        EnumArray<const wchar_t*, GraphicsShaderStage> shaderTargets = {L"vs_6_6", L"hs_6_6", L"ds_6_6", L"gs_6_6",
+                                                                        L"ps_6_6"};
 
-        std::array<const wchar_t*, (size_t)GraphicsShaderStage::Count> shaderTargets = {L"vs_6_6", L"hs_6_6", L"ds_6_6",
-                                                                                        L"gs_6_6", L"ps_6_6"};
-
-        const std::string& entryPoint = mParams.entryPoints[(size_t)stage];
+        const std::string& entryPoint = mParams.entryPoints[stage];
 
         int wideStrSize = MultiByteToWideChar(CP_UTF8, 0, entryPoint.c_str(), (int)entryPoint.size(), nullptr, 0);
         std::wstring wideEntryPoint((size_t)wideStrSize, 0);
         MultiByteToWideChar(CP_UTF8, 0, entryPoint.c_str(), (int)entryPoint.size(), wideEntryPoint.data(),
                             (int)wideEntryPoint.size());
 
-        LPCWSTR compilerArgs[] = {mParams.filepaths[(size_t)stage].c_str(),
+        LPCWSTR compilerArgs[] = {mParams.filepaths[stage].c_str(),
                                   L"-E",
                                   wideEntryPoint.c_str(),
                                   L"-T",
-                                  shaderTargets[(size_t)stage],
+                                  shaderTargets[stage],
                                   (mParams.debug) ? L"-Zi" : L"",
                                   (mParams.debug) ? L"-Od" : L"O3"};
 
         // Load the source file
-        const std::filesystem::path& filepath = mParams.filepaths[(size_t)stage];
+        const std::filesystem::path& filepath = mParams.filepaths[stage];
         ComPtr<IDxcBlobEncoding> sourceBlob;
         if(FAILED(utils->LoadFile(filepath.c_str(), nullptr, &sourceBlob)))
         {
@@ -208,11 +204,12 @@ void GraphicsShader::create()
                     switch(result.error().error)
                     {
                     case ShaderReflectionError::ResourceInReservedRegisterSpace:
-                        logShaderError(stage,
-                                       "Found {} resource '{}' at register {}, space {}. This is reserved for a constant "
-                                       "buffer that holds the vertex buffer descriptor indices.",
-                                       shaderInputBindDesc.Type, shaderInputBindDesc.Name, shaderInputBindDesc.BindPoint,
-                                       shaderInputBindDesc.Space);
+                        logShaderError(
+                            stage,
+                            "Found {} resource '{}' at register {}, space {}. This is reserved for a constant "
+                            "buffer that holds the vertex buffer descriptor indices.",
+                            shaderInputBindDesc.Type, shaderInputBindDesc.Name, shaderInputBindDesc.BindPoint,
+                            shaderInputBindDesc.Space);
                         break;
                     case ShaderReflectionError::GetConstantBufferFailure:
                         logShaderError(stage, "Failed to retrieve reflection data for constant buffer '{}'.",
@@ -256,11 +253,12 @@ void GraphicsShader::create()
                     switch(result.error().error)
                     {
                     case ShaderReflectionError::ResourceInReservedRegisterSpace:
-                        logShaderError(stage,
-                                       "Found {} resource '{}' at register {}, space {}. This is reserved for a constant "
-                                       "buffer that holds the resource descriptor indices.",
-                                       shaderInputBindDesc.Type, shaderInputBindDesc.Name, shaderInputBindDesc.BindPoint,
-                                       shaderInputBindDesc.Space);
+                        logShaderError(
+                            stage,
+                            "Found {} resource '{}' at register {}, space {}. This is reserved for a constant "
+                            "buffer that holds the resource descriptor indices.",
+                            shaderInputBindDesc.Type, shaderInputBindDesc.Name, shaderInputBindDesc.BindPoint,
+                            shaderInputBindDesc.Space);
                         break;
                     case ShaderReflectionError::GetConstantBufferFailure:
                         logShaderError(stage, "Failed to retrieve reflection data for constant buffer '{}'.",
@@ -300,7 +298,7 @@ void GraphicsShader::create()
 
 D3D12_SHADER_BYTECODE GraphicsShader::getShaderByteCode(GraphicsShaderStage stage) const
 {
-    ID3DBlob* blob = mShaders[(size_t)stage].shaderBlob.Get();
+    ID3DBlob* blob = mShaders[stage].shaderBlob.Get();
     if(blob != nullptr) { return CD3DX12_SHADER_BYTECODE(blob); }
 
     return {};
@@ -323,8 +321,7 @@ std::optional<uint32_t> GraphicsShader::getResourceIndex(SharedString name,
 {
     for(const ShaderResource& resource : mShaderInputs.resources)
     {
-        if(resource.name == name && resource.type == resourceType &&
-           resource.dimension == resourceDimension)
+        if(resource.name == name && resource.type == resourceType && resource.dimension == resourceDimension)
         {
             return resource.index;
         }
@@ -335,6 +332,6 @@ std::optional<uint32_t> GraphicsShader::getResourceIndex(SharedString name,
 
 void GraphicsShader::logShaderErrorImpl(GraphicsShaderStage stage, std::string_view message)
 {
-    spdlog::error("{}({}): {}", mParams.filepaths[(size_t)stage].generic_string(), stage, message);
+    spdlog::error("{}({}): {}", mParams.filepaths[stage].generic_string(), stage, message);
 }
 } // namespace scrap::d3d12

@@ -16,11 +16,11 @@ RaytracingPipelineState::RaytracingPipelineState(RaytracingPipelineStateParams&&
 {
     for(auto stage : enumerate<RaytracingShaderStage>())
     {
-        const auto& inputParams = params.fixedStages[(size_t)stage];
+        const auto& inputParams = params.fixedStages[stage];
 
         if(!inputParams) { continue; }
 
-        auto& internalParams = mFixedStageShaderParams[(size_t)stage];
+        auto& internalParams = mFixedStageShaderParams[stage];
         internalParams.shaderEntryPointIndex = inputParams->shaderEntryPointIndex;
 
         if(inputParams->localRootSignature != nullptr)
@@ -133,7 +133,7 @@ void RaytracingPipelineState::create()
 
         for(auto stage : enumerate(mShaderStages))
         {
-            const auto& shaderParams = mFixedStageShaderParams[(size_t)stage];
+            const auto& shaderParams = mFixedStageShaderParams[stage];
 
             D3D12_EXPORT_DESC& desc = exportDescs.emplace_back();
             desc.Name = fixedStageShaders[shaderParams.shaderEntryPointIndex].wideEntryPoint.c_str();
@@ -165,7 +165,7 @@ void RaytracingPipelineState::create()
             auto GetFixedStageEntryPointName = [&](RaytracingShaderStage stage) -> LPCWSTR {
                 if(!testEnumInMask(mShaderStages, stage)) { return nullptr; }
 
-                const auto& shaderParams = mFixedStageShaderParams[(size_t)stage];
+                const auto& shaderParams = mFixedStageShaderParams[stage];
                 std::span fixedStageShaders = mShader->getFixedStageShaders();
 
                 return fixedStageShaders[shaderParams.shaderEntryPointIndex].wideEntryPoint.c_str();
@@ -218,7 +218,7 @@ void RaytracingPipelineState::create()
 
             for(auto stage : enumerate(mShaderStages))
             {
-                const auto& shaderParams = mFixedStageShaderParams[(size_t)stage];
+                const auto& shaderParams = mFixedStageShaderParams[stage];
                 if(shaderParams.localRootSignatureIndex == localRootSignatureIndex)
                 {
                     ++structures.exportsAssociation.NumExports;
@@ -285,11 +285,11 @@ void RaytracingPipelineState::setShaderIdentifier(RaytracingPipelineStage stage,
     switch(stage)
     {
     case RaytracingPipelineStage::RayGen:
-        mFixedStageShaderParams[(size_t)RaytracingPipelineStage::RayGen].shaderIdentifier = shaderIdentifier;
+        mFixedStageShaderParams[RaytracingShaderStage::RayGen].shaderIdentifier = shaderIdentifier;
         break;
     case scrap::RaytracingPipelineStage::HitGroup: mHitGroupShaderIdentifier = shaderIdentifier; break;
     case RaytracingPipelineStage::Miss:
-        mFixedStageShaderParams[(size_t)RaytracingPipelineStage::Miss].shaderIdentifier = shaderIdentifier;
+        mFixedStageShaderParams[RaytracingShaderStage::Miss].shaderIdentifier = shaderIdentifier;
         break;
     default: break;
     }
@@ -306,10 +306,9 @@ const RaytracingShaderIdentifier& RaytracingPipelineState::getShaderIdentifier(R
     switch(stage)
     {
     case RaytracingPipelineStage::RayGen:
-        return mFixedStageShaderParams[(size_t)RaytracingPipelineStage::RayGen].shaderIdentifier;
+        return mFixedStageShaderParams[RaytracingShaderStage::RayGen].shaderIdentifier;
     case scrap::RaytracingPipelineStage::HitGroup: return mHitGroupShaderIdentifier;
-    case RaytracingPipelineStage::Miss:
-        return mFixedStageShaderParams[(size_t)RaytracingPipelineStage::Miss].shaderIdentifier;
+    case RaytracingPipelineStage::Miss: return mFixedStageShaderParams[RaytracingShaderStage::Miss].shaderIdentifier;
     default: return kInvalidShaderIdentifier;
     }
 }
@@ -317,7 +316,7 @@ const RaytracingShaderIdentifier& RaytracingPipelineState::getShaderIdentifier(R
 std::wstring_view
 scrap::d3d12::RaytracingPipelineState::getShaderEntryPointName(const RaytracingShaderStage stage) const
 {
-    return getFixedStageShaderEntryPointName(mFixedStageShaderParams[(size_t)stage]);
+    return getFixedStageShaderEntryPointName(mFixedStageShaderParams[stage]);
 }
 
 std::wstring_view RaytracingPipelineState::getShaderEntryPointName(RaytracingPipelineStage stage) const

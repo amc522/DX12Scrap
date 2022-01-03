@@ -1,5 +1,6 @@
 #pragma once
 
+#include "EnumArray.h"
 #include "RenderDefs.h"
 #include "Utility.h"
 #include "d3d12/D3D12Fwd.h"
@@ -16,8 +17,8 @@ namespace scrap::d3d12
 {
 struct GraphicsShaderParams
 {
-    std::array<std::filesystem::path, (size_t)GraphicsShaderStage::Count> filepaths;
-    std::array<std::string, (size_t)GraphicsShaderStage::Count> entryPoints;
+    EnumArray<std::filesystem::path, GraphicsShaderStage> filepaths;
+    EnumArray<std::string, GraphicsShaderStage> entryPoints;
     GraphicsShaderStageMask stages = GraphicsShaderStageMask::None;
     bool debug = false;
 };
@@ -53,7 +54,7 @@ public:
         return (stageMask & mParams.stages) == stageMask;
     }
 
-    ID3DBlob* getShader(GraphicsShaderStage stage) const { return mShaders[(size_t)stage].shaderBlob.Get(); }
+    ID3DBlob* getShader(GraphicsShaderStage stage) const { return mShaders[stage].shaderBlob.Get(); }
     D3D12_SHADER_BYTECODE getShaderByteCode(GraphicsShaderStage stage) const;
 
     ShaderInputs& accessShaderInputs() { return mShaderInputs; }
@@ -82,7 +83,7 @@ private:
     void logShaderErrorImpl(GraphicsShaderStage stage, std::string_view message);
 
     GraphicsShaderParams mParams;
-    std::array<ShaderInfo, (size_t)GraphicsShaderStage::Count> mShaders;
+    EnumArray<ShaderInfo, GraphicsShaderStage> mShaders;
     GraphicsShaderState mState = GraphicsShaderState::Invalid;
     std::mutex mCreationMutex;
 

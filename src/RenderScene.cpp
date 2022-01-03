@@ -688,7 +688,7 @@ bool RaytracingRenderer::createRootSignatures()
         }
 
         rootSigResult.value()->SetName(L"Closest Hit Local Root Signature");
-        mLocalRootSignatures[(size_t)RaytracingShaderStage::ClosestHit] = std::move(rootSigResult.value());
+        mLocalRootSignatures[RaytracingShaderStage::ClosestHit] = std::move(rootSigResult.value());
         spdlog::info("Created raytracing local root signature.");
     }
 
@@ -736,13 +736,11 @@ bool RaytracingRenderer::createInternalPipelineStates()
         d3d12::RaytracingPipelineStateParams pipelineStateParams;
         pipelineStateParams.shader = shader;
 
-        pipelineStateParams.fixedStages[(size_t)RaytracingShaderStage::RayGen] =
-            d3d12::RaytracingPipelineStateShaderParams{.shaderEntryPointIndex = shader->getFixedStageIndex(
-                                                           RaytracingShaderStage::RayGen, raygenEntryPointName)};
+        pipelineStateParams.fixedStages[RaytracingShaderStage::RayGen] = d3d12::RaytracingPipelineStateShaderParams{
+            .shaderEntryPointIndex = shader->getFixedStageIndex(RaytracingShaderStage::RayGen, raygenEntryPointName)};
 
-        pipelineStateParams.fixedStages[(size_t)RaytracingShaderStage::Miss] =
-            d3d12::RaytracingPipelineStateShaderParams{
-                .shaderEntryPointIndex = shader->getFixedStageIndex(RaytracingShaderStage::Miss, missEntryPointName)};
+        pipelineStateParams.fixedStages[RaytracingShaderStage::Miss] = d3d12::RaytracingPipelineStateShaderParams{
+            .shaderEntryPointIndex = shader->getFixedStageIndex(RaytracingShaderStage::Miss, missEntryPointName)};
 
         // pipelineStateParams.hitGroupName = hitGroupName;
         pipelineStateParams.primitiveType = d3d12::RaytracingPipelineStatePrimitiveType::Triangles;
@@ -772,8 +770,8 @@ RaytracingRenderer::createPipelineState(d3d12::RaytracingShaderParams&& shaderPa
 
         if(stageShaderInfo == nullptr) { continue; }
 
-        pipelineStateParams.fixedStages[(size_t)stage] =
-            d3d12::RaytracingPipelineStateShaderParams{.localRootSignature = mLocalRootSignatures[(size_t)stage],
+        pipelineStateParams.fixedStages[stage] =
+            d3d12::RaytracingPipelineStateShaderParams{.localRootSignature = mLocalRootSignatures[stage],
                                                        .shaderEntryPointIndex = stageShaderInfo->index};
     }
 
@@ -835,9 +833,6 @@ bool RaytracingRenderer::buildShaderTables()
 
     mShaderTable = std::make_shared<d3d12::ShaderTable>();
     mShaderTable->init(params);
-
-    std::array<std::span<const std::byte>, (size_t)RaytracingPipelineStage::Count> localRootArguments{
-        {{}, ToByteSpan(rootArguments), {}}};
 
     {
         auto shaderTableResult = mShaderTable->addPipelineState(mMainPassPipelineState, {}, mCommandList.get());
@@ -1021,10 +1016,10 @@ bool RenderScene::createRenderObject()
 
     {
         d3d12::GraphicsShaderParams shaderParams;
-        shaderParams.filepaths[(size_t)GraphicsShaderStage::Vertex] = L"assets\\hello_cube.hlsl";
-        shaderParams.filepaths[(size_t)GraphicsShaderStage::Pixel] = L"assets\\hello_cube.hlsl";
-        shaderParams.entryPoints[(size_t)GraphicsShaderStage::Vertex] = "VSMain";
-        shaderParams.entryPoints[(size_t)GraphicsShaderStage::Pixel] = "PSMain";
+        shaderParams.filepaths[GraphicsShaderStage::Vertex] = L"assets\\hello_cube.hlsl";
+        shaderParams.filepaths[GraphicsShaderStage::Pixel] = L"assets\\hello_cube.hlsl";
+        shaderParams.entryPoints[GraphicsShaderStage::Vertex] = "VSMain";
+        shaderParams.entryPoints[GraphicsShaderStage::Pixel] = "PSMain";
         shaderParams.stages = GraphicsShaderStageMask::VsPs;
 #ifdef _DEBUG
         shaderParams.debug = true;

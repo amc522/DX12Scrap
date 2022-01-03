@@ -2,6 +2,7 @@
 
 #include "D3D12RaytracingShader.h"
 #include "EASTL/fixed_vector.h"
+#include "EnumArray.h"
 #include "RenderDefs.h"
 #include "d3d12/D3D12Fwd.h"
 #include "d3d12/D3D12TrackedGpuObject.h"
@@ -32,7 +33,7 @@ struct RaytracingPipelineStateShaderParams
 struct RaytracingPipelineStateParams
 {
     std::shared_ptr<RaytracingShader> shader;
-    std::array<std::optional<RaytracingPipelineStateShaderParams>, (size_t)RaytracingShaderStage::Count> fixedStages;
+    EnumArray<std::optional<RaytracingPipelineStateShaderParams>, RaytracingShaderStage> fixedStages;
     std::span<RaytracingPipelineStateShaderParams> callables;
     std::string_view hitGroupName;
     RaytracingPipelineStatePrimitiveType primitiveType = RaytracingPipelineStatePrimitiveType::Triangles;
@@ -127,7 +128,7 @@ private:
     std::shared_ptr<RaytracingShader> mShader;
     eastl::fixed_vector<TrackedGpuObject<ID3D12RootSignature>, 1> mLocalRootSignatures;
 
-    std::array<ShaderStageParams, (size_t)RaytracingShaderStage::Count> mFixedStageShaderParams;
+    EnumArray<ShaderStageParams, RaytracingShaderStage> mFixedStageShaderParams;
     std::vector<ShaderStageParams> mCallableShaderParams;
     std::wstring mHitGroupName;
     RaytracingPipelineStatePrimitiveType mPrimitiveType;
