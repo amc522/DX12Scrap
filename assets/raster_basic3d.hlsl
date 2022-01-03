@@ -36,7 +36,7 @@ VertexOutput VSMain(VertexInput input)
 
     VertexOutput output;
 
-    output.clipPos = mul(gFrame.worldToClip, float4(positions[input.vertexId], 1.0));
+    output.clipPos = mul(gObjectCb.objectToClip, float4(positions[input.vertexId], 1.0));
     output.worldNormal = normals[input.vertexId];
     output.uv = texCoords[input.vertexId];
 

@@ -25,6 +25,7 @@ constexpr ShaderRegisterSlot kFrameCB{1};
 constexpr ShaderRegisterSlot kResourceCB{2};
 constexpr ShaderRegisterSlot kOutputBuffer{3};
 constexpr ShaderRegisterSlot kAccelerationStructure{4};
+constexpr ShaderRegisterSlot kObjectCB{5};
 } // namespace reservedShaderRegister
 
 namespace RasterRootParamSlot
@@ -34,6 +35,7 @@ enum Value
     FrameCB = 0,
     ResourceIndices,
     VertexIndices,
+    ObjectCB,
     Count
 };
 }

@@ -121,6 +121,13 @@ bool RasterRenderer::createRootSignature()
     vertexRootConstants.Constants.RegisterSpace = d3d12::reservedShaderRegister::kVertexCB.registerSpace;
     vertexRootConstants.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
+    D3D12_ROOT_PARAMETER1& objectConstantBuffer = rootParameters[d3d12::RasterRootParamSlot::ObjectCB];
+    objectConstantBuffer.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    objectConstantBuffer.Descriptor.ShaderRegister = d3d12::reservedShaderRegister::kObjectCB.shaderRegister;
+    objectConstantBuffer.Descriptor.RegisterSpace = d3d12::reservedShaderRegister::kObjectCB.registerSpace;
+    objectConstantBuffer.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_VOLATILE;
+    objectConstantBuffer.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
     // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_static_sampler_desc
     // Static samplers are the same as normal samplers, except that they are not going to change after creating the
     // root signature. Static samplers can be used to describe all the basic samplers that are used by most shaders
@@ -200,10 +207,18 @@ void RasterRenderer::createFrameConstantBuffer()
     params.flags = d3d12::BufferFlags::ConstantBuffer;
     params.name = "Frame Constant Buffer";
 
-    auto constantBuffer = std::make_unique<d3d12::Buffer>();
-    constantBuffer->init(params);
+    auto frameConstantBuffer = std::make_unique<d3d12::Buffer>();
+    frameConstantBuffer->init(params);
 
-    mFrameConstantBuffer = std::move(constantBuffer);
+    mFrameConstantBuffer = std::move(frameConstantBuffer);
+
+    params.byteSize = sizeof(ObjectConstantBuffer);
+    params.name = "Object Constant Buffers";
+
+    auto objectConstantBuffer = std::make_unique<d3d12::Buffer>();
+    objectConstantBuffer->init(params);
+
+    mObjectConstantBuffer = std::move(objectConstantBuffer);
 }
 
 RasterRenderer& RasterRenderer::operator=(RasterRenderer&&) = default;
@@ -214,8 +229,14 @@ void RasterRenderer::preRender(const FrameInfo& frameInfo, const RenderParams& r
 
     {
         d3d12::GpuBufferWriteGuard<d3d12::Buffer> writeGuard(*mFrameConstantBuffer, mCommandList.get());
-        auto frameCbSpan = writeGuard.getWriteBufferAs<FrameConstantBuffer>();
-        frameCbSpan.front() = renderParams.frameConstants;
+        auto& frameConstantBuffer = writeGuard.getWriteBufferAs<FrameConstantBuffer>().front();
+        frameConstantBuffer = renderParams.frameConstants;
+        frameConstantBuffer.worldToView = glm::transpose(frameConstantBuffer.worldToView);
+        frameConstantBuffer.viewToWorld = glm::transpose(frameConstantBuffer.viewToWorld);
+        frameConstantBuffer.viewToClip = glm::transpose(frameConstantBuffer.viewToClip);
+        frameConstantBuffer.clipToView = glm::transpose(frameConstantBuffer.clipToView);
+        frameConstantBuffer.worldToClip = glm::transpose(frameConstantBuffer.worldToClip);
+        frameConstantBuffer.clipToWorld = glm::transpose(frameConstantBuffer.clipToWorld);
     }
 }
 
@@ -263,7 +284,11 @@ void RasterRenderer::render(const FrameInfo& frameInfo, const RenderParams& rend
         mCommandList.get()->SetGraphicsRootConstantBufferView(
             d3d12::RasterRootParamSlot::FrameCB, mFrameConstantBuffer->getResource()->GetGPUVirtualAddress());
 
+        mCommandList.get()->SetGraphicsRootConstantBufferView(
+            d3d12::RasterRootParamSlot::ObjectCB, mObjectConstantBuffer->getResource()->GetGPUVirtualAddress());
+
         mFrameConstantBuffer->markAsUsed(mCommandList.get());
+        mObjectConstantBuffer->markAsUsed(mCommandList.get());
 
         mCommandList.get()->RSSetViewports(1, &viewport);
         mCommandList.get()->RSSetScissorRects(1, &scissorRect);
@@ -288,6 +313,23 @@ void RasterRenderer::render(const FrameInfo& frameInfo, const RenderParams& rend
         for(RenderObject& renderObject : renderParams.renderObjects)
         {
             bindTextures(renderObject.mMaterial);
+
+            {
+                const ObjectConstantBuffer objectConstants{
+                    .objectToWorld = glm::transpose(renderObject.mTransform),
+                    .worldToObject = glm::inverse(objectConstants.objectToWorld),
+                    .objectToView = glm::transpose(renderParams.frameConstants.worldToView *
+                                                   static_cast<glm::mat4x4>(renderObject.mTransform)),
+                    .viewToObject = glm::inverse(objectConstants.objectToView),
+                    .objectToClip = glm::transpose(renderParams.frameConstants.worldToClip *
+                                                   static_cast<glm::mat4x4>(renderObject.mTransform)),
+                    .clipToObject = glm::inverse(objectConstants.objectToClip)};
+
+                d3d12::GpuBufferWriteGuard<d3d12::Buffer> objectCbWriteGuard(*mObjectConstantBuffer,
+                                                                             mCommandList.get());
+                objectCbWriteGuard.getWriteBufferAs<ObjectConstantBuffer>().front() = objectConstants;
+            }
+
             d3d12::drawIndexed(mCommandList, d3d12::DrawIndexedParams{
                                                  .indexBuffer = renderObject.mGpuMesh->getIndexBuffer().get(),
                                                  .pipelineState = renderObject.mMaterial.mRasterPipelineState.get(),
@@ -382,8 +424,14 @@ void RaytracingRenderer::preRender(const FrameInfo& frameInfo, const RenderParam
         d3d12::ScopedGpuEvent gpuEvent(mCommandList.get(), "Update Constant Buffers");
 
         d3d12::GpuBufferWriteGuard<d3d12::Buffer> writeGuard(*mFrameConstantBuffer, mCommandList.get());
-        auto frameCbSpan = writeGuard.getWriteBufferAs<FrameConstantBuffer>();
-        frameCbSpan.front() = renderParams.frameConstants;
+        auto& frameConstantBuffer = writeGuard.getWriteBufferAs<FrameConstantBuffer>().front();
+        frameConstantBuffer = renderParams.frameConstants;
+        frameConstantBuffer.worldToView = glm::transpose(frameConstantBuffer.worldToView);
+        frameConstantBuffer.viewToWorld = glm::transpose(frameConstantBuffer.viewToWorld);
+        frameConstantBuffer.viewToClip = glm::transpose(frameConstantBuffer.viewToClip);
+        frameConstantBuffer.clipToView = glm::transpose(frameConstantBuffer.clipToView);
+        frameConstantBuffer.worldToClip = glm::transpose(frameConstantBuffer.worldToClip);
+        frameConstantBuffer.clipToWorld = glm::transpose(frameConstantBuffer.clipToWorld);
     }
 
     if(!mShaderTable->isReady()) { return; }
@@ -865,27 +913,20 @@ void RenderScene::preRender(const FrameInfo& frameInfo)
 
     mCamera.update(frameInfo);
 
-    mRenderObjects.front().mTransform =
-        glm::rotate(static_cast<glm::mat4x4>(mRenderObjects.front().mTransform), 0.01f, glm::vec3(0.0f, 1.0f, 0.0f));
+    RenderObject& renderObject = mRenderObjects.front();
+    renderObject.mTransform =
+        glm::rotate(static_cast<glm::mat4x4>(renderObject.mTransform), 0.01f, glm::vec3(0.0f, 1.0f, 0.0f));
 
     const auto windowSize = frameInfo.mainWindow->getSize();
 
     {
-        const glm::mat4x4 worldToViewMat = mCamera.worldToViewMatrix();
-        const glm::mat4x4 viewToWorldMat = glm::inverse(worldToViewMat);
-        const glm::mat4x4 viewToClipMat =
-            glm::perspectiveFovLH_ZO(1.04719f, (float)windowSize.x, (float)windowSize.y, 0.1f, 100.0f);
-        const glm::mat4x4 clipToViewMat = glm::inverse(viewToClipMat);
-        const glm::mat4x4 worldToClipMat = viewToClipMat * worldToViewMat;
-        const glm::mat4x4 clipToWorldMat = glm::inverse(worldToClipMat);
-
         FrameConstantBuffer& frameCb = mRenderParams.frameConstants;
-        frameCb.worldToView = glm::transpose(worldToViewMat);
-        frameCb.viewToWorld = glm::transpose(viewToWorldMat);
-        frameCb.viewToClip = glm::transpose(viewToClipMat);
-        frameCb.clipToView = glm::transpose(clipToViewMat);
-        frameCb.worldToClip = glm::transpose(worldToClipMat);
-        frameCb.clipToWorld = glm::transpose(clipToWorldMat);
+        frameCb.worldToView = mCamera.worldToViewMatrix();
+        frameCb.viewToWorld = glm::inverse(frameCb.worldToView);
+        frameCb.viewToClip = glm::perspectiveFovLH_ZO(1.04719f, (float)windowSize.x, (float)windowSize.y, 0.1f, 100.0f);
+        frameCb.clipToView = glm::inverse(frameCb.viewToClip);
+        frameCb.worldToClip = frameCb.viewToClip * frameCb.worldToView;
+        frameCb.clipToWorld = glm::inverse(frameCb.worldToClip);
         frameCb.cameraWorldPos = mCamera.getPosition();
         frameCb.time = std::chrono::duration_cast<std::chrono::duration<float>>(
                            std::chrono::steady_clock::now().time_since_epoch())
@@ -1012,8 +1053,8 @@ bool RenderScene::createRenderObject()
 
     {
         d3d12::GraphicsShaderParams shaderParams;
-        shaderParams.filepaths[GraphicsShaderStage::Vertex] = L"assets\\hello_cube.hlsl";
-        shaderParams.filepaths[GraphicsShaderStage::Pixel] = L"assets\\hello_cube.hlsl";
+        shaderParams.filepaths[GraphicsShaderStage::Vertex] = L"assets\\raster_basic3d.hlsl";
+        shaderParams.filepaths[GraphicsShaderStage::Pixel] = L"assets\\raster_basic3d.hlsl";
         shaderParams.entryPoints[GraphicsShaderStage::Vertex] = "VSMain";
         shaderParams.entryPoints[GraphicsShaderStage::Pixel] = "PSMain";
         shaderParams.stages = GraphicsShaderStageMask::VsPs;

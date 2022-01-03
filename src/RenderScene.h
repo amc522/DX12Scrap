@@ -40,6 +40,16 @@ struct FrameConstantBuffer
     glm::vec3 padding;
 };
 
+struct ObjectConstantBuffer
+{
+    glm::mat4x4 objectToWorld;
+    glm::mat4x4 worldToObject;
+    glm::mat4x4 objectToView;
+    glm::mat4x4 viewToObject;
+    glm::mat4x4 objectToClip;
+    glm::mat4x4 clipToObject;
+};
+
 struct RenderParams
 {
     FrameConstantBuffer frameConstants;
@@ -91,6 +101,7 @@ private:
     d3d12::GraphicsCommandList mCommandList;
 
     std::shared_ptr<d3d12::Buffer> mFrameConstantBuffer;
+    std::shared_ptr<d3d12::Buffer> mObjectConstantBuffer;
 
     std::unique_ptr<d3d12::Texture> mDepthStencilTexture;
     bool mInitialized = false;
