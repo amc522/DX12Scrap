@@ -817,15 +817,11 @@ constexpr std::span<const std::byte> AsBytes(const T& value)
 
 bool RaytracingRenderer::buildShaderTables()
 {
-    struct RootArguments
-    {
-        FrameConstantBuffer cb;
-    } rootArguments{};
-
     d3d12::ShaderTableParams params;
     params.raygen.entryByteStride = 0;
     params.raygen.capacity = 1;
-    params.hitGroup.entryByteStride = sizeof(RootArguments);
+    params.hitGroup.entryByteStride =
+        sizeof(uint32_t) * (d3d12::kMaxBindlessVertexBuffers + d3d12::kMaxBindlessResources);
     params.hitGroup.capacity = 1;
     params.miss.entryByteStride = 0;
     params.miss.capacity = 1;
