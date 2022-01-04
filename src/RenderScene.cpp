@@ -963,30 +963,6 @@ void RenderScene::endFrame()
     }
 }
 
-GpuMesh RenderScene::createCube()
-{
-    constexpr uint32_t subdivisions = 1;
-    MeshSizes meshSizes = CalculateCubeMeshSizes(CubeMeshTopologyType::Triangle, subdivisions);
-
-    CpuMesh cubeMesh(GetCubeMeshPrimitiveTopology(CubeMeshTopologyType::Triangle));
-    cubeMesh.initIndices(IndexBufferFormat::UInt16, meshSizes.indexCount);
-    cubeMesh.createVertexElement(ShaderVertexSemantic::Position, 0, gpufmt::Format::R32G32B32_SFLOAT,
-                                 meshSizes.vertexCount);
-    cubeMesh.createVertexElement(ShaderVertexSemantic::Normal, 0, gpufmt::Format::R32G32B32_SFLOAT,
-                                 meshSizes.vertexCount);
-    cubeMesh.createVertexElement(ShaderVertexSemantic::Tangent, 0, gpufmt::Format::R32G32B32_SFLOAT,
-                                 meshSizes.vertexCount);
-    cubeMesh.createVertexElement(ShaderVertexSemantic::Binormal, 0, gpufmt::Format::R32G32B32_SFLOAT,
-                                 meshSizes.vertexCount);
-    cubeMesh.createVertexElement(ShaderVertexSemantic::TexCoord, 0, gpufmt::Format::R32G32_SFLOAT,
-                                 meshSizes.vertexCount);
-
-    PrimitiveMesh3dParams primitiveParams(cubeMesh);
-    GenerateCubeMeshTris(primitiveParams, subdivisions);
-
-    return GpuMesh(cubeMesh, ResourceAccessFlags::GpuRead, "Cube");
-}
-
 std::shared_ptr<d3d12::Texture> RenderScene::createTexture()
 {
     cputex::TextureParams textureParams;
@@ -1050,7 +1026,8 @@ bool RenderScene::createRenderObject()
 
     RenderObject renderObject{RenderObjectId(mNextRenderObjectId++)};
     renderObject.name = SharedString("Cube");
-    renderObject.mGpuMesh = std::make_shared<GpuMesh>(createCube());
+    renderObject.mGpuMesh = std::make_shared<GpuMesh>(
+        GpuMesh(GenerateCubeMesh(CubeMeshTopologyType::Triangle, 1), ResourceAccessFlags::GpuRead, "Cube"));
 
     {
         d3d12::GraphicsShaderParams shaderParams;

@@ -168,7 +168,6 @@ public:
     void endFrame();
 
 private:
-    GpuMesh createCube();
     std::shared_ptr<d3d12::Texture> createTexture();
 
     bool createRenderObject();

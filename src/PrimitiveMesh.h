@@ -88,4 +88,9 @@ MeshSizes GenerateCubeMesh(CubeMeshTopologyType topologyType,
                            uint32_t subdivisions = 0,
                            glm::vec3 offset = {0.0f, 0.0f, 0.0f},
                            glm::vec3 size = {1.0f, 1.0f, 1.0f});
+
+CpuMesh GenerateCubeMesh(CubeMeshTopologyType topologyType,
+                         uint32_t subdivisions = 0,
+                         glm::vec3 offset = {0.0f, 0.0f, 0.0f},
+                         glm::vec3 size = {1.0f, 1.0f, 1.0f});
 } // namespace scrap

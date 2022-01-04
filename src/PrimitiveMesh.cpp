@@ -283,4 +283,27 @@ MeshSizes GenerateCubeMesh(CubeMeshTopologyType topologyType,
     default: return {};
     }
 }
+
+CpuMesh GenerateCubeMesh(CubeMeshTopologyType topologyType, uint32_t subdivisions, glm::vec3 offset, glm::vec3 size)
+{
+    MeshSizes meshSizes = CalculateCubeMeshSizes(topologyType, subdivisions);
+
+    CpuMesh cubeMesh(GetCubeMeshPrimitiveTopology(topologyType));
+    cubeMesh.initIndices(IndexBufferFormat::UInt16, meshSizes.indexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::Position, 0, gpufmt::Format::R32G32B32_SFLOAT,
+                                 meshSizes.vertexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::Normal, 0, gpufmt::Format::R32G32B32_SFLOAT,
+                                 meshSizes.vertexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::Tangent, 0, gpufmt::Format::R32G32B32_SFLOAT,
+                                 meshSizes.vertexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::Binormal, 0, gpufmt::Format::R32G32B32_SFLOAT,
+                                 meshSizes.vertexCount);
+    cubeMesh.createVertexElement(ShaderVertexSemantic::TexCoord, 0, gpufmt::Format::R32G32_SFLOAT,
+                                 meshSizes.vertexCount);
+
+    PrimitiveMesh3dParams primitiveParams(cubeMesh);
+    GenerateCubeMeshTris(primitiveParams, subdivisions, offset, size);
+
+    return cubeMesh;
+}
 } // namespace scrap
