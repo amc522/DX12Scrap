@@ -3,6 +3,7 @@
 #include "EnumArray.h"
 #include "FreeBlockTracker.h"
 #include "RenderDefs.h"
+#include "d3d12/D3D12Buffer.h"
 #include "d3d12/D3D12Fwd.h"
 
 #include <memory>
@@ -134,5 +135,6 @@ private:
     EnumArray<ShaderTableStageParams, RaytracingPipelineStage> mParams;
     eastl::vector_set<RefCountedPipelineState> mPipelineStates;
     std::mutex mMutex;
+    EnumArray<GpuBufferWriteGuard<d3d12::Buffer>, RaytracingPipelineStage> mShaderTableBufferMaps;
 };
 } // namespace scrap::d3d12
