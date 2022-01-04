@@ -9,6 +9,7 @@
 
 #include <EASTL/vector_map.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <glm/mat4x3.hpp>
 
 namespace scrap
@@ -30,6 +31,23 @@ public:
     d3d12::ShaderTableAllocation mShaderTableAllocation;
 };
 
+struct Transform
+{
+    glm::vec3 position{0.0f, 0.0f, 0.0f};
+    glm::quat rotation = glm::identity<glm::quat>();
+    glm::vec3 scale{1.0f, 1.0f, 1.0f};
+
+    glm::mat4 getMatrix4x4() const
+    {
+        auto transform = glm::identity<glm::mat4x4>();
+        transform = glm::translate(transform, position);
+        transform = transform * glm::mat4_cast(rotation);
+        transform = glm::scale(transform, scale);
+
+        return transform;
+    }
+};
+
 class RenderObjectId
 {
 public:
@@ -47,7 +65,7 @@ class RenderObject
 {
 public:
     RenderObjectId mId;
-    glm::mat4x3 mTransform = glm::identity<glm::mat4x3>();
+    Transform mTransform;
     std::shared_ptr<GpuMesh> mGpuMesh;
     Material mMaterial;
     d3d12::TlasInstanceAllocation mInstanceAllocation;

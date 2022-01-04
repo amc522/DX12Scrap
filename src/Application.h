@@ -41,6 +41,7 @@ private:
     std::unique_ptr<RenderScene> mRenderScene;
     bool mRunning = false;
 
+    std::chrono::steady_clock::time_point mApplicationStartTime;
     std::chrono::steady_clock::time_point mLastFrameTime;
     std::chrono::nanoseconds mFrameDelta{0};
 };

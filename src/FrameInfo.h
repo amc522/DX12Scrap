@@ -10,6 +10,8 @@ class Window;
 
 struct FrameInfo
 {
+    std::chrono::nanoseconds runtime{0};
+    std::chrono::duration<float> runtimeSec{0.0f};
     std::chrono::nanoseconds frameDelta{0};
     std::chrono::duration<float> frameDeltaSec{0.0f};
     Window* mainWindow = nullptr;

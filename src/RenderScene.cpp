@@ -315,14 +315,16 @@ void RasterRenderer::render(const FrameInfo& frameInfo, const RenderParams& rend
             bindTextures(renderObject.mMaterial);
 
             {
+                glm::mat4x3 transformMat = renderObject.mTransform.getMatrix4x4();
+
                 const ObjectConstantBuffer objectConstants{
-                    .objectToWorld = glm::transpose(renderObject.mTransform),
+                    .objectToWorld = glm::transpose(transformMat),
                     .worldToObject = glm::inverse(objectConstants.objectToWorld),
                     .objectToView = glm::transpose(renderParams.frameConstants.worldToView *
-                                                   static_cast<glm::mat4x4>(renderObject.mTransform)),
+                                                   static_cast<glm::mat4x4>(transformMat)),
                     .viewToObject = glm::inverse(objectConstants.objectToView),
                     .objectToClip = glm::transpose(renderParams.frameConstants.worldToClip *
-                                                   static_cast<glm::mat4x4>(renderObject.mTransform)),
+                                                   static_cast<glm::mat4x4>(transformMat)),
                     .clipToObject = glm::inverse(objectConstants.objectToClip)};
 
                 d3d12::GpuBufferWriteGuard<d3d12::Buffer> objectCbWriteGuard(*mObjectConstantBuffer,
@@ -467,7 +469,7 @@ void RaytracingRenderer::preRender(const FrameInfo& frameInfo, const RenderParam
             renderObject.mInstanceAllocation = std::move(addResult.value());
         }
 
-        renderObject.mInstanceAllocation.updateTransform(renderObject.mTransform);
+        renderObject.mInstanceAllocation.updateTransform(renderObject.mTransform.getMatrix4x4());
 
         if(!renderObject.mMaterial.mShaderTableAllocation.isValid())
         {
@@ -914,8 +916,10 @@ void RenderScene::preRender(const FrameInfo& frameInfo)
     mCamera.update(frameInfo);
 
     RenderObject& renderObject = mRenderObjects.front();
-    renderObject.mTransform =
-        glm::rotate(static_cast<glm::mat4x4>(renderObject.mTransform), 0.01f, glm::vec3(0.0f, 1.0f, 0.0f));
+    renderObject.mTransform.rotation =
+        glm::rotate(renderObject.mTransform.rotation, 0.01f, glm::vec3(0.0f, 1.0f, 0.0f));
+    renderObject.mTransform.position = glm::vec3(std::sin(frameInfo.runtimeSec.count()) * 5.0f, 0.0f, 0.0f);
+    renderObject.mTransform.scale = glm::vec3(std::abs(std::sin(frameInfo.runtimeSec.count())) + 0.5f);
 
     const auto windowSize = frameInfo.mainWindow->getSize();
 
@@ -928,9 +932,7 @@ void RenderScene::preRender(const FrameInfo& frameInfo)
         frameCb.worldToClip = frameCb.viewToClip * frameCb.worldToView;
         frameCb.clipToWorld = glm::inverse(frameCb.worldToClip);
         frameCb.cameraWorldPos = mCamera.getPosition();
-        frameCb.time = std::chrono::duration_cast<std::chrono::duration<float>>(
-                           std::chrono::steady_clock::now().time_since_epoch())
-                           .count();
+        frameCb.time = frameInfo.runtimeSec.count();
         frameCb.frameTimeDelta = frameInfo.frameDeltaSec.count();
     }
 
@@ -1049,7 +1051,6 @@ bool RenderScene::createRenderObject()
     RenderObject renderObject{RenderObjectId(mNextRenderObjectId++)};
     renderObject.name = SharedString("Cube");
     renderObject.mGpuMesh = std::make_shared<GpuMesh>(createCube());
-    renderObject.mTransform = glm::identity<glm::mat4x3>();
 
     {
         d3d12::GraphicsShaderParams shaderParams;

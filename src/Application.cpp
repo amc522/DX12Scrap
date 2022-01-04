@@ -13,6 +13,7 @@
 namespace scrap
 {
 Application::Application()
+    : mApplicationStartTime(std::chrono::steady_clock::now())
 {
     spdlog::info("Starting application");
 
@@ -79,6 +80,8 @@ void Application::update()
     mMainWindow->beginFrame();
 
     FrameInfo frameInfo;
+    frameInfo.runtime = now - mApplicationStartTime;
+    frameInfo.runtimeSec = std::chrono::duration_cast<std::chrono::duration<float>>(frameInfo.runtime);
     frameInfo.frameDelta = mFrameDelta;
     frameInfo.frameDeltaSec = std::chrono::duration_cast<std::chrono::duration<float>>(mFrameDelta);
     frameInfo.mainWindow = mMainWindow.get();
