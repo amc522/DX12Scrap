@@ -135,6 +135,6 @@ private:
     EnumArray<ShaderTableStageParams, RaytracingPipelineStage> mParams;
     eastl::vector_set<RefCountedPipelineState> mPipelineStates;
     std::mutex mMutex;
-    EnumArray<GpuBufferWriteGuard<d3d12::Buffer>, RaytracingPipelineStage> mShaderTableBufferMaps;
+    EnumArray<GpuBufferWriteGuard, RaytracingPipelineStage> mShaderTableBufferMaps;
 };
 } // namespace scrap::d3d12

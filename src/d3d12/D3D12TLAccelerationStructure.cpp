@@ -95,7 +95,7 @@ bool TLAccelerationStructure::build(const GraphicsCommandList& commandList)
     else if(mIsDirty)
     {
         {
-            GpuBufferWriteGuard<Buffer> writeGuard(*mInstanceDescsGpuBuffer, commandList.get());
+            GpuBufferWriteGuard writeGuard(*mInstanceDescsGpuBuffer, commandList.get());
             auto writeBuffer = writeGuard.getWriteBufferAs<D3D12_RAYTRACING_INSTANCE_DESC>();
 
             std::copy(mInstanceDescs.cbegin(), mInstanceDescs.cend(), writeBuffer.begin());

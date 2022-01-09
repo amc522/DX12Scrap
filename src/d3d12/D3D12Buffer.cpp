@@ -251,7 +251,7 @@ std::optional<BufferError> Buffer::initInternal(Params params, std::span<const s
     D3D12_RESOURCE_DESC textureUploadDesc = {};
     textureUploadDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
     textureUploadDesc.Alignment = allocInfo.Alignment;
-    textureUploadDesc.Width = allocInfo.SizeInBytes;
+    textureUploadDesc.Width = params.byteSize;
     textureUploadDesc.Height = 1;
     textureUploadDesc.DepthOrArraySize = 1;
     textureUploadDesc.MipLevels = 1;

@@ -67,7 +67,7 @@ ShaderTable::addPipelineState(std::shared_ptr<RaytracingPipelineState> pipelineS
 
         if(!result) { return tl::make_unexpected(Error::InsufficientSpace); }
 
-        GpuBufferWriteGuard<Buffer> stageTableWriteGuard{*stageShaderTable.shaderTableBuffer, commandList};
+        GpuBufferWriteGuard stageTableWriteGuard{*stageShaderTable.shaderTableBuffer, commandList};
         auto writeBuffer = stageTableWriteGuard.getWriteBuffer();
         writeBuffer = writeBuffer.subspan(result->getRange().start * mParams[stage].entryByteStride,
                                           RaytracingShaderIdentifier::kByteSize + stageArguments.size_bytes());
@@ -128,7 +128,7 @@ void ShaderTable::beginUpdate(GraphicsCommandList& commandList)
     for(auto stage : enumerate<RaytracingPipelineStage>())
     {
         mShaderTableBufferMaps[stage] =
-            GpuBufferWriteGuard<Buffer>(*mShaderTables[stage].shaderTableBuffer, commandList.get());
+            GpuBufferWriteGuard(*mShaderTables[stage].shaderTableBuffer, commandList.get());
     }
 }
 

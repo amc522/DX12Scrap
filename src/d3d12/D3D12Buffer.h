@@ -3,6 +3,7 @@
 #include "RenderDefs.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
 #include "d3d12/D3D12TrackedGpuObject.h"
+#include "d3d12/D3D12GpuWriteGuard.h"
 
 #include <optional>
 #include <span>
@@ -192,59 +193,5 @@ private:
     bool mInitialized = false;
 };
 
-template<class T>
-class GpuBufferWriteGuard
-{
-public:
-    GpuBufferWriteGuard() = default;
-    GpuBufferWriteGuard(T& gpuBuffer, ID3D12GraphicsCommandList* commandList)
-        : mGpuBuffer(&gpuBuffer)
-        , mCommandList(commandList)
-    {
-        mWriteBuffer = mGpuBuffer->map();
-    }
-
-    GpuBufferWriteGuard(const GpuBufferWriteGuard<T>&) = delete;
-    GpuBufferWriteGuard(GpuBufferWriteGuard<T>&& other)
-        : mGpuBuffer(other.mGpuBuffer)
-        , mCommandList(other.mCommandList)
-        , mWriteBuffer(std::move(other.mWriteBuffer))
-    {
-        other.mGpuBuffer = nullptr;
-        other.mCommandList = nullptr;
-    }
-
-    ~GpuBufferWriteGuard()
-    {
-        if(mGpuBuffer != nullptr) { mGpuBuffer->unmap(mCommandList); }
-    }
-
-    GpuBufferWriteGuard& operator=(const GpuBufferWriteGuard<T>&) = delete;
-    GpuBufferWriteGuard& operator=(GpuBufferWriteGuard<T>&& other)
-    {
-        if(mGpuBuffer != nullptr) { mGpuBuffer->unmap(mCommandList); }
-        mGpuBuffer = other.mGpuBuffer;
-        other.mGpuBuffer = nullptr;
-
-        mCommandList = other.mCommandList;
-        other.mCommandList = nullptr;
-
-        mWriteBuffer = std::move(other.mWriteBuffer);
-
-        return *this;
-    }
-
-    std::span<std::byte> getWriteBuffer() { return mWriteBuffer; }
-
-    template<class U>
-    std::span<U> getWriteBufferAs()
-    {
-        return std::span<U>(reinterpret_cast<U*>(mWriteBuffer.data()), mWriteBuffer.size_bytes() / sizeof(U));
-    }
-
-private:
-    T* mGpuBuffer = nullptr;
-    ID3D12GraphicsCommandList* mCommandList = nullptr;
-    std::span<std::byte> mWriteBuffer;
-};
+using GpuBufferWriteGuard = GpuWriteGuard<Buffer>;
 } // namespace scrap::d3d12

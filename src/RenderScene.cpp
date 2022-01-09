@@ -228,7 +228,7 @@ void RasterRenderer::preRender(const FrameInfo& frameInfo, const RenderParams& r
     mCommandList.beginRecording();
 
     {
-        d3d12::GpuBufferWriteGuard<d3d12::Buffer> writeGuard(*mFrameConstantBuffer, mCommandList.get());
+        d3d12::GpuBufferWriteGuard writeGuard(*mFrameConstantBuffer, mCommandList.get());
         auto& frameConstantBuffer = writeGuard.getWriteBufferAs<FrameConstantBuffer>().front();
         frameConstantBuffer = renderParams.frameConstants;
         frameConstantBuffer.worldToView = glm::transpose(frameConstantBuffer.worldToView);
@@ -327,7 +327,7 @@ void RasterRenderer::render(const FrameInfo& frameInfo, const RenderParams& rend
                                                    static_cast<glm::mat4x4>(transformMat)),
                     .clipToObject = glm::inverse(objectConstants.objectToClip)};
 
-                d3d12::GpuBufferWriteGuard<d3d12::Buffer> objectCbWriteGuard(*mObjectConstantBuffer,
+                d3d12::GpuBufferWriteGuard objectCbWriteGuard(*mObjectConstantBuffer,
                                                                              mCommandList.get());
                 objectCbWriteGuard.getWriteBufferAs<ObjectConstantBuffer>().front() = objectConstants;
             }
@@ -425,7 +425,7 @@ void RaytracingRenderer::preRender(const FrameInfo& frameInfo, const RenderParam
     {
         d3d12::ScopedGpuEvent gpuEvent(mCommandList.get(), "Update Constant Buffers");
 
-        d3d12::GpuBufferWriteGuard<d3d12::Buffer> writeGuard(*mFrameConstantBuffer, mCommandList.get());
+        d3d12::GpuBufferWriteGuard writeGuard(*mFrameConstantBuffer, mCommandList.get());
         auto& frameConstantBuffer = writeGuard.getWriteBufferAs<FrameConstantBuffer>().front();
         frameConstantBuffer = renderParams.frameConstants;
         frameConstantBuffer.worldToView = glm::transpose(frameConstantBuffer.worldToView);
