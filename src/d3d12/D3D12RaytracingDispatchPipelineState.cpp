@@ -20,6 +20,8 @@ void RaytracingDispatchPipelineState::init(RaytracingDispatchPipelineStateParams
 
 void RaytracingDispatchPipelineState::addPipelineState(std::shared_ptr<RaytracingPipelineState> pipelineState)
 {
+    if(mPipelineStates.find(pipelineState) != mPipelineStates.end()) { return; }
+
     {
         std::span stateSubObjects = pipelineState->getStateSubObjects();
         mTempStateSubObjects.resize(stateSubObjects.size() + 3);
@@ -33,13 +35,14 @@ void RaytracingDispatchPipelineState::addPipelineState(std::shared_ptr<Raytracin
 
             auto& destSubObject = mTempStateSubObjects[i];
 
-            const auto* sourceDesc =
-                reinterpret_cast<const D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION*>(sourceSubObject.pDesc);
-            auto subObjectIndex = (sourceDesc->pSubobjectToAssociate - &stateSubObjects[0]);
+            const D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION& sourceDesc =
+                *reinterpret_cast<const D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION*>(sourceSubObject.pDesc);
+            const auto subObjectIndex = (sourceDesc.pSubobjectToAssociate - &stateSubObjects[0]);
 
-            auto* destDesc =
-                reinterpret_cast<D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION*>(const_cast<void*>(destSubObject.pDesc));
-            destDesc->pSubobjectToAssociate = &mTempStateSubObjects[subObjectIndex];
+            auto& destDesc = mTempExportsAssociations.emplace_back(sourceDesc);
+            destDesc.pSubobjectToAssociate = &mTempStateSubObjects[subObjectIndex];
+
+            destSubObject.pDesc = &destDesc;
         }
     }
 
@@ -87,6 +90,11 @@ void RaytracingDispatchPipelineState::addPipelineState(std::shared_ptr<Raytracin
         hr = d3d12::DeviceContext::instance().getDevice7()->CreateStateObject(&stateObjectDesc,
                                                                               IID_PPV_ARGS(&stateObject));
     }
+
+    mPipelineStates.insert(pipelineState);
+
+    mTempStateSubObjects.clear();
+    mTempExportsAssociations.clear();
 
     if(FAILED(hr)) { return; }
 

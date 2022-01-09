@@ -2,6 +2,7 @@
 
 #include "d3d12/D3D12Fwd.h"
 #include "d3d12/D3D12TrackedGpuObject.h"
+#include "EASTL/vector_set.h"
 
 #include <d3d12.h>
 #include <wrl/client.h>
@@ -37,8 +38,10 @@ public:
 
 private:
     std::vector<D3D12_STATE_SUBOBJECT> mTempStateSubObjects;
+    std::vector<D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION> mTempExportsAssociations;
     TrackedGpuObject<ID3D12RootSignature> mGlobalRootSignature;
     TrackedGpuObject<ID3D12StateObject> mStateObject;
+    eastl::vector_set<std::shared_ptr<RaytracingPipelineState>> mPipelineStates;
     uint32_t mMaxPayloadByteSize = 0;
     uint32_t mMaxAttributeByteSize = 0;
 };
