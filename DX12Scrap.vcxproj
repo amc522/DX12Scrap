@@ -43,6 +43,7 @@
     <ClCompile Include="src\d3d12\D3D12GraphicsShader.cpp" />
     <ClCompile Include="src\d3d12\D3D12TLAccelerationStructure.cpp" />
     <ClCompile Include="src\d3d12\D3D12TrackedGpuObject.cpp" />
+    <ClCompile Include="src\d3d12\D3D12UploadBufferPool.cpp" />
     <ClCompile Include="src\FormattedBuffer.cpp" />
     <ClCompile Include="src\FreeBlockTracker.cpp" />
     <ClCompile Include="src\GpuMesh.cpp" />
@@ -71,6 +72,7 @@
     <ClInclude Include="src\d3d12\D3D12Command.h" />
     <ClInclude Include="src\d3d12\D3D12FixedDescriptorHeap.h" />
     <ClInclude Include="src\d3d12\D3D12Fwd.h" />
+    <ClInclude Include="src\d3d12\D3D12GpuWriteGuard.h" />
     <ClInclude Include="src\d3d12\D3D12GraphicsContext.h" />
     <ClInclude Include="src\d3d12\D3D12MonotonicDescriptorHeap.h" />
     <ClInclude Include="src\d3d12\D3D12GraphicsPipelineState.h" />
@@ -86,6 +88,7 @@
     <ClInclude Include="src\d3d12\D3D12TLAccelerationStructure.h" />
     <ClInclude Include="src\d3d12\D3D12TrackedGpuObject.h" />
     <ClInclude Include="src\d3d12\D3D12Translations.h" />
+    <ClInclude Include="src\d3d12\D3D12UploadBufferPool.h" />
     <ClInclude Include="src\d3d12\D3D12VertexBuffer.h" />
     <ClInclude Include="src\EastlFixedVectorExt.h" />
     <ClInclude Include="src\EnumArray.h" />

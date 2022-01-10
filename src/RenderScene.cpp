@@ -310,6 +310,8 @@ void RasterRenderer::render(const FrameInfo& frameInfo, const RenderParams& rend
         mCommandList.get()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
         mCommandList.get()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
+        auto& uploadBufferPool = d3d12::DeviceContext::instance().getGraphicsContext().getUploadBufferPool();
+
         for(RenderObject& renderObject : renderParams.renderObjects)
         {
             bindTextures(renderObject.mMaterial);
@@ -327,9 +329,10 @@ void RasterRenderer::render(const FrameInfo& frameInfo, const RenderParams& rend
                                                    static_cast<glm::mat4x4>(transformMat)),
                     .clipToObject = glm::inverse(objectConstants.objectToClip)};
 
-                d3d12::GpuBufferWriteGuard objectCbWriteGuard(*mObjectConstantBuffer,
-                                                                             mCommandList.get());
-                objectCbWriteGuard.getWriteBufferAs<ObjectConstantBuffer>().front() = objectConstants;
+                d3d12::UploadBufferMap bufferMap = uploadBufferPool.map(sizeof(ObjectConstantBuffer));
+                std::memcpy(bufferMap.writeBuffer.data(), &objectConstants, sizeof(objectConstants));
+                d3d12::UploadBufferCopyData copyData = uploadBufferPool.unmap(bufferMap);
+                mCommandList.get()->CopyBufferRegion(mObjectConstantBuffer->getResource(), 0, copyData.buffer, copyData.byteOffset, copyData.byteSize);
             }
 
             d3d12::drawIndexed(mCommandList, d3d12::DrawIndexedParams{

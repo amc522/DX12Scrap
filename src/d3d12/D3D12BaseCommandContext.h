@@ -4,6 +4,7 @@
 #include "d3d12/D3D12Debug.h"
 #include "d3d12/D3D12FixedDescriptorHeap.h"
 #include "d3d12/D3D12FrameCodes.h"
+#include "d3d12/D3D12UploadBufferPool.h"
 
 #include <array>
 #include <cstdint>
@@ -22,13 +23,18 @@ template<class FrameCodeT>
 class BaseCommandContext
 {
 public:
-    BaseCommandContext(std::string_view debugName): mDebugName(debugName) {}
+    BaseCommandContext(std::string_view debugName): mDebugName(debugName) 
+    {
+        mUploadBufferPool.init();
+    }
 
     virtual ~BaseCommandContext()
     {
         waitOnGpu();
         if(mFenceEvent != nullptr) { CloseHandle(mFenceEvent); }
     }
+
+    UploadBufferPool& getUploadBufferPool() { return mUploadBufferPool; }
 
     void queueObjectForDestruction(Microsoft::WRL::ComPtr<ID3D12DeviceChild> deviceChild, FrameCodeT lastUsedFrameCode)
     {
@@ -203,5 +209,7 @@ protected:
 
     std::mutex mPendingFreeListMutex;
     std::vector<PendingFreeObject> mPendingFreeList;
+
+    UploadBufferPool mUploadBufferPool;
 };
 } // namespace scrap::d3d12
