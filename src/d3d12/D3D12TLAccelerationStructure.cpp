@@ -45,7 +45,7 @@ TLAccelerationStructure::addInstance(const TLAccelerationStructureInstanceParams
     instanceDesc.AccelerationStructure =
         params.accelerationStructure->getBuffer().getResource()->GetGPUVirtualAddress();
     instanceDesc.Flags = flags;
-    instanceDesc.InstanceContributionToHitGroupIndex = params.instanceContributionToHitGroupIndex;
+    instanceDesc.InstanceContributionToHitGroupIndex = params.instanceId + params.instanceContributionToHitGroupIndex;
     instanceDesc.InstanceID = params.instanceId;
     instanceDesc.InstanceMask = params.instanceMask;
     std::memcpy(instanceDesc.Transform, glm::value_ptr(transposedTransform), sizeof(instanceDesc.Transform));

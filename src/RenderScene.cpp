@@ -850,7 +850,7 @@ RaytracingRenderer::createPipelineState(d3d12::RaytracingShaderParams&& shaderPa
 bool RaytracingRenderer::buildAccelerationStructures()
 {
     d3d12::TLAccelerationStructureParams tlasParams;
-    tlasParams.initialReservedObjects = 1;
+    tlasParams.initialReservedObjects = 512;
     tlasParams.buildOption = d3d12::AccelerationStructureBuildOption::FastTrace;
     tlasParams.flags = d3d12::AccelerationStructureFlags::AllowUpdates;
     tlasParams.instanceDescs.accessFlags = ResourceAccessFlags::None;
@@ -875,7 +875,7 @@ bool RaytracingRenderer::buildShaderTables()
     params.raygen.capacity = 1;
     params.hitGroup.entryByteStride =
         sizeof(uint32_t) * (d3d12::kMaxBindlessVertexBuffers + d3d12::kMaxBindlessResources);
-    params.hitGroup.capacity = 1;
+    params.hitGroup.capacity = mTlas->getCapacity();
     params.miss.entryByteStride = 0;
     params.miss.capacity = 1;
     params.name = "Shader Table";

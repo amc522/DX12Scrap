@@ -99,6 +99,8 @@ public:
 
     bool isReady() const;
 
+    size_t getCapacity() const { return mParams.initialReservedObjects; }
+
 private:
     bool doesInstanceDescsNeedResize(uint32_t newCapacity);
     void resizeInstanceDescsBuffer(uint32_t capacity);
