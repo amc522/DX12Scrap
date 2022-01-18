@@ -26,7 +26,7 @@ void Mouse::beginFrame()
     }
 
     mDistance = 0.0f;
-
+    mScrollDelta = 0;
     mLastPosition = mPosition;
 }
 
@@ -48,8 +48,6 @@ void Mouse::handleEvent(const SDL_MouseButtonEvent& mouseButtonEvent)
         mouseButtonState->clicks = mouseButtonEvent.clicks;
         mouseButtonState->down = false;
         break;
-
-    case SDL_MOUSEWHEEL: break;
     }
 }
 
@@ -70,5 +68,8 @@ void Mouse::handleEvent(const SDL_MouseMotionEvent& mouseMotionEvent)
     }
 }
 
-void Mouse::handleEvent(const SDL_MouseWheelEvent& sdlEvent) {}
+void Mouse::handleEvent(const SDL_MouseWheelEvent& mouseWheelEvent)
+{
+    mScrollDelta = (mouseWheelEvent.direction == SDL_MOUSEWHEEL_NORMAL) ? mouseWheelEvent.y : -mouseWheelEvent.y;
+}
 } // namespace scrap

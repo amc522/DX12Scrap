@@ -118,6 +118,9 @@
     <ClCompile Include="src\d3d12\D3D12UploadBufferPool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\CameraController.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application.h">
@@ -281,6 +284,9 @@
     </ClInclude>
     <ClInclude Include="src\d3d12\D3D12UploadBufferPool.h">
       <Filter>Source Files\d3d12</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CameraController.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

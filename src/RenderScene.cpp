@@ -928,13 +928,13 @@ void RenderScene::preRender(const FrameInfo& frameInfo)
 
     {
         FrameConstantBuffer& frameCb = mRenderParams.frameConstants;
-        frameCb.worldToView = mCamera.worldToViewMatrix();
+        frameCb.worldToView = mCamera.getCamera().worldToViewMatrix();
         frameCb.viewToWorld = glm::inverse(frameCb.worldToView);
         frameCb.viewToClip = glm::perspectiveFovLH_ZO(1.04719f, (float)windowSize.x, (float)windowSize.y, 0.1f, 100.0f);
         frameCb.clipToView = glm::inverse(frameCb.viewToClip);
         frameCb.worldToClip = frameCb.viewToClip * frameCb.worldToView;
         frameCb.clipToWorld = glm::inverse(frameCb.worldToClip);
-        frameCb.cameraWorldPos = mCamera.getPosition();
+        frameCb.cameraWorldPos = mCamera.getCamera().getPosition();
         frameCb.time = frameInfo.runtimeSec.count();
         frameCb.frameTimeDelta = frameInfo.frameDeltaSec.count();
     }

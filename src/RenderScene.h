@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "Camera.h"
+#include "CameraController.h"
 #include "EnumArray.h"
 #include "GpuMesh.h"
 #include "RenderObject.h"
@@ -172,7 +172,7 @@ private:
 
     bool createRenderObject();
 
-    Camera mCamera;
+    CameraController mCamera;
     std::unique_ptr<RasterRenderer> mRasterScene;
     std::unique_ptr<RaytracingRenderer> mRaytraceScene;
     Scene mActiveScene = Scene::Raytracing;

@@ -1,41 +1,23 @@
 #include "Camera.h"
 
-#include "FrameInfo.h"
-#include "GlmStrings.h"
-#include "Keyboard.h"
-#include "Mouse.h"
-#include "Window.h"
-
 #include <glm/glm.hpp>
-#include <spdlog/spdlog.h>
 
 namespace scrap
 {
-void Camera::update(const FrameInfo& frameInfo)
+void Camera::move(glm::vec3 direction, float amount)
 {
-    const Keyboard& keyboard = frameInfo.mainWindow->getKeyboard();
-    const Mouse& mouse = frameInfo.mainWindow->getMouse();
+    move(direction * amount);
+}
 
-    const float speed =
-        (keyboard.getKeyState(SDLK_LSHIFT).down) ? 10.0f * mMovementSpeed_m_per_sec : mMovementSpeed_m_per_sec;
-    float translationRate = frameInfo.frameDeltaSec.count() * speed;
+void Camera::move(glm::vec3 amount)
+{
+    mPosition += amount;
+}
 
-    if(keyboard.getKeyState(SDLK_w).down) { mPosition += getForward() * translationRate; }
-    if(keyboard.getKeyState(SDLK_s).down) { mPosition += -getForward() * translationRate; }
-    if(keyboard.getKeyState(SDLK_a).down) { mPosition += -getRight() * translationRate; }
-    if(keyboard.getKeyState(SDLK_d).down) { mPosition += getRight() * translationRate; }
-    if(keyboard.getKeyState(SDLK_q).down) { mPosition += glm::vec3(0.0f, -1.0f, 0.0f) * translationRate; }
-    if(keyboard.getKeyState(SDLK_e).down) { mPosition += glm::vec3(0.0f, 1.0f, 0.0f) * translationRate; }
-
-    if(mouse.isButtonDown(MouseButton::Right))
-    {
-        const float rotationRate = mRotationSpeed_rad_per_sec * frameInfo.frameDeltaSec.count();
-        mYaw += rotationRate * mouse.getDelta().x;
-        mPitch = glm::clamp(mPitch + rotationRate * -mouse.getDelta().y, -glm::half_pi<float>(), glm::half_pi<float>());
-
-        // a camera without gimble lock
-        // storedRotationQuat = yawDeltaQuat * storedRotationQuat * pitchDeltaQuat
-    }
+void Camera::look(float yawRad, float pitchRad)
+{
+    mYaw += yawRad;
+    mPitch += pitchRad;
 }
 
 glm::mat4x4 Camera::worldToViewMatrix() const

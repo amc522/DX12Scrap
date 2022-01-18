@@ -12,7 +12,9 @@ struct FrameInfo;
 class Camera
 {
 public:
-    void update(const FrameInfo& frameInfo);
+    void move(glm::vec3 direction, float amount);
+    void move(glm::vec3 amount);
+    void look(float yawRad, float pitchRad);
 
     glm::mat4x4 worldToViewMatrix() const;
 
@@ -23,9 +25,6 @@ public:
     glm::vec3 getUp() const;
     glm::vec3 getRight() const;
 
-    void setMovementSpeed(float metersPerSecond) { mMovementSpeed_m_per_sec = metersPerSecond; }
-    void setRotationSpeed(float radiansPerSecond) { mRotationSpeed_rad_per_sec = radiansPerSecond; }
-
     const glm::vec3 getPosition() const { return mPosition; }
     void setPosition(glm::vec3 position) { mPosition = position; }
 
@@ -35,7 +34,5 @@ private:
     // store the yaw and pitch separately so the pitch can be clamped.
     float mYaw = 0.0f;
     float mPitch = 0.0f;
-    float mMovementSpeed_m_per_sec = 1.0f;
-    float mRotationSpeed_rad_per_sec = 0.1f;
 };
 } // namespace scrap

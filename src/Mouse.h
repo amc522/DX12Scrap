@@ -41,6 +41,8 @@ public:
     glm::ivec2 getDelta() const { return mPosition - mLastPosition; }
     float getDistanceTravelled() const { return mDistance; }
 
+    int getScrollDelta() const { return mScrollDelta; }
+
     const MouseButtonState& getButtonState(MouseButton button) const { return mMouseButtonStates[(size_t)button]; }
     bool isButtonDown(MouseButton button) const { return mMouseButtonStates[(size_t)button].down; }
 
@@ -53,6 +55,7 @@ private:
     glm::ivec2 mPosition;
     glm::ivec2 mLastPosition;
     float mDistance = 0.0f;
+    int mScrollDelta = 0;
     bool mLastPositionSet = false;
 };
 } // namespace scrap
