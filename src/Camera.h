@@ -1,9 +1,9 @@
 #pragma once
 
-#include <glm/ext/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <glm/mat3x3.hpp>
 #include <glm/mat4x4.hpp>
-#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
 
 namespace scrap
 {
@@ -15,6 +15,9 @@ public:
     void update(const FrameInfo& frameInfo);
 
     glm::mat4x4 worldToViewMatrix() const;
+
+    glm::quat getRotationQuat() const;
+    glm::mat3 getRotationMat3() const;
 
     glm::vec3 getForward() const;
     glm::vec3 getUp() const;
@@ -28,7 +31,10 @@ public:
 
 private:
     glm::vec3 mPosition{0.0f, 0.0f, 0.0f};
-    glm::mat3 mRotation{glm::identity<glm::mat3>()};
+
+    // store the yaw and pitch separately so the pitch can be clamped.
+    float mYaw = 0.0f;
+    float mPitch = 0.0f;
     float mMovementSpeed_m_per_sec = 1.0f;
     float mRotationSpeed_rad_per_sec = 0.1f;
 };
